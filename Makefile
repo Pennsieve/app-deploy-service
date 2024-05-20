@@ -2,8 +2,7 @@
 
 LAMBDA_BUCKET ?= "pennsieve-cc-lambda-functions-use1"
 WORKING_DIR   ?= "$(shell pwd)"
-# TODO replace template-serverless-service
-SERVICE_NAME  ?= "template-serverless-service"
+SERVICE_NAME ?= "app-deploy-service"
 PACKAGE_NAME  ?= "${SERVICE_NAME}-${IMAGE_TAG}.zip"
 
 .DEFAULT: help
@@ -49,6 +48,16 @@ package:
   		env GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/service/bootstrap; \
 		cd $(WORKING_DIR)/lambda/bin/service/ ; \
 			zip -r $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) .
+	@echo ""
+	@echo "***********************"
+	@echo "*   Building Fargate   *"
+	@echo "***********************"
+	@echo ""
+	cd $(WORKING_DIR)/fargate/app-provisioner; \
+		docker build -t pennsieve/app-deployer:${IMAGE_TAG} . ;\
+		docker push pennsieve/app-deployer:${IMAGE_TAG} ;\
+
+	@echo "Done"		
 
 # Copy Service lambda to S3 location
 publish:
@@ -58,7 +67,10 @@ publish:
 	@echo "*   Publishing lambda   *"
 	@echo "*************************"
 	@echo ""
-	aws s3 cp $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) s3://$(LAMBDA_BUCKET)/$(SERVICE_NAME)/
+	@echo "starting cp"
+	ls $(WORKING_DIR)/lambda/bin/service/
+	aws s3 cp $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) s3://$(LAMBDA_BUCKET)/$(SERVICE_NAME)/ --output json
+	@echo "done cp"
 	rm -rf $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) $(WORKING_DIR)/lambda/bin/service/bootstrap
 
 # Run go mod tidy on modules

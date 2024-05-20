@@ -19,3 +19,23 @@
 
 # Lambda Binaries Zip files
 lambda/bin
+.DS_Store
+fargate/app-provisioner/env.dev
+fargate/app-provisioner/terraform/s3-backend/.terraform.lock.hcl
+fargate/app-provisioner/terraform/s3-backend/error.log
+fargate/app-provisioner/terraform/s3-backend/s3backend.tfvars
+fargate/app-provisioner/terraform/s3-backend/terraform.tfstate
+fargate/app-provisioner/terraform/s3-backend/tfplan
+fargate/app-provisioner/terraform/s3-backend/.terraform/providers/registry.terraform.io/hashicorp/aws/5.46.0/linux_arm64/terraform-provider-aws_v5.46.0_x5
+fargate/app-provisioner/terraform/infrastructure/.terraform.lock.hcl
+fargate/app-provisioner/terraform/infrastructure/error.log
+fargate/app-provisioner/terraform/infrastructure/application.tfbackend
+fargate/app-provisioner/terraform/infrastructure/application.tfvars
+fargate/app-provisioner/terraform/infrastructure/.terraform/terraform.tfstate
+fargate/app-provisioner/terraform/infrastructure/.terraform/providers/registry.terraform.io/hashicorp/archive/2.4.2/linux_arm64/terraform-provider-archive_v2.4.2_x5
+fargate/app-provisioner/terraform/infrastructure/.terraform/providers/registry.terraform.io/hashicorp/aws/5.46.0/linux_arm64/terraform-provider-aws_v5.46.0_x5
+fargate/app-provisioner/terraform/infrastructure/app-gateway-lambda.zip
+fargate/app-provisioner/terraform/infrastructure/tfplan
+fargate/app-provisioner/terraform/infrastructure/.terraform/providers/registry.terraform.io/hashicorp/aws/5.47.0/linux_arm64/terraform-provider-aws_v5.47.0_x5
+fargate/app-provisioner/terraform/infrastructure/outputs.json
+fargate/app-provisioner/env.dev

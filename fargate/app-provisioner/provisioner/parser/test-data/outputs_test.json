@@ -1,0 +1,7 @@
+{
+  "app_ecr_repository": {
+    "sensitive": false,
+    "type": "string",
+    "value": "some-account-url/app"
+  }
+}
