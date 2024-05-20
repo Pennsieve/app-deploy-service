@@ -23,11 +23,12 @@ type AWSProvisioner struct {
 	BackendExists bool
 	Action        string
 	Env           string
+	GitUrl        string
 }
 
-func NewAWSProvisioner(iamClient *iam.Client, stsClient *sts.Client, accountId string, action string, env string) provisioner.Provisioner {
+func NewAWSProvisioner(iamClient *iam.Client, stsClient *sts.Client, accountId string, action string, env string, gitUrl string) provisioner.Provisioner {
 	return &AWSProvisioner{IAMClient: iamClient, STSClient: stsClient,
-		AccountId: accountId, Action: action, Env: env}
+		AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl}
 }
 
 func (p *AWSProvisioner) Run(ctx context.Context) error {
@@ -98,7 +99,7 @@ func (p *AWSProvisioner) create(ctx context.Context) error {
 
 	// create infrastructure
 	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/infrastructure.sh",
-		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken)
+		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl)
 	out, err := cmd.Output()
 	if err != nil {
 		return err
@@ -116,7 +117,7 @@ func (p *AWSProvisioner) delete(ctx context.Context) error {
 		return err
 	}
 	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/destroy-infrastructure.sh",
-		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken)
+		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl)
 	out, err := cmd.Output()
 	if err != nil {
 		return err

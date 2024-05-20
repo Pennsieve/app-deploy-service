@@ -54,8 +54,8 @@ package:
 	@echo "***********************"
 	@echo ""
 	cd $(WORKING_DIR)/fargate/app-provisioner; \
-		docker build -t pennsieve/app-deployer:${IMAGE_TAG} . ;\
-		docker push pennsieve/app-deployer:${IMAGE_TAG} ;\
+		docker build -t pennsieve/app-provisioner:${IMAGE_TAG} . ;\
+		docker push pennsieve/app-provisioner:${IMAGE_TAG} ;\
 
 	@echo "Done"		
 

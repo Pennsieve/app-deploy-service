@@ -14,6 +14,7 @@ import (
 	aws "github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/aws"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/parser"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/store_dynamodb"
+	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/utils"
 )
 
 func main() {
@@ -21,15 +22,26 @@ func main() {
 	ctx := context.Background()
 
 	applicationId := os.Getenv("APPLICATION_ID")
+	applicationType := os.Getenv("APPLICATION_TYPE")
+
 	action := os.Getenv("ACTION")
 
 	accountUuid := os.Getenv("ACCOUNT_UUID")
 	accountId := os.Getenv("ACCOUNT_ID")
+	accountType := os.Getenv("ACCOUNT_TYPE")
+
 	organizationId := os.Getenv("ORG_ID")
 	userId := os.Getenv("USER_ID")
 	env := os.Getenv("ENV")
-	applicationName := os.Getenv("NODE_NAME")
-	applicationDescription := os.Getenv("NODE_DESCRIPTION")
+
+	applicationName := os.Getenv("APPLICATION_NAME")
+	applicationDescription := os.Getenv("APPLICATION_DESCRIPTION")
+
+	sourceUrl := os.Getenv("SOURCE_URL")
+	sourceType := os.Getenv("SOURCE_TYPE")
+
+	computeNodeUuid := os.Getenv("COMPUTE_NODE_UUID")
+	computeNodeEfsId := os.Getenv("COMPUTE_NODE_EFS_ID")
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 
@@ -40,7 +52,7 @@ func main() {
 	}
 
 	provisioner := aws.NewAWSProvisioner(iam.NewFromConfig(cfg), sts.NewFromConfig(cfg),
-		accountId, action, env)
+		accountId, action, env, utils.ExtractGitUrl(sourceUrl))
 	err = provisioner.Run(ctx)
 	if err != nil {
 		log.Fatal("error running provisioner", err.Error())
@@ -60,32 +72,36 @@ func main() {
 		dynamoDBClient := dynamodb.NewFromConfig(cfg)
 		applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 
-		applications, err := applicationsStore.Get(ctx, accountUuid, env)
+		applications, err := applicationsStore.Get(ctx, computeNodeUuid, sourceUrl)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		if len(applications) > 1 {
-			log.Fatal("expected only one application entry")
-		}
 		if len(applications) == 1 {
-			log.Fatalf("application with env: %s already exists",
-				applications[0].Env)
-
+			log.Fatalf("application with env: %s already exists", applications[0].Env)
 		}
 
 		id := uuid.New()
 		applicationId := id.String()
-		store_nodes := store_dynamodb.Application{
-			Uuid:           applicationId,
-			Name:           applicationName,
-			Description:    applicationDescription,
-			AppEcrUrl:      outputs.AppEcrUrl.Value,
-			Env:            env,
-			OrganizationId: organizationId,
-			UserId:         userId,
-			CreatedAt:      time.Now().UTC().String(),
+		store_applications := store_dynamodb.Application{
+			Uuid:             applicationId,
+			Name:             applicationName,
+			Description:      applicationDescription,
+			ApplicationType:  applicationType,
+			AccountUuid:      accountUuid,
+			AccountId:        accountId,
+			AccountType:      accountType,
+			ComputeNodeUuid:  computeNodeUuid,
+			ComputeNodeEfsId: computeNodeEfsId,
+			SourceType:       sourceType,
+			SourceUrl:        sourceUrl,
+			DestinationType:  "ecr",
+			DestinationUrl:   outputs.AppEcrUrl.Value,
+			Env:              env,
+			OrganizationId:   organizationId,
+			UserId:           userId,
+			CreatedAt:        time.Now().UTC().String(),
 		}
-		err = applicationsStore.Insert(ctx, store_nodes)
+		err = applicationsStore.Insert(ctx, store_applications)
 		if err != nil {
 			log.Fatal(err.Error())
 		}

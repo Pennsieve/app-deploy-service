@@ -46,8 +46,10 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 
-	dynamo_store := store_dynamodb.NewNodeDatabaseStore(dynamoDBClient, applicationsTable)
-	_, err = dynamo_store.GetById(ctx, uuid)
+	applicationIdKey := "APPLICATION_ID"
+
+	dynamo_store := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
+	application, err := dynamo_store.GetById(ctx, uuid)
 	if err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
@@ -67,6 +69,16 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 	actionValue := "DELETE"
 	tableKey := "APPLICATIONS_TABLE"
 	tableValue := applicationsTable
+	accountIdKey := "ACCOUNT_ID"
+	accountIdValue := application.AccountId
+	accountTypeKey := "ACCOUNT_TYPE"
+	accountTypeValue := application.AccountType
+	accountUuidKey := "ACCOUNT_UUID"
+	accountUuidValue := application.AccountUuid
+	computeNodeUuidKey := "COMPUTE_NODE_UUID"
+	computeNodeUuidValue := application.ComputeNodeUuid
+	sourceUrlKey := "SOURCE_URL"
+	sourceUrlValue := application.SourceUrl
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -83,6 +95,10 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 				{
 					Name: &TaskDefContainerName,
 					Environment: []types.KeyValuePair{
+						{
+							Name:  &applicationIdKey,
+							Value: &uuid,
+						},
 						{
 							Name:  &envKey,
 							Value: &envValue,
@@ -102,6 +118,26 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 						{
 							Name:  &userIdKey,
 							Value: &userIdValue,
+						},
+						{
+							Name:  &accountIdKey,
+							Value: &accountIdValue,
+						},
+						{
+							Name:  &accountUuidKey,
+							Value: &accountUuidValue,
+						},
+						{
+							Name:  &accountTypeKey,
+							Value: &accountTypeValue,
+						},
+						{
+							Name:  &computeNodeUuidKey,
+							Value: &computeNodeUuidValue,
+						},
+						{
+							Name:  &sourceUrlKey,
+							Value: &sourceUrlValue,
 						},
 					},
 				},

@@ -20,8 +20,8 @@ import (
 
 func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "PostApplicationsHandler"
-	var node models.Application
-	if err := json.Unmarshal([]byte(request.Body), &node); err != nil {
+	var application models.Application
+	if err := json.Unmarshal([]byte(request.Body), &application); err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusInternalServerError,
@@ -30,8 +30,8 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	}
 
 	envValue := os.Getenv("ENV")
-	if node.Env != "" {
-		envValue = node.Env
+	if application.Env != "" {
+		envValue = application.Env
 	}
 
 	TaskDefinitionArn := os.Getenv("TASK_DEF_ARN")
@@ -39,7 +39,6 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	SubNetIds := strings.Split(subIdStr, ",")
 	cluster := os.Getenv("CLUSTER_ARN")
 	SecurityGroup := os.Getenv("SECURITY_GROUP")
-
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
@@ -59,11 +58,11 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	log.Println("Initiating new Provisioning Fargate Task.")
 	envKey := "ENV"
 	accountIdKey := "ACCOUNT_ID"
-	accountIdValue := node.Account.AccountId
+	accountIdValue := application.Account.AccountId
 	accountTypeKey := "ACCOUNT_TYPE"
-	accountTypeValue := node.Account.AccountType
+	accountTypeValue := application.Account.AccountType
 	accountUuidKey := "ACCOUNT_UUID"
-	accountUuidValue := node.Account.Uuid
+	accountUuidValue := application.Account.Uuid
 	organizationIdKey := "ORG_ID"
 	organizationIdValue := organizationId
 	userIdKey := "USER_ID"
@@ -72,11 +71,28 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	actionValue := "CREATE"
 	tableKey := "APPLICATIONS_TABLE"
 	tableValue := os.Getenv("APPLICATIONS_TABLE")
-	nodeNameKey := "NODE_NAME"
-	nodeDescriptionKey := "NODE_DESCRIPTION"
-	nameValue := node.Name
-	descriptionValue := node.Description
-	_ = "GIT_URL"
+	applicationNameKey := "APPLICATION_NAME"
+	applicationDescriptionKey := "APPLICATION_DESCRIPTION"
+	nameValue := application.Name
+	descriptionValue := application.Description
+
+	computeNodeUuidKey := "COMPUTE_NODE_UUID"
+	computeNodeEfsIdKey := "COMPUTE_NODE_EFS_ID"
+	computeNodeUuidValue := application.ComputeNode.Uuid
+	computeNodeEfsIdValue := application.ComputeNode.EfsId
+
+	sourceTypeKey := "SOURCE_TYPE"
+	sourceTypeValue := application.Source.SourceType
+	sourceUrlKey := "SOURCE_URL"
+	sourceUrlValue := application.Source.Url
+
+	destinationTypeKey := "DESTINATION_TYPE"
+	destinationTypeValue := application.Destination.DestinationType
+	destinationUrlKey := "DESTINATION_URL"
+	destinationUrlValue := application.Destination.Url
+
+	applicationTypeKey := "APPLICATION_TYPE"
+	applicationTypeValue := application.ApplicationType
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -98,11 +114,11 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 							Value: &envValue,
 						},
 						{
-							Name:  &nodeNameKey,
+							Name:  &applicationNameKey,
 							Value: &nameValue,
 						},
 						{
-							Name:  &nodeDescriptionKey,
+							Name:  &applicationDescriptionKey,
 							Value: &descriptionValue,
 						},
 						{
@@ -132,6 +148,34 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 						{
 							Name:  &userIdKey,
 							Value: &userIdValue,
+						},
+						{
+							Name:  &sourceTypeKey,
+							Value: &sourceTypeValue,
+						},
+						{
+							Name:  &sourceUrlKey,
+							Value: &sourceUrlValue,
+						},
+						{
+							Name:  &destinationTypeKey,
+							Value: &destinationTypeValue,
+						},
+						{
+							Name:  &destinationUrlKey,
+							Value: &destinationUrlValue,
+						},
+						{
+							Name:  &computeNodeUuidKey,
+							Value: &computeNodeUuidValue,
+						},
+						{
+							Name:  &computeNodeEfsIdKey,
+							Value: &computeNodeEfsIdValue,
+						},
+						{
+							Name:  &applicationTypeKey,
+							Value: &applicationTypeValue,
 						},
 					},
 				},

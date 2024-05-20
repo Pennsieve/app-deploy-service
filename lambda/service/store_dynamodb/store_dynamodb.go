@@ -11,44 +11,44 @@ import (
 )
 
 type DynamoDBStore interface {
-	GetById(context.Context, string) (App, error)
-	Get(context.Context, string) ([]App, error)
+	GetById(context.Context, string) (Application, error)
+	Get(context.Context, string) ([]Application, error)
 }
 
-type NodeDatabaseStore struct {
+type ApplicationDatabaseStore struct {
 	DB        *dynamodb.Client
 	TableName string
 }
 
-func NewNodeDatabaseStore(db *dynamodb.Client, tableName string) DynamoDBStore {
-	return &NodeDatabaseStore{db, tableName}
+func NewApplicationDatabaseStore(db *dynamodb.Client, tableName string) DynamoDBStore {
+	return &ApplicationDatabaseStore{db, tableName}
 }
-func (r *NodeDatabaseStore) GetById(ctx context.Context, uuid string) (App, error) {
-	node := App{Uuid: uuid}
+func (r *ApplicationDatabaseStore) GetById(ctx context.Context, uuid string) (Application, error) {
+	application := Application{Uuid: uuid}
 	response, err := r.DB.GetItem(ctx, &dynamodb.GetItemInput{
-		Key: node.GetKey(), TableName: aws.String(r.TableName),
+		Key: application.GetKey(), TableName: aws.String(r.TableName),
 	})
 	if err != nil {
-		return App{}, fmt.Errorf("error getting node: %w", err)
+		return Application{}, fmt.Errorf("error getting application: %w", err)
 	}
 	if response.Item == nil {
-		return App{}, nil
+		return Application{}, nil
 	}
 
-	err = attributevalue.UnmarshalMap(response.Item, &node)
+	err = attributevalue.UnmarshalMap(response.Item, &application)
 	if err != nil {
-		return node, fmt.Errorf("error unmarshaling node: %w", err)
+		return application, fmt.Errorf("error unmarshaling application: %w", err)
 	}
 
-	return node, nil
+	return application, nil
 }
 
-func (r *NodeDatabaseStore) Get(ctx context.Context, filter string) ([]App, error) {
-	nodes := []App{}
+func (r *ApplicationDatabaseStore) Get(ctx context.Context, filter string) ([]Application, error) {
+	applications := []Application{}
 	filt := expression.Name("organizationId").Equal((expression.Value(filter)))
 	expr, err := expression.NewBuilder().WithFilter(filt).Build()
 	if err != nil {
-		return nodes, fmt.Errorf("error building expression: %w", err)
+		return applications, fmt.Errorf("error building expression: %w", err)
 	}
 
 	response, err := r.DB.Scan(ctx, &dynamodb.ScanInput{
@@ -59,13 +59,13 @@ func (r *NodeDatabaseStore) Get(ctx context.Context, filter string) ([]App, erro
 		TableName:                 aws.String(r.TableName),
 	})
 	if err != nil {
-		return nodes, fmt.Errorf("error getting nodes: %w", err)
+		return applications, fmt.Errorf("error getting applications: %w", err)
 	}
 
-	err = attributevalue.UnmarshalListOfMaps(response.Items, &nodes)
+	err = attributevalue.UnmarshalListOfMaps(response.Items, &applications)
 	if err != nil {
-		return nodes, fmt.Errorf("error unmarshaling nodes: %w", err)
+		return applications, fmt.Errorf("error unmarshaling applications: %w", err)
 	}
 
-	return nodes, nil
+	return applications, nil
 }

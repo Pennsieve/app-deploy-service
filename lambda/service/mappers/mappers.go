@@ -5,16 +5,35 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 )
 
-func DynamoDBNodeToJsonNode(dynamoNodes []store_dynamodb.App) []models.Application {
+func DynamoDBApplicationToJsonApplication(dynamoApplications []store_dynamodb.Application) []models.Application {
 	applications := []models.Application{}
 
-	for _, c := range dynamoNodes {
+	for _, a := range dynamoApplications {
 		applications = append(applications, models.Application{
-			Uuid:           c.Uuid,
-			AppEcrUrl:      c.AppEcrUrl,
-			CreatedAt:      c.CreatedAt,
-			OrganizationId: c.OrganizationId,
-			UserId:         c.UserId,
+			Uuid:        a.Uuid,
+			Name:        a.Name,
+			Description: a.Description,
+			Account: models.Account{
+				Uuid:        a.AccountUuid,
+				AccountId:   a.AccountId,
+				AccountType: a.AccountType,
+			},
+			ComputeNode: models.ComputeNode{
+				Uuid:  a.ComputeNodeUuid,
+				EfsId: a.ComputeNodeEfsId,
+			},
+			Source: models.Source{
+				SourceType: a.SourceType,
+				Url:        a.SourceUrl,
+			},
+			Destination: models.Destination{
+				DestinationType: a.DestinationType,
+				Url:             a.DestinationUrl,
+			},
+			Env:            a.Env,
+			CreatedAt:      a.CreatedAt,
+			OrganizationId: a.OrganizationId,
+			UserId:         a.UserId,
 		})
 	}
 

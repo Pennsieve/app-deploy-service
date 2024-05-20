@@ -32,8 +32,8 @@ func GetApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTP
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
 	organizationId := claims.OrgClaim.NodeId
 
-	dynamo_store := store_dynamodb.NewNodeDatabaseStore(dynamoDBClient, applicationsTable)
-	dynamoNodes, err := dynamo_store.Get(ctx, organizationId)
+	dynamo_store := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
+	dynamoApplications, err := dynamo_store.Get(ctx, organizationId)
 	if err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
@@ -42,7 +42,7 @@ func GetApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTP
 		}, nil
 	}
 
-	m, err := json.Marshal(mappers.DynamoDBNodeToJsonNode(dynamoNodes))
+	m, err := json.Marshal(mappers.DynamoDBApplicationToJsonApplication(dynamoApplications))
 	if err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{

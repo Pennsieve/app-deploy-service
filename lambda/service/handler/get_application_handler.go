@@ -29,7 +29,7 @@ func GetApplicationHandler(ctx context.Context, request events.APIGatewayV2HTTPR
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 
-	dynamo_store := store_dynamodb.NewNodeDatabaseStore(dynamoDBClient, applicationsTable)
+	dynamo_store := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	application, err := dynamo_store.GetById(ctx, uuid)
 	if err != nil {
 		log.Println(err.Error())
@@ -38,7 +38,7 @@ func GetApplicationHandler(ctx context.Context, request events.APIGatewayV2HTTPR
 			Body:       handlerError(handlerName, ErrDynamoDB),
 		}, nil
 	}
-	if (store_dynamodb.App{}) == application {
+	if (store_dynamodb.Application{}) == application {
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusNotFound,
 			Body:       handlerError(handlerName, ErrNoRecordsFound),
@@ -46,10 +46,28 @@ func GetApplicationHandler(ctx context.Context, request events.APIGatewayV2HTTPR
 	}
 
 	m, err := json.Marshal(models.Application{
-		Uuid:           application.Uuid,
-		Name:           application.Name,
-		Description:    application.Description,
-		AppEcrUrl:      application.AppEcrUrl,
+		Uuid:            application.Uuid,
+		Name:            application.Name,
+		Description:     application.Description,
+		ApplicationType: application.ApplicationType,
+		Account: models.Account{
+			Uuid:        application.AccountUuid,
+			AccountId:   application.AccountId,
+			AccountType: application.AccountType,
+		},
+		ComputeNode: models.ComputeNode{
+			Uuid:  application.ComputeNodeUuid,
+			EfsId: application.ComputeNodeEfsId,
+		},
+		Source: models.Source{
+			SourceType: application.SourceType,
+			Url:        application.SourceUrl,
+		},
+		Destination: models.Destination{
+			DestinationType: application.DestinationType,
+			Url:             application.DestinationUrl,
+		},
+		Env:            application.Env,
 		CreatedAt:      application.CreatedAt,
 		OrganizationId: application.OrganizationId,
 		UserId:         application.UserId,

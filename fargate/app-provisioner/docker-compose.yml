@@ -2,14 +2,14 @@ version: '3.9'
 
 services:
   
-  app-deployer:
+  app-provisioner:
     env_file:
       - env.dev
-    image: pennsieve/app-deployer
+    image: pennsieve/app-provisioner
     volumes:
       - ./terraform:/usr/src/app/terraform
       - $HOME/.aws:/root/.aws:ro
-    container_name: app-deployer
+    container_name: app-provisioner
     build:
       context: .
       dockerfile: ./Dockerfile

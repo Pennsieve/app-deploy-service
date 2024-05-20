@@ -18,17 +18,21 @@ type Application struct {
 	ComputeNodeUuid  string `dynamodbav:"computeNodeUuid"`
 	ComputeNodeEfsId string `dynamodbav:"computeNodeEfsId"`
 
-	SourceType string `dynamodbav:"computeNodeUuid"`
-	SourceUrl  string `dynamodbav:"computeNodeUuid"`
+	SourceType string `dynamodbav:"sourceType"`
+	SourceUrl  string `dynamodbav:"sourceUrl"`
 
-	DestinationType string `dynamodbav:"computeNodeUuid"`
-	DestinationUrl  string `dynamodbav:"computeNodeUuid"`
+	DestinationType string `dynamodbav:"destinationType"`
+	DestinationUrl  string `dynamodbav:"destinationUrl"`
 
 	Env string `dynamodbav:"environment"`
 
 	OrganizationId string `dynamodbav:"organizationId"`
 	UserId         string `dynamodbav:"userId"`
 	CreatedAt      string `dynamodbav:"createdAt"`
+}
+
+type DeleteNode struct {
+	Uuid string `dynamodbav:"uuid"`
 }
 
 func (i Application) GetKey() map[string]types.AttributeValue {
