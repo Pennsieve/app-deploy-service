@@ -2,9 +2,11 @@ package handler
 
 import (
 	"context"
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/pennsieve/template-serverless-service/service/logging"
 	"log/slog"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambdacontext"
+	"github.com/pennsieve/app-deploy-service/service/logging"
 )
 
 var logger = logging.Default
@@ -13,18 +15,24 @@ func init() {
 	logger.Info("init()")
 }
 
-// TODO update Handler function name
-func TemplateServiceHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (*events.APIGatewayV2HTTPResponse, error) {
-	logger = logger.With(slog.String("requestID", request.RequestContext.RequestID))
+func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	if lc, ok := lambdacontext.FromContext(ctx); ok {
+		logger = logger.With(slog.String("requestID", lc.AwsRequestID))
+	}
 
-	apiResponse, err := handleRequest()
+	logger.Info("request parameters",
+		"routeKey", request.RouteKey,
+		"pathParameters", request.PathParameters,
+		"rawPath", request.RawPath,
+		"requestContext.routeKey", request.RequestContext.RouteKey,
+		"requestContext.http.path", request.RequestContext.HTTP.Path)
 
-	return apiResponse, err
-}
+	router := NewLambdaRouter()
+	// register routes based on their supported methods
+	router.POST("/applications", PostApplicationsHandler)
+	router.GET("/applications", GetApplicationsHandler)
+	router.GET("/applications/{id}", GetApplicationHandler)
+	router.DELETE("/applications/{id}", DeleteApplicationHandler)
 
-func handleRequest() (*events.APIGatewayV2HTTPResponse, error) {
-	logger.Info("handleRequest()")
-	apiResponse := events.APIGatewayV2HTTPResponse{Body: "{'response':'hello'}", StatusCode: 200}
-
-	return &apiResponse, nil
+	return router.Start(ctx, request)
 }
