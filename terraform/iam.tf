@@ -132,7 +132,7 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
 }
 
 # Fargate Task
-resource "aws_iam_role" "provisioner_fargate_task_iam_role" {
+resource "aws_iam_role" "app_provisioner_fargate_task_iam_role" {
   name = "${var.environment_name}-${var.service_name}-fargate-task-role-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
   path = "/service-roles/"
 
@@ -153,17 +153,17 @@ EOF
 
 }
 
-resource "aws_iam_role_policy_attachment" "provisioner_fargate_iam_role_policy_attachment" {
-  role       = aws_iam_role.provisioner_fargate_task_iam_role.id
-  policy_arn = aws_iam_policy.provisioner_iam_policy.arn
+resource "aws_iam_role_policy_attachment" "app_provisioner_fargate_iam_role_policy_attachment" {
+  role       = aws_iam_role.app_provisioner_fargate_task_iam_role.id
+  policy_arn = aws_iam_policy.app_provisioner_iam_policy.arn
 }
 
-resource "aws_iam_policy" "provisioner_iam_policy" {
+resource "aws_iam_policy" "app_provisioner_iam_policy" {
   name   = "${var.environment_name}-${var.service_name}-policy-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
-  policy = data.aws_iam_policy_document.provisioner_fargate_iam_policy_document.json
+  policy = data.aws_iam_policy_document.app_provisioner_fargate_iam_policy_document.json
 }
 
-data "aws_iam_policy_document" "provisioner_fargate_iam_policy_document" {
+data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
   statement {
     sid    = "TaskSecretsManagerPermissions"
     effect = "Allow"

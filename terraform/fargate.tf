@@ -1,5 +1,5 @@
 # Render Task Definition JSON
-data "template_file" "provisioner_ecs_task_definition" {
+data "template_file" "app_provisioner_ecs_task_definition" {
   template = file("${path.module}/task_definition.json.tpl")
 
   vars = {
@@ -17,16 +17,16 @@ data "template_file" "provisioner_ecs_task_definition" {
 }
 
 # Create Fargate Task Definition
-resource "aws_ecs_task_definition" "provisioner_ecs_task_definition" {
+resource "aws_ecs_task_definition" "app_provisioner_ecs_task_definition" {
   family                   = "${var.environment_name}-${var.service_name}-${var.tier}-task-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  container_definitions    = data.template_file.provisioner_ecs_task_definition.rendered
+  container_definitions    = data.template_file.app_provisioner_ecs_task_definition.rendered
 
   cpu                = var.task_cpu
   memory             = var.task_memory
-  task_role_arn      = aws_iam_role.provisioner_fargate_task_iam_role.arn
-  execution_role_arn = aws_iam_role.provisioner_fargate_task_iam_role.arn
+  task_role_arn      = aws_iam_role.app_provisioner_fargate_task_iam_role.arn
+  execution_role_arn = aws_iam_role.app_provisioner_fargate_task_iam_role.arn
 
-  depends_on = [data.template_file.provisioner_ecs_task_definition]
+  depends_on = [data.template_file.app_provisioner_ecs_task_definition]
 }

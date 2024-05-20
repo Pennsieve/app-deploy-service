@@ -22,7 +22,7 @@ variable "container_cpu" {
 }
 
 variable "image_url" {
-  default = "pennsieve/provisioner"
+  default = "pennsieve/app-provisioner"
 }
 
 variable "task_memory" {
@@ -34,7 +34,7 @@ variable "task_cpu" {
 }
 
 variable "tier" {
-  default = "provisioner"
+  default = "app-provisioner"
 }
 
 variable "lambda_bucket" {
