@@ -1,6 +1,6 @@
 module github.com/pennsieve/app-deploy-service/service
 
-go 1.22.2
+go 1.21
 
 require (
 	github.com/aws/aws-lambda-go v1.47.0
