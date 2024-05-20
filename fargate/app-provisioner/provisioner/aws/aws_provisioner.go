@@ -17,18 +17,20 @@ import (
 )
 
 type AWSProvisioner struct {
-	IAMClient     *iam.Client
-	STSClient     *sts.Client
-	AccountId     string
-	BackendExists bool
-	Action        string
-	Env           string
-	GitUrl        string
+	IAMClient        *iam.Client
+	STSClient        *sts.Client
+	AccountId        string
+	BackendExists    bool
+	Action           string
+	Env              string
+	GitUrl           string
+	ComputeNodeEfsId string
+	AppSlug          string
 }
 
-func NewAWSProvisioner(iamClient *iam.Client, stsClient *sts.Client, accountId string, action string, env string, gitUrl string) provisioner.Provisioner {
+func NewAWSProvisioner(iamClient *iam.Client, stsClient *sts.Client, accountId string, action string, env string, gitUrl string, computeNodeEfsId string, app_slug string) provisioner.Provisioner {
 	return &AWSProvisioner{IAMClient: iamClient, STSClient: stsClient,
-		AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl}
+		AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, AppSlug: app_slug}
 }
 
 func (p *AWSProvisioner) Run(ctx context.Context) error {
@@ -99,7 +101,7 @@ func (p *AWSProvisioner) create(ctx context.Context) error {
 
 	// create infrastructure
 	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/infrastructure.sh",
-		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl)
+		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl, p.ComputeNodeEfsId, p.AppSlug)
 	out, err := cmd.Output()
 	if err != nil {
 		return err
@@ -117,7 +119,7 @@ func (p *AWSProvisioner) delete(ctx context.Context) error {
 		return err
 	}
 	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/destroy-infrastructure.sh",
-		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl)
+		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl, p.ComputeNodeEfsId, p.AppSlug)
 	out, err := cmd.Output()
 	if err != nil {
 		return err

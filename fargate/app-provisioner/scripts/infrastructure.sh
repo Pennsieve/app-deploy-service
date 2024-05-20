@@ -25,6 +25,8 @@ region = "$AWS_DEFAULT_REGION"
 env = "$ENV"
 app_cpu = "${APP_CPU:-2048}"
 app_memory = "${APP_MEMORY:-4096}"
+compute_node_efs_id = "$6"
+app_slug = "$7"
 EOL
 
 echo "Running init and plan ..."

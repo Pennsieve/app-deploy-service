@@ -1,6 +1,6 @@
 // ECS Task definition
 resource "aws_ecs_task_definition" "application" {
-  family                = "${var.app_name}-${var.account_id}-${var.env}"
+  family                = "${var.app_slug}-${var.account_id}-${var.env}"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.app_cpu
@@ -10,7 +10,7 @@ resource "aws_ecs_task_definition" "application" {
 
   container_definitions = jsonencode([
     {
-      name      = "${var.app_name}-${random_uuid.val.id}"
+      name      = "${var.app_slug}-${var.account_id}"
       image     = aws_ecr_repository.app.repository_url
       essential = true
       portMappings = [
@@ -21,7 +21,7 @@ resource "aws_ecs_task_definition" "application" {
       ]
       mountPoints = [
         {
-          sourceVolume = "${var.app_name}-storage-${random_uuid.val.id}"
+          sourceVolume = "${var.app_slug}-storage-${var.account_id}-${var.env}"
           containerPath = "/mnt/efs"
           readOnly = false
         }
@@ -29,7 +29,7 @@ resource "aws_ecs_task_definition" "application" {
       logConfiguration = {
         logDriver = "awslogs"
         options = {
-          awslogs-group = "/ecs/${var.app_name}/${random_uuid.val.id}"
+          awslogs-group = "/ecs/${var.app_slug}/${var.account_id}-${var.env}"
           awslogs-region = var.region
           awslogs-stream-prefix = "ecs"
           awslogs-create-group = "true"
@@ -39,7 +39,7 @@ resource "aws_ecs_task_definition" "application" {
   ])
 
   volume {
-    name = "${var.app_name}-storage-${random_uuid.val.id}"
+    name = "${var.app_slug}-storage-${var.account_id}-${var.env}"
 
     efs_volume_configuration {
       file_system_id          = var.compute_node_efs_id

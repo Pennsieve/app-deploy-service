@@ -14,3 +14,12 @@ func TestExtractGitUrl(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, got)
 	}
 }
+
+func TestExtractRepoName(t *testing.T) {
+	uri := "git://github.com/edmore/cytof-pipeline"
+	expected := "cytof-pipeline"
+	got := utils.ExtractRepoName(uri)
+	if got != expected {
+		t.Errorf("expected %s, got %s", expected, got)
+	}
+}
