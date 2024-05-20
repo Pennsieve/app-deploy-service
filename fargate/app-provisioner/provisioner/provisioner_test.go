@@ -11,7 +11,7 @@ import (
 )
 
 func TestAWSProvisioner(t *testing.T) {
-	provisioner := aws.NewAWSProvisioner(&iam.Client{}, &sts.Client{}, "someAccountId", "UNKNOWN_ACTION", "dev")
+	provisioner := aws.NewAWSProvisioner(&iam.Client{}, &sts.Client{}, "someAccountId", "UNKNOWN_ACTION", "dev", "someUrl", "SomeEfsId", "someSlug")
 	err := provisioner.Run(context.Background())
 	assert.Equal(t, "action not supported: UNKNOWN_ACTION", err.Error())
 }
