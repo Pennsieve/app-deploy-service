@@ -42,8 +42,8 @@ func (r *ApplicationDatabaseStore) Insert(ctx context.Context, application Appli
 
 func (r *ApplicationDatabaseStore) Get(ctx context.Context, computeNodeUuid string, sourceUrl string) ([]Application, error) {
 	applications := []Application{}
-	filt1 := expression.Name("accountUuid").Equal((expression.Value(computeNodeUuid)))
-	filt2 := expression.Name("environment").Equal((expression.Value(sourceUrl)))
+	filt1 := expression.Name("computeNodeUuid").Equal((expression.Value(computeNodeUuid)))
+	filt2 := expression.Name("sourceUrl").Equal((expression.Value(sourceUrl)))
 	expr, err := expression.NewBuilder().WithFilter(filt1.And(filt2)).Build()
 	if err != nil {
 		return applications, fmt.Errorf("error building expression: %w", err)

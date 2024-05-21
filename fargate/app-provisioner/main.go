@@ -76,7 +76,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err.Error())
 		}
-		if len(applications) == 1 {
+		if len(applications) > 0 {
 			log.Fatalf("application with env: %s already exists", applications[0].Env)
 		}
 
