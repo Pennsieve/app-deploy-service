@@ -3,5 +3,10 @@
     "sensitive": false,
     "type": "string",
     "value": "some-account-url/app"
+  },
+  "app_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "some-task-defn-arn"
   }
 }

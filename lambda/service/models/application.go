@@ -2,6 +2,7 @@ package models
 
 type Application struct {
 	Uuid            string               `json:"uuid"`
+	ApplicationId   string               `json:"applicationId"`
 	Name            string               `json:"name"`
 	Description     string               `json:"description"`
 	Resources       ApplicationResources `json:"resources"`

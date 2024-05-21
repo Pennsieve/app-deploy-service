@@ -47,6 +47,7 @@ func GetApplicationHandler(ctx context.Context, request events.APIGatewayV2HTTPR
 
 	m, err := json.Marshal(models.Application{
 		Uuid:            application.Uuid,
+		ApplicationId:   application.ApplicationId,
 		Name:            application.Name,
 		Description:     application.Description,
 		ApplicationType: application.ApplicationType,

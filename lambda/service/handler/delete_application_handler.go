@@ -46,7 +46,7 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 
-	applicationIdKey := "APPLICATION_ID"
+	applicationIdKey := "APPLICATION_UUID"
 
 	dynamo_store := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	application, err := dynamo_store.GetById(ctx, uuid)

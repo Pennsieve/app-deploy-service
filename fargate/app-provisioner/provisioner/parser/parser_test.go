@@ -12,4 +12,5 @@ func TestOutputParser(t *testing.T) {
 	parser := parser.NewOutputParser("./test-data/outputs_test.json")
 	outputs, _ := parser.Run(context.Background())
 	assert.Equal(t, "some-account-url/app", outputs.AppEcrUrl.Value)
+	assert.Equal(t, "some-task-defn-arn", outputs.AppTaskDefn.Value)
 }
