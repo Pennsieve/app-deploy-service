@@ -32,6 +32,9 @@ func GetApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTP
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
 	organizationId := claims.OrgClaim.NodeId
 
+	log.Println("claims.OrgClaim.NodeId", claims.OrgClaim.NodeId)
+	log.Println("claims.OrgClaim.IntId", claims.OrgClaim.IntId)
+
 	dynamo_store := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	dynamoApplications, err := dynamo_store.Get(ctx, organizationId)
 	if err != nil {
