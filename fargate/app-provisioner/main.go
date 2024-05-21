@@ -21,7 +21,7 @@ func main() {
 	log.Println("Running app provisioner")
 	ctx := context.Background()
 
-	applicationId := os.Getenv("APPLICATION_ID")
+	applicationUuid := os.Getenv("APPLICATION_UUID")
 	applicationType := os.Getenv("APPLICATION_TYPE")
 
 	action := os.Getenv("ACTION")
@@ -87,6 +87,7 @@ func main() {
 			Name:             applicationName,
 			Description:      applicationDescription,
 			ApplicationType:  applicationType,
+			ApplicationId:    outputs.AppTaskDefn.Value,
 			AccountUuid:      accountUuid,
 			AccountId:        accountId,
 			AccountType:      accountType,
@@ -106,11 +107,11 @@ func main() {
 			log.Fatal(err.Error())
 		}
 	case "DELETE":
-		log.Println("Deleting", applicationId)
+		log.Println("Deleting", applicationUuid)
 		dynamoDBClient := dynamodb.NewFromConfig(cfg)
 		applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 
-		err = applicationsStore.Delete(ctx, applicationId)
+		err = applicationsStore.Delete(ctx, applicationUuid)
 		if err != nil {
 			log.Fatal(err.Error())
 		}

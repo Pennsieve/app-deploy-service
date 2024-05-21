@@ -5,5 +5,6 @@ type OutputValue struct {
 }
 
 type Output struct {
-	AppEcrUrl OutputValue `json:"app_ecr_repository"`
+	AppEcrUrl   OutputValue `json:"app_ecr_repository"`
+	AppTaskDefn OutputValue `json:"app_id"`
 }

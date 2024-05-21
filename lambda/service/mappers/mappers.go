@@ -11,6 +11,7 @@ func DynamoDBApplicationToJsonApplication(dynamoApplications []store_dynamodb.Ap
 	for _, a := range dynamoApplications {
 		applications = append(applications, models.Application{
 			Uuid:            a.Uuid,
+			ApplicationId:   a.ApplicationId,
 			Name:            a.Name,
 			Description:     a.Description,
 			ApplicationType: a.ApplicationType,

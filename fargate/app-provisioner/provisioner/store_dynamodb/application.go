@@ -10,6 +10,7 @@ type Application struct {
 	Name            string `dynamodbav:"name"`
 	Description     string `dynamodbav:"description"`
 	ApplicationType string `dynamodbav:"applicationType"`
+	ApplicationId   string `dynamodbav:"applicationId"`
 
 	AccountUuid string `dynamodbav:"accountUuid"`
 	AccountId   string `dynamodbav:"accountId"`
