@@ -28,12 +28,12 @@ type ComputeNode struct {
 }
 
 type Source struct {
-	SourceType string `json:"sourceType"`
+	SourceType string `json:"type"`
 	Url        string `json:"url"`
 }
 
 type Destination struct {
-	DestinationType string `json:"destinationType"`
+	DestinationType string `json:"type"`
 	Url             string `json:"url"`
 }
 

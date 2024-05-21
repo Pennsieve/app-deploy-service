@@ -18,11 +18,11 @@ type Application struct {
 	ComputeNodeUuid  string `dynamodbav:"computeNodeUuid"`
 	ComputeNodeEfsId string `dynamodbav:"computeNodeEfsId"`
 
-	SourceType string `dynamodbav:"computeNodeUuid"`
-	SourceUrl  string `dynamodbav:"computeNodeUuid"`
+	SourceType string `dynamodbav:"sourceType"`
+	SourceUrl  string `dynamodbav:"sourceUrl"`
 
-	DestinationType string `dynamodbav:"computeNodeUuid"`
-	DestinationUrl  string `dynamodbav:"computeNodeUuid"`
+	DestinationType string `dynamodbav:"destinationType"`
+	DestinationUrl  string `dynamodbav:"destinationUrl"`
 
 	Env string `dynamodbav:"environment"`
 
