@@ -100,7 +100,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	deployerTaskDefnValue := DeployerTaskDefinitionArn
 	subetsIdKey := "SUBNET_IDS"
 	subetsIdValue := subIdStr
-	clusterKey := "CLUSTER"
+	clusterKey := "CLUSTER_ARN"
 	clusterValue := cluster
 	securityGroupKey := "SECURITY_GROUP"
 	securityGroupValue := SecurityGroup
