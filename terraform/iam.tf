@@ -156,7 +156,7 @@ EOF
 
 # TODO: restrict this access
 resource "aws_iam_policy" "ecs_run_task" {
-  name = "ecs_task_role_run_task-${random_uuid.val.id}"
+  name = "${var.environment_name}-${var.service_name}-ecs-run-task-policy-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
 
   policy = jsonencode({
     Version = "2012-10-17"
