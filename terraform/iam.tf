@@ -135,7 +135,6 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
 resource "aws_iam_role" "app_provisioner_fargate_task_iam_role" {
   name = "${var.environment_name}-${var.service_name}-fargate-task-role-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
   path = "/service-roles/"
-  managed_policy_arns = [aws_iam_policy.ecs_run_task.arn]
 
   assume_role_policy = <<EOF
 {
@@ -153,28 +152,6 @@ resource "aws_iam_role" "app_provisioner_fargate_task_iam_role" {
 EOF
 
 }
-
-# TODO: restrict this access
-resource "aws_iam_policy" "ecs_run_task" {
-  name = "${var.environment_name}-${var.service_name}-ecs-run-task-policy-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "ecs:DescribeTasks",
-          "ecs:RunTask",
-          "ecs:ListTasks",
-          "iam:PassRole",
-        ]
-        Effect   = "Allow"
-        Resource = "*"
-      },
-    ]
-  })
-}
-
 
 resource "aws_iam_role_policy_attachment" "app_provisioner_fargate_iam_role_policy_attachment" {
   role       = aws_iam_role.app_provisioner_fargate_task_iam_role.id
@@ -225,6 +202,7 @@ statement {
       "${data.terraform_remote_state.platform_infrastructure.outputs.discover_publish50_bucket_arn}/*",
     ]
   }
+
   statement {
     sid    = "TaskLogPermissions"
     effect = "Allow"
@@ -258,6 +236,19 @@ statement {
       "${aws_dynamodb_table.applications_table.arn}/*"
     ]
 
+  }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "ecs:DescribeTasks",
+      "ecs:RunTask",
+      "ecs:ListTasks",
+      "iam:PassRole",
+    ]
+
+     resources = ["*"]
   }
   
 }
