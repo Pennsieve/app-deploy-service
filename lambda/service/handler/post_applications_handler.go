@@ -35,11 +35,13 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	}
 
 	TaskDefinitionArn := os.Getenv("TASK_DEF_ARN")
+	DeployerTaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
 	subIdStr := os.Getenv("SUBNET_IDS")
 	SubNetIds := strings.Split(subIdStr, ",")
 	cluster := os.Getenv("CLUSTER_ARN")
 	SecurityGroup := os.Getenv("SECURITY_GROUP")
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
+	DeployerTaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
 	organizationId := claims.OrgClaim.NodeId
@@ -93,6 +95,17 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	applicationTypeKey := "APPLICATION_TYPE"
 	applicationTypeValue := application.ApplicationType
+
+	deployerTaskDefnKey := "DEPLOYER_TASK_DEF_ARN"
+	deployerTaskDefnValue := DeployerTaskDefinitionArn
+	subetsIdKey := "SUBNET_IDS"
+	subetsIdValue := subIdStr
+	clusterKey := "CLUSTER"
+	clusterValue := cluster
+	securityGroupKey := "SECURITY_GROUP"
+	securityGroupValue := SecurityGroup
+	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
+	deployertaskDefnContainerValue := DeployerTaskDefContainerName
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -176,6 +189,26 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 						{
 							Name:  &applicationTypeKey,
 							Value: &applicationTypeValue,
+						},
+						{
+							Name:  &deployerTaskDefnKey,
+							Value: &deployerTaskDefnValue,
+						},
+						{
+							Name:  &subetsIdKey,
+							Value: &subetsIdValue,
+						},
+						{
+							Name:  &clusterKey,
+							Value: &clusterValue,
+						},
+						{
+							Name:  &securityGroupKey,
+							Value: &securityGroupValue,
+						},
+						{
+							Name:  &deployertaskDefnContainerKey,
+							Value: &deployertaskDefnContainerValue,
 						},
 					},
 				},

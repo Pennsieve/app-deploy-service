@@ -47,7 +47,7 @@ func (p *AWSProvisioner) Run(ctx context.Context) error {
 
 }
 
-func (p *AWSProvisioner) assumeRole(ctx context.Context) (aws.Credentials, error) {
+func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error) {
 	log.Println("assuming role ...")
 
 	provisionerAccountId, err := p.STSClient.GetCallerIdentity(ctx,
@@ -69,7 +69,7 @@ func (p *AWSProvisioner) assumeRole(ctx context.Context) (aws.Credentials, error
 func (p *AWSProvisioner) create(ctx context.Context) error {
 	log.Println("creating infrastructure ...")
 
-	creds, err := p.assumeRole(ctx)
+	creds, err := p.AssumeRole(ctx)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func (p *AWSProvisioner) create(ctx context.Context) error {
 func (p *AWSProvisioner) delete(ctx context.Context) error {
 	fmt.Println("destroying infrastructure")
 
-	creds, err := p.assumeRole(ctx)
+	creds, err := p.AssumeRole(ctx)
 	if err != nil {
 		return err
 	}
