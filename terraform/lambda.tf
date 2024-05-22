@@ -21,11 +21,13 @@ resource "aws_lambda_function" "service_lambda" {
       PENNSIEVE_DOMAIN = data.terraform_remote_state.account.outputs.domain_name,
       REGION           = var.aws_region
       TASK_DEF_ARN = aws_ecs_task_definition.app_provisioner_ecs_task_definition.arn,
+      DEPLOYER_TASK_DEF_ARN = aws_ecs_task_definition.app_deployer_ecs_task_definition.arn,
       CLUSTER_ARN = data.terraform_remote_state.fargate.outputs.ecs_cluster_arn,
       SUBNET_IDS = join(",", data.terraform_remote_state.vpc.outputs.private_subnet_ids),
       SECURITY_GROUP = data.terraform_remote_state.platform_infrastructure.outputs.rehydration_fargate_security_group_id,
       LOG_LEVEL = "info",
       TASK_DEF_CONTAINER_NAME = var.tier,
+      DEPLOYER_TASK_DEF_CONTAINER_NAME = var.deployer_tier,
       APPLICATIONS_TABLE = aws_dynamodb_table.applications_table.name
     }
   }

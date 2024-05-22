@@ -41,6 +41,18 @@ variable "lambda_bucket" {
   default = "pennsieve-cc-lambda-functions-use1"
 }
 
+variable "deployer_image_url" {
+  default = "gcr.io/kaniko-project/executor"
+}
+
+variable "deployer_image_tag" {
+  default = "debug"
+}
+
+variable "deployer_tier" {
+  default = "app-deployer"
+}
+
 locals {
   common_tags = {
     aws_account      = var.aws_account
