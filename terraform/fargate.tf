@@ -30,3 +30,35 @@ resource "aws_ecs_task_definition" "app_provisioner_ecs_task_definition" {
 
   depends_on = [data.template_file.app_provisioner_ecs_task_definition]
 }
+
+# Render Task Definition JSON - Deployer
+data "template_file" "app_deployer_ecs_task_definition" {
+  template = file("${path.module}/deployer_task_definition.json.tpl")
+
+  vars = {
+    aws_region                = data.aws_region.current_region.name
+    aws_region_shortname      = data.terraform_remote_state.region.outputs.aws_region_shortname
+    container_cpu             = var.container_cpu
+    container_memory          = var.container_memory
+    environment_name          = var.environment_name
+    image_tag                 = var.deployer_image_tag
+    image_url                 = var.deployer_image_url
+    service_name              = var.service_name
+    tier                      = var.deployer_tier
+  }
+}
+
+# Create Fargate Task Definition
+resource "aws_ecs_task_definition" "app_deployer_ecs_task_definition" {
+  family                   = "${var.environment_name}-${var.service_name}-${var.deployer_tier}-task-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  container_definitions    = data.template_file.app_deployer_ecs_task_definition.rendered
+
+  cpu                = var.task_cpu
+  memory             = var.task_memory
+  task_role_arn      = aws_iam_role.app_provisioner_fargate_task_iam_role.arn # TODO: update
+  execution_role_arn = aws_iam_role.app_provisioner_fargate_task_iam_role.arn # TODO: update
+
+  depends_on = [data.template_file.app_deployer_ecs_task_definition]
+}
