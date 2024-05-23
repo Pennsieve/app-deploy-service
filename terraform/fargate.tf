@@ -55,8 +55,8 @@ resource "aws_ecs_task_definition" "app_deployer_ecs_task_definition" {
   network_mode             = "awsvpc"
   container_definitions    = data.template_file.app_deployer_ecs_task_definition.rendered
 
-  cpu                = var.task_cpu
-  memory             = var.task_memory
+  cpu                = var.deployer_task_memory
+  memory             = var.deployer_task_cpu
   task_role_arn      = aws_iam_role.app_provisioner_fargate_task_iam_role.arn # TODO: update
   execution_role_arn = aws_iam_role.app_provisioner_fargate_task_iam_role.arn # TODO: update
 
