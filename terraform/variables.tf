@@ -53,6 +53,14 @@ variable "deployer_tier" {
   default = "app-deployer"
 }
 
+variable "deployer_task_memory" {
+  default = "4096"
+}
+
+variable "deployer_task_cpu" {
+  default = "2048"
+}
+
 locals {
   common_tags = {
     aws_account      = var.aws_account
