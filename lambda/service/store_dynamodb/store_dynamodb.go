@@ -48,13 +48,13 @@ func (r *ApplicationDatabaseStore) Get(ctx context.Context, organizationId strin
 	applications := []Application{}
 
 	var c expression.ConditionBuilder
-	filt := expression.Name("organizationId").Equal((expression.Value(organizationId)))
+	c = expression.Name("organizationId").Equal((expression.Value(organizationId)))
 
 	if applicationType, found := params["applicationType"]; found {
-		c = filt.And(expression.Name("applicationType").Equal((expression.Value(applicationType))))
+		c = c.And(expression.Name("applicationType").Equal((expression.Value(applicationType))))
 	}
 	if computeNodeUuid, found := params["computeNodeUuid"]; found {
-		c = filt.And(expression.Name("computeNodeUuid").Equal((expression.Value(computeNodeUuid))))
+		c = c.And(expression.Name("computeNodeUuid").Equal((expression.Value(computeNodeUuid))))
 	}
 
 	expr, err := expression.NewBuilder().WithFilter(c).Build()
