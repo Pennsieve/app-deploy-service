@@ -12,7 +12,7 @@ import (
 
 type DynamoDBStore interface {
 	GetById(context.Context, string) (Application, error)
-	Get(context.Context, string) ([]Application, error)
+	Get(context.Context, string, map[string]string) ([]Application, error)
 }
 
 type ApplicationDatabaseStore struct {
@@ -23,6 +23,7 @@ type ApplicationDatabaseStore struct {
 func NewApplicationDatabaseStore(db *dynamodb.Client, tableName string) DynamoDBStore {
 	return &ApplicationDatabaseStore{db, tableName}
 }
+
 func (r *ApplicationDatabaseStore) GetById(ctx context.Context, uuid string) (Application, error) {
 	application := Application{Uuid: uuid}
 	response, err := r.DB.GetItem(ctx, &dynamodb.GetItemInput{
@@ -43,10 +44,20 @@ func (r *ApplicationDatabaseStore) GetById(ctx context.Context, uuid string) (Ap
 	return application, nil
 }
 
-func (r *ApplicationDatabaseStore) Get(ctx context.Context, filter string) ([]Application, error) {
+func (r *ApplicationDatabaseStore) Get(ctx context.Context, organizationId string, params map[string]string) ([]Application, error) {
 	applications := []Application{}
-	filt := expression.Name("organizationId").Equal((expression.Value(filter)))
-	expr, err := expression.NewBuilder().WithFilter(filt).Build()
+
+	var c expression.ConditionBuilder
+	filt := expression.Name("organizationId").Equal((expression.Value(organizationId)))
+
+	if applicationType, found := params["applicationType"]; found {
+		c = filt.And(expression.Name("applicationType").Equal((expression.Value(applicationType))))
+	}
+	if computeNodeUuid, found := params["computeNodeUuid"]; found {
+		c = filt.And(expression.Name("computeNodeUuid").Equal((expression.Value(computeNodeUuid))))
+	}
+
+	expr, err := expression.NewBuilder().WithFilter(c).Build()
 	if err != nil {
 		return applications, fmt.Errorf("error building expression: %w", err)
 	}
