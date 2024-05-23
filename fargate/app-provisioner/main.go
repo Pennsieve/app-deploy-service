@@ -45,6 +45,8 @@ func main() {
 	sourceUrl := os.Getenv("SOURCE_URL")
 	sourceType := os.Getenv("SOURCE_TYPE")
 
+	destinationUrl := os.Getenv("DESTINATION_URL")
+
 	computeNodeUuid := os.Getenv("COMPUTE_NODE_UUID")
 	computeNodeEfsId := os.Getenv("COMPUTE_NODE_EFS_ID")
 
@@ -58,9 +60,12 @@ func main() {
 
 	provisioner := awsProvisioner.NewAWSProvisioner(iam.NewFromConfig(cfg), sts.NewFromConfig(cfg),
 		accountId, action, env, utils.ExtractGitUrl(sourceUrl), computeNodeEfsId, utils.ExtractRepoName(sourceUrl))
-	err = provisioner.Run(ctx)
-	if err != nil {
-		log.Fatal("error running provisioner", err.Error())
+
+	if action != "DEPLOY" {
+		err = provisioner.Run(ctx)
+		if err != nil {
+			log.Fatal("error running provisioner", err.Error())
+		}
 	}
 
 	// POST provisioning actions
@@ -85,7 +90,7 @@ func main() {
 			log.Fatalf("application with env: %s already exists", applications[0].Env)
 		}
 
-		destinationUrl := outputs.AppEcrUrl.Value
+		destinationUrl = outputs.AppEcrUrl.Value
 		id := uuid.New()
 		applicationId := id.String()
 		store_applications := store_dynamodb.Application{
@@ -172,7 +177,6 @@ func main() {
 		runner := runner.NewECSTaskRunner(escClient, runTaskIn)
 		if err := runner.Run(ctx); err != nil {
 			log.Fatal(err)
-
 		}
 
 	case "DELETE":
@@ -183,6 +187,68 @@ func main() {
 		err = applicationsStore.Delete(ctx, applicationUuid)
 		if err != nil {
 			log.Fatal(err.Error())
+		}
+	case "DEPLOY":
+		// Build and deploy
+		escClient := ecs.NewFromConfig(cfg)
+		log.Println("Initiating new Deployment Fargate Task.")
+		creds, err := provisioner.AssumeRole(ctx)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		accessKeyId := "AWS_ACCESS_KEY_ID"
+		accessKeyIdValue := creds.AccessKeyID
+		secretAccessKey := "AWS_SECRET_ACCESS_KEY"
+		secretAccessKeyValue := creds.SecretAccessKey
+		sessionToken := "AWS_SESSION_TOKEN"
+		sessionTokenValue := creds.SessionToken
+
+		TaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
+		subIdStr := os.Getenv("SUBNET_IDS")
+		SubNetIds := strings.Split(subIdStr, ",")
+		cluster := os.Getenv("CLUSTER_ARN")
+		SecurityGroup := os.Getenv("SECURITY_GROUP")
+		TaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+
+		runTaskIn := &ecs.RunTaskInput{
+			TaskDefinition: aws.String(TaskDefinitionArn),
+			Cluster:        aws.String(cluster),
+			NetworkConfiguration: &types.NetworkConfiguration{
+				AwsvpcConfiguration: &types.AwsVpcConfiguration{
+					Subnets:        SubNetIds,
+					SecurityGroups: []string{SecurityGroup},
+					AssignPublicIp: types.AssignPublicIpEnabled,
+				},
+			},
+			Overrides: &types.TaskOverride{
+				ContainerOverrides: []types.ContainerOverride{
+					{
+						Name:    &TaskDefContainerName,
+						Command: []string{"--context", sourceUrl, "--destination", destinationUrl, "--force"},
+						Environment: []types.KeyValuePair{
+							{
+								Name:  &accessKeyId,
+								Value: &accessKeyIdValue,
+							},
+							{
+								Name:  &sessionToken,
+								Value: &sessionTokenValue,
+							},
+							{
+								Name:  &secretAccessKey,
+								Value: &secretAccessKeyValue,
+							},
+						},
+					},
+				},
+			},
+			LaunchType: types.LaunchTypeFargate,
+		}
+		runner := runner.NewECSTaskRunner(escClient, runTaskIn)
+		if err := runner.Run(ctx); err != nil {
+			log.Fatal(err)
+
 		}
 
 	default:
