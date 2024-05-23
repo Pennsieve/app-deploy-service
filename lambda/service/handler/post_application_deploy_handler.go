@@ -228,6 +228,6 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: http.StatusAccepted,
-		Body:       string("Application creation initiated"),
+		Body:       string("Application deployment initiated"),
 	}, nil
 }
