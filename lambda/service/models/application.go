@@ -1,20 +1,21 @@
 package models
 
 type Application struct {
-	Uuid            string               `json:"uuid"`
-	ApplicationId   string               `json:"applicationId"`
-	Name            string               `json:"name"`
-	Description     string               `json:"description"`
-	Resources       ApplicationResources `json:"resources"`
-	Account         Account              `json:"account"`
-	ComputeNode     ComputeNode          `json:"computeNode"`
-	Source          Source               `json:"source"`
-	Destination     Destination          `json:"destination"`
-	ApplicationType string               `json:"applicationType"`
-	Env             string               `json:"environment"`
-	OrganizationId  string               `json:"organizationId"`
-	UserId          string               `json:"userId"`
-	CreatedAt       string               `json:"createdAt"`
+	Uuid                     string               `json:"uuid"`
+	ApplicationId            string               `json:"applicationId"`
+	ApplicationContainerName string               `json:"applicationContainerName"`
+	Name                     string               `json:"name"`
+	Description              string               `json:"description"`
+	Resources                ApplicationResources `json:"resources"`
+	Account                  Account              `json:"account"`
+	ComputeNode              ComputeNode          `json:"computeNode"`
+	Source                   Source               `json:"source"`
+	Destination              Destination          `json:"destination"`
+	ApplicationType          string               `json:"applicationType"`
+	Env                      string               `json:"environment"`
+	OrganizationId           string               `json:"organizationId"`
+	UserId                   string               `json:"userId"`
+	CreatedAt                string               `json:"createdAt"`
 }
 
 type Account struct {

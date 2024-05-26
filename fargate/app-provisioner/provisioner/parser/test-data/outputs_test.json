@@ -8,5 +8,10 @@
     "sensitive": false,
     "type": "string",
     "value": "some-task-defn-arn"
+  },
+  "app_container_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "some-container_name"
   }
 }

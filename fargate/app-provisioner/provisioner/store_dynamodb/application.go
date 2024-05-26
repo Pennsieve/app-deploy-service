@@ -6,11 +6,12 @@ import (
 )
 
 type Application struct {
-	Uuid            string `dynamodbav:"uuid"`
-	Name            string `dynamodbav:"name"`
-	Description     string `dynamodbav:"description"`
-	ApplicationType string `dynamodbav:"applicationType"`
-	ApplicationId   string `dynamodbav:"applicationId"`
+	Uuid                     string `dynamodbav:"uuid"`
+	Name                     string `dynamodbav:"name"`
+	Description              string `dynamodbav:"description"`
+	ApplicationType          string `dynamodbav:"applicationType"`
+	ApplicationId            string `dynamodbav:"applicationId"`
+	ApplicationContainerName string `dynamodbav:"applicationContainerName"`
 
 	AccountUuid string `dynamodbav:"accountUuid"`
 	AccountId   string `dynamodbav:"accountId"`

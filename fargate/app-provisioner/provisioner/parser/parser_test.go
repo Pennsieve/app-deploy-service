@@ -13,4 +13,5 @@ func TestOutputParser(t *testing.T) {
 	outputs, _ := parser.Run(context.Background())
 	assert.Equal(t, "some-account-url/app", outputs.AppEcrUrl.Value)
 	assert.Equal(t, "some-task-defn-arn", outputs.AppTaskDefn.Value)
+	assert.Equal(t, "some-container_name", outputs.AppContainerName.Value)
 }
