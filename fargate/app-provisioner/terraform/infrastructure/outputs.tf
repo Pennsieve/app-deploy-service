@@ -5,7 +5,13 @@ output "app_ecr_repository" {
 }
 
 output "app_id" {
-  description = "App ECR repository"
+  description = "App Task definition ARN"
 
   value = aws_ecs_task_definition.application.arn
+}
+
+output "app_container_name" {
+  description = "App Task definition family"
+
+  value = aws_ecs_task_definition.application.family
 }
