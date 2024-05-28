@@ -15,7 +15,11 @@ func DynamoDBApplicationToJsonApplication(dynamoApplications []store_dynamodb.Ap
 			ApplicationContainerName: a.ApplicationContainerName,
 			Name:                     a.Name,
 			Description:              a.Description,
-			ApplicationType:          a.ApplicationType,
+			Resources: models.ApplicationResources{
+				CPU:    a.CPU,
+				Memory: a.Memory,
+			},
+			ApplicationType: a.ApplicationType,
 			Account: models.Account{
 				Uuid:        a.AccountUuid,
 				AccountId:   a.AccountId,
