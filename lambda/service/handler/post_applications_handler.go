@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -106,6 +107,11 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	securityGroupValue := SecurityGroup
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
+
+	cpuKey := "APP_CPU"
+	cpuValue := strconv.Itoa(application.Resources.CPU)
+	memoryKey := "APP_MEMORY"
+	memoryValue := strconv.Itoa(application.Resources.Memory)
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -209,6 +215,14 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 						{
 							Name:  &deployertaskDefnContainerKey,
 							Value: &deployertaskDefnContainerValue,
+						},
+						{
+							Name:  &cpuKey,
+							Value: &cpuValue,
+						},
+						{
+							Name:  &memoryKey,
+							Value: &memoryValue,
 						},
 					},
 				},

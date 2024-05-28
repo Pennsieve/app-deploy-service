@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,6 +53,9 @@ func main() {
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 
+	appCPU := os.Getenv("APP_CPU")
+	appMemory := os.Getenv("APP_MEMORY")
+
 	// Initializing environment
 	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
@@ -87,7 +91,16 @@ func main() {
 			log.Fatal(err.Error())
 		}
 		if len(applications) > 0 {
-			log.Fatalf("application with env: %s already exists", applications[0].Env)
+			log.Fatalf("application with computeNodeUuid: %s already exists", computeNodeUuid)
+		}
+
+		appCPUInt, err := strconv.Atoi(appCPU)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		appMemoryInt, err := strconv.Atoi(appMemory)
+		if err != nil {
+			log.Fatal(err.Error())
 		}
 
 		destinationUrl = outputs.AppEcrUrl.Value
@@ -109,6 +122,8 @@ func main() {
 			SourceUrl:                sourceUrl,
 			DestinationType:          "ecr",
 			DestinationUrl:           destinationUrl,
+			CPU:                      appCPUInt,
+			Memory:                   appMemoryInt,
 			Env:                      env,
 			OrganizationId:           organizationId,
 			UserId:                   userId,

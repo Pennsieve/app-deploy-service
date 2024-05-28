@@ -26,6 +26,9 @@ type Application struct {
 	DestinationType string `dynamodbav:"destinationType"`
 	DestinationUrl  string `dynamodbav:"destinationUrl"`
 
+	CPU    int `dynamodbav:"cpu"`
+	Memory int `dynamodbav:"memory"`
+
 	Env string `dynamodbav:"environment"`
 
 	OrganizationId string `dynamodbav:"organizationId"`
