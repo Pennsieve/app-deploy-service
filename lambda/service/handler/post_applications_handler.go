@@ -108,6 +108,19 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
 
+	cpuKey := "APP_CPU"
+	cpuValue := strconv.Itoa(application.Resources.CPU)
+	memoryKey := "APP_MEMORY"
+	memoryValue := strconv.Itoa(application.Resources.Memory)
+
+	if application.Resources.CPU == 0 {
+		cpuValue = strconv.Itoa(2048)
+	}
+
+	if application.Resources.Memory == 0 {
+		cpuValue = strconv.Itoa(4096)
+	}
+
 	environment := []types.KeyValuePair{
 		{
 			Name:  &envKey,
@@ -197,23 +210,14 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 			Name:  &deployertaskDefnContainerKey,
 			Value: &deployertaskDefnContainerValue,
 		},
-	}
-
-	if application.Resources.CPU != 0 && application.Resources.Memory != 0 {
-		cpuKey := "APP_CPU"
-		cpuValue := strconv.Itoa(application.Resources.CPU)
-		memoryKey := "APP_MEMORY"
-		memoryValue := strconv.Itoa(application.Resources.Memory)
-
-		environment = append(environment, types.KeyValuePair{
+		{
 			Name:  &cpuKey,
 			Value: &cpuValue,
-		})
-		environment = append(environment, types.KeyValuePair{
+		},
+		{
 			Name:  &memoryKey,
 			Value: &memoryValue,
-		})
-
+		},
 	}
 
 	runTaskIn := &ecs.RunTaskInput{
