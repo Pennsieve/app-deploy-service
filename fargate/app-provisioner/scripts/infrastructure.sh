@@ -18,6 +18,8 @@ bucket  = "tfstate-$1"
 key     = "$ENV/apps/$5/terraform.tfstate"
 EOL
 
+echo "cpu: ${APP_CPU}"
+echo "memory: ${APP_MEMORY}"
 echo "Running init and plan ..."
 
 cat $BACKEND_FILE
@@ -27,8 +29,8 @@ echo "Creating tfvars config"
 account_id = "$1"
 region = "$AWS_DEFAULT_REGION"
 env = "$ENV"
-app_cpu = "${$((APP_CPU))}"
-app_memory = "${$((APP_MEMORY))}"
+app_cpu = "${APP_CPU:-2048}"
+app_memory = "${APP_MEMORY:-4096}"
 compute_node_efs_id = "$6"
 app_slug = "$7"
 EOL
@@ -46,6 +48,6 @@ terraform apply tfplan
 terraform output -json > $OUTPUT_FILE
 
 pwd
-cat error.log
+cat error.log | grep "[ERROR"
 
 echo "DONE RUNNING IN ENVIRONMENT: $ENV"
