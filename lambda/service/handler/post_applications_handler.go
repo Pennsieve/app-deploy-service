@@ -118,7 +118,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	}
 
 	if application.Resources.Memory == 0 {
-		cpuValue = strconv.Itoa(4096)
+		memoryValue = strconv.Itoa(4096)
 	}
 
 	environment := []types.KeyValuePair{
