@@ -18,6 +18,10 @@ bucket  = "tfstate-$1"
 key     = "$ENV/apps/$5/terraform.tfstate"
 EOL
 
+echo "cpu: ${APP_CPU}"
+echo "memory: ${APP_MEMORY}"
+echo "Running init and plan ..."
+
 echo "Creating tfvars config"
   /bin/cat > $VAR_FILE <<EOL
 account_id = "$1"
