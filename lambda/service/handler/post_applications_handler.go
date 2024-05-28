@@ -108,10 +108,113 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
 
-	cpuKey := "APP_CPU"
-	cpuValue := strconv.Itoa(application.Resources.CPU)
-	memoryKey := "APP_MEMORY"
-	memoryValue := strconv.Itoa(application.Resources.Memory)
+	environment := []types.KeyValuePair{
+		{
+			Name:  &envKey,
+			Value: &envValue,
+		},
+		{
+			Name:  &applicationNameKey,
+			Value: &nameValue,
+		},
+		{
+			Name:  &applicationDescriptionKey,
+			Value: &descriptionValue,
+		},
+		{
+			Name:  &accountIdKey,
+			Value: &accountIdValue,
+		},
+		{
+			Name:  &accountUuidKey,
+			Value: &accountUuidValue,
+		},
+		{
+			Name:  &accountTypeKey,
+			Value: &accountTypeValue,
+		},
+		{
+			Name:  &actionKey,
+			Value: &actionValue,
+		},
+		{
+			Name:  &tableKey,
+			Value: &tableValue,
+		},
+		{
+			Name:  &organizationIdKey,
+			Value: &organizationIdValue,
+		},
+		{
+			Name:  &userIdKey,
+			Value: &userIdValue,
+		},
+		{
+			Name:  &sourceTypeKey,
+			Value: &sourceTypeValue,
+		},
+		{
+			Name:  &sourceUrlKey,
+			Value: &sourceUrlValue,
+		},
+		{
+			Name:  &destinationTypeKey,
+			Value: &destinationTypeValue,
+		},
+		{
+			Name:  &destinationUrlKey,
+			Value: &destinationUrlValue,
+		},
+		{
+			Name:  &computeNodeUuidKey,
+			Value: &computeNodeUuidValue,
+		},
+		{
+			Name:  &computeNodeEfsIdKey,
+			Value: &computeNodeEfsIdValue,
+		},
+		{
+			Name:  &applicationTypeKey,
+			Value: &applicationTypeValue,
+		},
+		{
+			Name:  &deployerTaskDefnKey,
+			Value: &deployerTaskDefnValue,
+		},
+		{
+			Name:  &subetsIdKey,
+			Value: &subetsIdValue,
+		},
+		{
+			Name:  &clusterKey,
+			Value: &clusterValue,
+		},
+		{
+			Name:  &securityGroupKey,
+			Value: &securityGroupValue,
+		},
+		{
+			Name:  &deployertaskDefnContainerKey,
+			Value: &deployertaskDefnContainerValue,
+		},
+	}
+
+	if application.Resources.CPU != 0 && application.Resources.Memory != 0 {
+		cpuKey := "APP_CPU"
+		cpuValue := strconv.Itoa(application.Resources.CPU)
+		memoryKey := "APP_MEMORY"
+		memoryValue := strconv.Itoa(application.Resources.Memory)
+
+		environment = append(environment, types.KeyValuePair{
+			Name:  &cpuKey,
+			Value: &cpuValue,
+		})
+		environment = append(environment, types.KeyValuePair{
+			Name:  &memoryKey,
+			Value: &memoryValue,
+		})
+
+	}
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -126,105 +229,8 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		Overrides: &types.TaskOverride{
 			ContainerOverrides: []types.ContainerOverride{
 				{
-					Name: &TaskDefContainerName,
-					Environment: []types.KeyValuePair{
-						{
-							Name:  &envKey,
-							Value: &envValue,
-						},
-						{
-							Name:  &applicationNameKey,
-							Value: &nameValue,
-						},
-						{
-							Name:  &applicationDescriptionKey,
-							Value: &descriptionValue,
-						},
-						{
-							Name:  &accountIdKey,
-							Value: &accountIdValue,
-						},
-						{
-							Name:  &accountUuidKey,
-							Value: &accountUuidValue,
-						},
-						{
-							Name:  &accountTypeKey,
-							Value: &accountTypeValue,
-						},
-						{
-							Name:  &actionKey,
-							Value: &actionValue,
-						},
-						{
-							Name:  &tableKey,
-							Value: &tableValue,
-						},
-						{
-							Name:  &organizationIdKey,
-							Value: &organizationIdValue,
-						},
-						{
-							Name:  &userIdKey,
-							Value: &userIdValue,
-						},
-						{
-							Name:  &sourceTypeKey,
-							Value: &sourceTypeValue,
-						},
-						{
-							Name:  &sourceUrlKey,
-							Value: &sourceUrlValue,
-						},
-						{
-							Name:  &destinationTypeKey,
-							Value: &destinationTypeValue,
-						},
-						{
-							Name:  &destinationUrlKey,
-							Value: &destinationUrlValue,
-						},
-						{
-							Name:  &computeNodeUuidKey,
-							Value: &computeNodeUuidValue,
-						},
-						{
-							Name:  &computeNodeEfsIdKey,
-							Value: &computeNodeEfsIdValue,
-						},
-						{
-							Name:  &applicationTypeKey,
-							Value: &applicationTypeValue,
-						},
-						{
-							Name:  &deployerTaskDefnKey,
-							Value: &deployerTaskDefnValue,
-						},
-						{
-							Name:  &subetsIdKey,
-							Value: &subetsIdValue,
-						},
-						{
-							Name:  &clusterKey,
-							Value: &clusterValue,
-						},
-						{
-							Name:  &securityGroupKey,
-							Value: &securityGroupValue,
-						},
-						{
-							Name:  &deployertaskDefnContainerKey,
-							Value: &deployertaskDefnContainerValue,
-						},
-						{
-							Name:  &cpuKey,
-							Value: &cpuValue,
-						},
-						{
-							Name:  &memoryKey,
-							Value: &memoryValue,
-						},
-					},
+					Name:        &TaskDefContainerName,
+					Environment: environment,
 				},
 			},
 		},
