@@ -38,7 +38,7 @@ terraform init -force-copy -backend-config=$BACKEND_FILE
 terraform plan -out=tfplan -var-file=$VAR_FILE
 
 echo "Running apply ..."
-terraform apply tfplan > apply.log
+terraform apply tfplan
 terraform output -json > $OUTPUT_FILE
 
 echo "DONE RUNNING IN ENVIRONMENT: $ENV"

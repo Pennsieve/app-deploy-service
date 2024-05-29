@@ -25,12 +25,12 @@ variable "image_url" {
   default = "pennsieve/app-provisioner"
 }
 
-variable "task_memory" {
-  default = "2048"
-}
-
 variable "task_cpu" {
   default = "512"
+}
+
+variable "task_memory" {
+  default = "2048"
 }
 
 variable "tier" {
@@ -53,12 +53,12 @@ variable "deployer_tier" {
   default = "app-deployer"
 }
 
-variable "deployer_task_memory" {
+variable "deployer_task_cpu" {
   default = "4096"
 }
 
-variable "deployer_task_cpu" {
-  default = "2048"
+variable "deployer_task_memory" {
+  default = "8192"
 }
 
 locals {
