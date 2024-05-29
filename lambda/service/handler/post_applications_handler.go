@@ -109,17 +109,22 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
 
 	cpuKey := "APP_CPU"
-	cpuValue := strconv.Itoa(application.Resources.CPU)
 	memoryKey := "APP_MEMORY"
-	memoryValue := strconv.Itoa(application.Resources.Memory)
+	cpuValue := application.Resources.CPU
+	memoryValue := application.Resources.Memory
+	defaultCPU := 2048
+	defaultMemory := 4096
 
 	if application.Resources.CPU == 0 {
-		cpuValue = strconv.Itoa(2048)
+		cpuValue = defaultCPU
 	}
 
 	if application.Resources.Memory == 0 {
-		memoryValue = strconv.Itoa(4096)
+		memoryValue = defaultMemory
 	}
+
+	cpuValueStr := strconv.Itoa(cpuValue)
+	memoryValueStr := strconv.Itoa(memoryValue)
 
 	environment := []types.KeyValuePair{
 		{
@@ -212,11 +217,11 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		},
 		{
 			Name:  &cpuKey,
-			Value: &cpuValue,
+			Value: &cpuValueStr,
 		},
 		{
 			Name:  &memoryKey,
-			Value: &memoryValue,
+			Value: &memoryValueStr,
 		},
 	}
 

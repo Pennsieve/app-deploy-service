@@ -18,11 +18,7 @@ bucket  = "tfstate-$1"
 key     = "$ENV/apps/$5/terraform.tfstate"
 EOL
 
-echo "cpu: ${APP_CPU}"
-echo "memory: ${APP_MEMORY}"
 echo "Running init and plan ..."
-
-cat $BACKEND_FILE
 
 echo "Creating tfvars config"
   /bin/cat > $VAR_FILE <<EOL
@@ -35,8 +31,6 @@ compute_node_efs_id = "$6"
 app_slug = "$7"
 EOL
 
-cat $VAR_FILE
-
 echo "Running init and plan ..."
 export TF_LOG_PATH="error.log"
 export TF_LOG=TRACE
@@ -46,9 +40,5 @@ terraform plan -out=tfplan -var-file=$VAR_FILE
 echo "Running apply ..."
 terraform apply tfplan > apply.log
 terraform output -json > $OUTPUT_FILE
-
-pwd
-cat error.log
-cat apply.log
 
 echo "DONE RUNNING IN ENVIRONMENT: $ENV"
