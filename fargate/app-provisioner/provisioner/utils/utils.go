@@ -12,5 +12,5 @@ func ExtractGitUrl(uri string) string {
 }
 
 func ExtractRepoName(uri string) string {
-	return uri[strings.LastIndex(uri, "/")+1:]
+	return strings.ToLower(uri[strings.LastIndex(uri, "/")+1:])
 }

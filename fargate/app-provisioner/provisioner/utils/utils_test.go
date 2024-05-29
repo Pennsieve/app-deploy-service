@@ -16,7 +16,7 @@ func TestExtractGitUrl(t *testing.T) {
 }
 
 func TestExtractRepoName(t *testing.T) {
-	uri := "git://github.com/edmore/cytof-pipeline"
+	uri := "git://github.com/edmore/cytof-PIPELINE"
 	expected := "cytof-pipeline"
 	got := utils.ExtractRepoName(uri)
 	if got != expected {
