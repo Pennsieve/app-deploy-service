@@ -39,7 +39,7 @@ resource "aws_ecs_task_definition" "application" {
   ])
 
   ephemeral_storage {
-    size_in_gb = 30
+    size_in_gib = 30
   }
 
   volume {
