@@ -13,6 +13,9 @@ resource "aws_ecs_task_definition" "application" {
       name      = "${var.app_slug}-${var.account_id}-${var.env}"
       image     = aws_ecr_repository.app.repository_url
       essential = true
+      ephemeral_storage {
+        size_in_gb = 30
+      }
       portMappings = [
         {
           containerPort = 8081
