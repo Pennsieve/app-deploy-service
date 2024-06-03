@@ -65,6 +65,11 @@ func main() {
 	provisioner := awsProvisioner.NewAWSProvisioner(iam.NewFromConfig(cfg), sts.NewFromConfig(cfg),
 		accountId, action, env, utils.ExtractGitUrl(sourceUrl), computeNodeEfsId, utils.ExtractRepoName(sourceUrl))
 
+	err = provisioner.CreatePolicy(context.Background())
+	if err != nil {
+		log.Fatalf("create policy error: %v\n", err)
+	}
+
 	if action != "DEPLOY" {
 		err = provisioner.Run(ctx)
 		if err != nil {

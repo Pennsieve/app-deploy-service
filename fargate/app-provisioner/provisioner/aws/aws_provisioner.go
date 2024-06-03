@@ -66,6 +66,42 @@ func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error
 	return credentials, nil
 }
 
+func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
+	log.Println("creating an inline policy ...")
+
+	provisionerAccountId, err := p.STSClient.GetCallerIdentity(ctx,
+		&sts.GetCallerIdentityInput{})
+	if err != nil {
+		return err
+	}
+
+	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/ROLE-%s", p.AccountId, *provisionerAccountId.Account)
+	policyDoc := fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Sid": "Statement1",
+				"Effect": "Allow",
+				"Action": "sts:AssumeRole",
+				"Resource": %s
+			}
+		]
+	}`, roleArn)
+
+	output, err := p.IAMClient.PutRolePolicy(context.Background(), &iam.PutRolePolicyInput{
+		PolicyName:     aws.String("ExternalAccountInlinePolicy"),
+		PolicyDocument: aws.String(policyDoc),
+		RoleName:       aws.String(fmt.Sprintf("%s-app-deploy-service-fargate-task-role-use1", p.Env)),
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(output)
+
+	return nil
+}
+
 func (p *AWSProvisioner) create(ctx context.Context) error {
 	log.Println("creating infrastructure ...")
 
