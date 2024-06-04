@@ -6,6 +6,7 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -97,6 +98,8 @@ func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 	}
 
 	fmt.Println(output)
+	// wait for policy to be attached
+	time.Sleep(20 * time.Second)
 
 	return nil
 }
@@ -112,7 +115,7 @@ func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
 		return nil, err
 	}
 
-	fmt.Println(output.PolicyDocument)
+	fmt.Printf("%v", output.PolicyDocument)
 	return output.PolicyDocument, err
 }
 
