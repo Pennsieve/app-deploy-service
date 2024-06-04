@@ -75,19 +75,6 @@ func main() {
 	// POST provisioning actions
 	switch action {
 	case "CREATE":
-		policy, err := provisioner.GetPolicy(context.Background())
-		if err != nil {
-			log.Fatalf("get policy error: %v\n", err)
-		}
-
-		if policy == nil {
-			log.Printf("no inline policy exists for account: %s, creating ...", accountId)
-			err = provisioner.CreatePolicy(context.Background())
-			if err != nil {
-				log.Fatalf("create policy error: %v\n", err)
-			}
-		}
-
 		// parse output file created after infrastructure creation
 		parser := parser.NewOutputParser("/usr/src/app/terraform/infrastructure/outputs.json")
 		outputs, err := parser.Run(ctx)

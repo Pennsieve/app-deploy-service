@@ -118,6 +118,19 @@ func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
 func (p *AWSProvisioner) create(ctx context.Context) error {
 	log.Println("creating infrastructure ...")
 
+	policy, err := p.GetPolicy(context.Background())
+	if err != nil {
+		return err
+	}
+
+	if policy == nil {
+		log.Printf("no inline policy exists for account: %s, creating ...", p.AccountId)
+		err = p.CreatePolicy(context.Background())
+		if err != nil {
+			return err
+		}
+	}
+
 	creds, err := p.AssumeRole(ctx)
 	if err != nil {
 		return err
