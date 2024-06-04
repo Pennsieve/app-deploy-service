@@ -247,6 +247,7 @@ statement {
       "ecs:ListTasks",
       "iam:PassRole",
       "iam:PutRolePolicy",
+      "iam:GetRolePolicy",
     ]
 
      resources = ["*"]
