@@ -111,6 +111,7 @@ func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
 		return nil, err
 	}
 
+	fmt.Println(output.PolicyDocument)
 	return output.PolicyDocument, err
 }
 
