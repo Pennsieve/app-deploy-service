@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -118,15 +119,15 @@ func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
 func (p *AWSProvisioner) create(ctx context.Context) error {
 	log.Println("creating infrastructure ...")
 
-	policy, err := p.GetPolicy(context.Background())
+	_, err := p.GetPolicy(context.Background())
 	if err != nil {
-		return err
-	}
-
-	if policy == nil {
-		log.Printf("no inline policy exists for account: %s, creating ...", p.AccountId)
-		err = p.CreatePolicy(context.Background())
-		if err != nil {
+		if strings.Contains(err.Error(), "NoSuchEntity") {
+			log.Printf("no inline policy exists for account: %s, creating ...", p.AccountId)
+			err = p.CreatePolicy(context.Background())
+			if err != nil {
+				return err
+			}
+		} else {
 			return err
 		}
 	}
