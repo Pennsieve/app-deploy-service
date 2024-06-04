@@ -75,21 +75,19 @@ func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 		return err
 	}
 
-	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/ROLE-%s", p.AccountId, *provisionerAccountId.Account)
 	policyDoc := fmt.Sprintf(`{
-		"Version": "2012-10-17",
-		"Statement": [
-			{
-				"Sid": "Statement1",
-				"Effect": "Allow",
-				"Action": "sts:AssumeRole",
-				"Resource": %s
-			}
-		]
-	}`, roleArn)
+					"Version": "2012-10-17",
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Action": "sts:AssumeRole",
+							"Resource": "arn:aws:iam::%s:role/ROLE-%s"
+						}
+					]
+				}`, p.AccountId, *provisionerAccountId.Account)
 
 	output, err := p.IAMClient.PutRolePolicy(context.Background(), &iam.PutRolePolicyInput{
-		PolicyName:     aws.String("ExternalAccountInlinePolicy"),
+		PolicyName:     aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
 		PolicyDocument: aws.String(policyDoc),
 		RoleName:       aws.String(fmt.Sprintf("%s-app-deploy-service-fargate-task-role-use1", p.Env)),
 	})
