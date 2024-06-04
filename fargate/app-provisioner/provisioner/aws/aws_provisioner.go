@@ -100,6 +100,20 @@ func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 	return nil
 }
 
+func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
+	log.Println("getting policy ...")
+
+	output, err := p.IAMClient.GetRolePolicy(context.Background(), &iam.GetRolePolicyInput{
+		PolicyName: aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
+		RoleName:   aws.String(fmt.Sprintf("%s-app-deploy-service-fargate-task-role-use1", p.Env)),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return output.PolicyDocument, err
+}
+
 func (p *AWSProvisioner) create(ctx context.Context) error {
 	log.Println("creating infrastructure ...")
 
