@@ -19,8 +19,7 @@ import (
 )
 
 type AWSProvisioner struct {
-	IAMClient        *iam.Client
-	STSClient        *sts.Client
+	Config           aws.Config
 	AccountId        string
 	BackendExists    bool
 	Action           string
@@ -30,9 +29,8 @@ type AWSProvisioner struct {
 	AppSlug          string
 }
 
-func NewAWSProvisioner(iamClient *iam.Client, stsClient *sts.Client, accountId string, action string, env string, gitUrl string, computeNodeEfsId string, app_slug string) provisioner.Provisioner {
-	return &AWSProvisioner{IAMClient: iamClient, STSClient: stsClient,
-		AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, AppSlug: app_slug}
+func NewAWSProvisioner(cfg aws.Config, accountId string, action string, env string, gitUrl string, computeNodeEfsId string, app_slug string) provisioner.Provisioner {
+	return &AWSProvisioner{Config: cfg, AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, AppSlug: app_slug}
 }
 
 func (p *AWSProvisioner) Run(ctx context.Context) error {
@@ -52,14 +50,16 @@ func (p *AWSProvisioner) Run(ctx context.Context) error {
 func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error) {
 	log.Println("assuming role ...")
 
-	provisionerAccountId, err := p.STSClient.GetCallerIdentity(ctx,
+	stsClient := sts.NewFromConfig(p.Config)
+
+	provisionerAccountId, err := stsClient.GetCallerIdentity(ctx,
 		&sts.GetCallerIdentityInput{})
 	if err != nil {
 		return aws.Credentials{}, err
 	}
 
 	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/ROLE-%s", p.AccountId, *provisionerAccountId.Account)
-	appCreds := stscreds.NewAssumeRoleProvider(p.STSClient, roleArn)
+	appCreds := stscreds.NewAssumeRoleProvider(stsClient, roleArn)
 	credentials, err := appCreds.Retrieve(ctx)
 	if err != nil {
 		return aws.Credentials{}, err
@@ -70,8 +70,10 @@ func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error
 
 func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 	log.Println("creating an inline policy ...")
+	stsClient := sts.NewFromConfig(p.Config)
+	iamClient := iam.NewFromConfig(p.Config)
 
-	provisionerAccountId, err := p.STSClient.GetCallerIdentity(ctx,
+	provisionerAccountId, err := stsClient.GetCallerIdentity(ctx,
 		&sts.GetCallerIdentityInput{})
 	if err != nil {
 		return err
@@ -88,7 +90,7 @@ func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 					]
 				}`, p.AccountId, *provisionerAccountId.Account)
 
-	output, err := p.IAMClient.PutRolePolicy(context.Background(), &iam.PutRolePolicyInput{
+	output, err := iamClient.PutRolePolicy(context.Background(), &iam.PutRolePolicyInput{
 		PolicyName:     aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
 		PolicyDocument: aws.String(policyDoc),
 		RoleName:       aws.String(fmt.Sprintf("%s-app-deploy-service-fargate-task-role-use1", p.Env)),
@@ -99,7 +101,7 @@ func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 
 	fmt.Println(output)
 	// wait for policy to be attached
-	time.Sleep(20 * time.Second)
+	time.Sleep(25 * time.Second)
 
 	return nil
 }
@@ -107,7 +109,9 @@ func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
 	log.Println("getting policy ...")
 
-	output, err := p.IAMClient.GetRolePolicy(context.Background(), &iam.GetRolePolicyInput{
+	iamClient := iam.NewFromConfig(p.Config)
+
+	output, err := iamClient.GetRolePolicy(context.Background(), &iam.GetRolePolicyInput{
 		PolicyName: aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
 		RoleName:   aws.String(fmt.Sprintf("%s-app-deploy-service-fargate-task-role-use1", p.Env)),
 	})

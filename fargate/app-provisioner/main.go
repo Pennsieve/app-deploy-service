@@ -12,8 +12,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/google/uuid"
 	awsProvisioner "github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/aws"
@@ -62,7 +60,7 @@ func main() {
 		log.Fatalf("LoadDefaultConfig: %v\n", err)
 	}
 
-	provisioner := awsProvisioner.NewAWSProvisioner(iam.NewFromConfig(cfg), sts.NewFromConfig(cfg),
+	provisioner := awsProvisioner.NewAWSProvisioner(cfg,
 		accountId, action, env, utils.ExtractGitUrl(sourceUrl), computeNodeEfsId, utils.ExtractRepoName(sourceUrl))
 
 	if action != "DEPLOY" {
