@@ -109,7 +109,7 @@ func main() {
 				ContainerOverrides: []types.ContainerOverride{
 					{
 						Name:    &TaskDefContainerName,
-						Command: []string{"--context", sourceUrl, "--destination", destinationUrl, "--force"},
+						Command: []string{"--context", sourceUrl, "--destination", store_application.DestinationUrl, "--force"},
 						Environment: []types.KeyValuePair{
 							{
 								Name:  &accessKeyId,
