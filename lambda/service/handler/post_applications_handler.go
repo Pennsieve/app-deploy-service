@@ -135,7 +135,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	params := map[string]string{
-		"computeNodeUuid": computeNodeEfsIdValue,
+		"computeNodeUuid": computeNodeUuidValue,
 		"sourceUrl":       sourceUrlValue,
 	}
 
