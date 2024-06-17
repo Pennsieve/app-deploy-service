@@ -73,10 +73,13 @@ func GetApplicationHandler(ctx context.Context, request events.APIGatewayV2HTTPR
 			DestinationType: application.DestinationType,
 			Url:             application.DestinationUrl,
 		},
-		Env:            application.Env,
-		CreatedAt:      application.CreatedAt,
-		OrganizationId: application.OrganizationId,
-		UserId:         application.UserId,
+		Params:           application.Params,
+		CommandArguments: application.CommandArguments,
+		Env:              application.Env,
+		CreatedAt:        application.CreatedAt,
+		OrganizationId:   application.OrganizationId,
+		UserId:           application.UserId,
+		Status:           application.Status,
 	})
 	if err != nil {
 		log.Println(err.Error())
