@@ -38,7 +38,7 @@ type Application struct {
 	Params           interface{} `dynamodbav:"params"`
 	CommandArguments interface{} `dynamodbav:"commandArguments"`
 
-	Status string `dynamodbav:"status"`
+	Status string `dynamodbav:"registrationStatus"`
 }
 
 type ApplicationKey struct {
