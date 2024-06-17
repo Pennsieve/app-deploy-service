@@ -37,10 +37,13 @@ func DynamoDBApplicationToJsonApplication(dynamoApplications []store_dynamodb.Ap
 				DestinationType: a.DestinationType,
 				Url:             a.DestinationUrl,
 			},
-			Env:            a.Env,
-			CreatedAt:      a.CreatedAt,
-			OrganizationId: a.OrganizationId,
-			UserId:         a.UserId,
+			Params:           a.Params,
+			CommandArguments: a.CommandArguments,
+			Env:              a.Env,
+			CreatedAt:        a.CreatedAt,
+			OrganizationId:   a.OrganizationId,
+			UserId:           a.UserId,
+			Status:           a.Status,
 		})
 	}
 
