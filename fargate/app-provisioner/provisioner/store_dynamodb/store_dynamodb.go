@@ -36,12 +36,12 @@ func (r *ApplicationDatabaseStore) Update(ctx context.Context, application Appli
 		TableName: aws.String(r.TableName),
 		Key:       key,
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":id":            &types.AttributeValueMemberS{Value: application.ApplicationId},
-			":containerName": &types.AttributeValueMemberS{Value: application.ApplicationContainerName},
-			":destination":   &types.AttributeValueMemberS{Value: application.DestinationUrl},
-			":status":        &types.AttributeValueMemberS{Value: application.Status},
+			":i": &types.AttributeValueMemberS{Value: application.ApplicationId},
+			":c": &types.AttributeValueMemberS{Value: application.ApplicationContainerName},
+			":d": &types.AttributeValueMemberS{Value: application.DestinationUrl},
+			":s": &types.AttributeValueMemberS{Value: application.Status},
 		},
-		UpdateExpression: aws.String("set applicationId = :id, applicationContainerName = :containerName, destinationUrl = :destination, status = :status"),
+		UpdateExpression: aws.String("set applicationId = :i, applicationContainerName = :c, destinationUrl = :d, status = :s"),
 	})
 	if err != nil {
 		return fmt.Errorf("error updating application: %w", err)
