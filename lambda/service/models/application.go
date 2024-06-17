@@ -16,6 +16,9 @@ type Application struct {
 	OrganizationId           string               `json:"organizationId"`
 	UserId                   string               `json:"userId"`
 	CreatedAt                string               `json:"createdAt"`
+	Params                   interface{}          `json:"params,omitempty"`
+	CommandArguments         interface{}          `json:"commandArguments,omitempty"`
+	Status                   string               `json:"status"`
 }
 
 type Account struct {

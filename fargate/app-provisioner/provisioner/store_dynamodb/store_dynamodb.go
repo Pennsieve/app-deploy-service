@@ -7,11 +7,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go/aws"
 )
 
 type DynamoDBStore interface {
-	Insert(context.Context, Application) error
+	Update(context.Context, Application, string) error
 	Get(context.Context, string, string) ([]Application, error)
 	Delete(context.Context, string) error
 }
@@ -25,16 +26,25 @@ func NewApplicationDatabaseStore(db *dynamodb.Client, tableName string) DynamoDB
 	return &ApplicationDatabaseStore{db, tableName}
 }
 
-func (r *ApplicationDatabaseStore) Insert(ctx context.Context, application Application) error {
-	item, err := attributevalue.MarshalMap(application)
+func (r *ApplicationDatabaseStore) Update(ctx context.Context, application Application, applicationUuid string) error {
+	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: applicationUuid})
 	if err != nil {
-		return fmt.Errorf("error marshaling application: %w", err)
+		return fmt.Errorf("error marshaling key for update: %w", err)
 	}
-	_, err = r.DB.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(r.TableName), Item: item,
+
+	_, err = r.DB.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(r.TableName),
+		Key:       key,
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":id":            &types.AttributeValueMemberS{Value: application.ApplicationId},
+			":containerName": &types.AttributeValueMemberS{Value: application.ApplicationContainerName},
+			":destination":   &types.AttributeValueMemberS{Value: application.DestinationUrl},
+			":status":        &types.AttributeValueMemberS{Value: application.Status},
+		},
+		UpdateExpression: aws.String("set applicationId = :id, applicationContainerName = :containerName, destinationUrl = :destination, status = :status"),
 	})
 	if err != nil {
-		return fmt.Errorf("error inserting application: %w", err)
+		return fmt.Errorf("error updating application: %w", err)
 	}
 
 	return nil
@@ -68,10 +78,10 @@ func (r *ApplicationDatabaseStore) Get(ctx context.Context, computeNodeUuid stri
 	return applications, nil
 }
 
-func (r *ApplicationDatabaseStore) Delete(ctx context.Context, applicationId string) error {
-	key, err := attributevalue.MarshalMap(DeleteNode{Uuid: applicationId})
+func (r *ApplicationDatabaseStore) Delete(ctx context.Context, applicationUuid string) error {
+	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: applicationUuid})
 	if err != nil {
-		return fmt.Errorf("error marshaling for delete: %w", err)
+		return fmt.Errorf("error marshaling key for delete: %w", err)
 	}
 
 	_, err = r.DB.DeleteItem(ctx, &dynamodb.DeleteItemInput{
