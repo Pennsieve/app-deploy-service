@@ -13,6 +13,7 @@ import (
 type DynamoDBStore interface {
 	GetById(context.Context, string) (Application, error)
 	Get(context.Context, string, map[string]string) ([]Application, error)
+	Insert(context.Context, Application) error
 }
 
 type ApplicationDatabaseStore struct {
@@ -56,6 +57,9 @@ func (r *ApplicationDatabaseStore) Get(ctx context.Context, organizationId strin
 	if computeNodeUuid, found := params["computeNodeUuid"]; found {
 		c = c.And(expression.Name("computeNodeUuid").Equal((expression.Value(computeNodeUuid))))
 	}
+	if sourceUrl, found := params["sourceUrl"]; found {
+		c = c.And(expression.Name("sourceUrl").Equal((expression.Value(sourceUrl))))
+	}
 
 	expr, err := expression.NewBuilder().WithFilter(c).Build()
 	if err != nil {
@@ -79,4 +83,19 @@ func (r *ApplicationDatabaseStore) Get(ctx context.Context, organizationId strin
 	}
 
 	return applications, nil
+}
+
+func (r *ApplicationDatabaseStore) Insert(ctx context.Context, application Application) error {
+	item, err := attributevalue.MarshalMap(application)
+	if err != nil {
+		return fmt.Errorf("error marshaling application: %w", err)
+	}
+	_, err = r.DB.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(r.TableName), Item: item,
+	})
+	if err != nil {
+		return fmt.Errorf("error inserting application: %w", err)
+	}
+
+	return nil
 }

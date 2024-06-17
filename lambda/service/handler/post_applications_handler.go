@@ -8,14 +8,18 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
+	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
 
@@ -126,7 +130,61 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	cpuValueStr := strconv.Itoa(cpuValue)
 	memoryValueStr := strconv.Itoa(memoryValue)
 
+	// persist to dynamodb
+	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	dynamoDBClient := dynamodb.NewFromConfig(cfg)
+	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
+	params := map[string]string{
+		"computeNodeUuid": computeNodeEfsIdValue,
+		"sourceUrl":       sourceUrlValue,
+	}
+
+	applications, err := applicationsStore.Get(ctx, organizationId, params)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	if len(applications) > 0 {
+		log.Fatalf("application with computeNodeUuid: %s already exists", computeNodeUuidValue)
+	}
+
+	id := uuid.New()
+	applicationId := id.String()
+	store_applications := store_dynamodb.Application{
+		Uuid:             applicationId,
+		Name:             nameValue,
+		Description:      descriptionValue,
+		ApplicationType:  applicationTypeValue,
+		AccountUuid:      accountUuidValue,
+		AccountId:        accountIdValue,
+		AccountType:      accountTypeValue,
+		ComputeNodeUuid:  computeNodeUuidValue,
+		ComputeNodeEfsId: computeNodeEfsIdValue,
+		SourceType:       sourceTypeValue,
+		SourceUrl:        sourceUrlValue,
+		DestinationType:  "ecr",
+		DestinationUrl:   destinationUrlValue,
+		CPU:              cpuValue,
+		Memory:           memoryValue,
+		Env:              envValue,
+		OrganizationId:   organizationId,
+		UserId:           userId,
+		CreatedAt:        time.Now().UTC().String(),
+		Params:           application.Params,
+		CommandArguments: application.CommandArguments,
+		Status:           "registering",
+	}
+	err = applicationsStore.Insert(ctx, store_applications)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	applicationIdKey := "APPLICATION_UUID"
+
 	environment := []types.KeyValuePair{
+		{
+			Name:  &applicationIdKey,
+			Value: &applicationId,
+		},
 		{
 			Name:  &envKey,
 			Value: &envValue,

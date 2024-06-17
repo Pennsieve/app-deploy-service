@@ -34,9 +34,14 @@ type Application struct {
 	OrganizationId string `dynamodbav:"organizationId"`
 	UserId         string `dynamodbav:"userId"`
 	CreatedAt      string `dynamodbav:"createdAt"`
+
+	Params           interface{} `dynamodbav:"params"`
+	CommandArguments interface{} `dynamodbav:"commandArguments"`
+
+	Status string `dynamodbav:"status"`
 }
 
-type DeleteNode struct {
+type ApplicationKey struct {
 	Uuid string `dynamodbav:"uuid"`
 }
 
