@@ -141,10 +141,18 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	applications, err := applicationsStore.Get(ctx, organizationId, params)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Println(err)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: 500,
+			Body:       handlerError(handlerName, ErrDynamoDB),
+		}, nil
 	}
 	if len(applications) > 0 {
-		log.Fatalf("application with computeNodeUuid: %s already exists", computeNodeUuidValue)
+		log.Println(err)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: 409,
+			Body:       handlerError(handlerName, ErrRecordExists),
+		}, nil
 	}
 
 	id := uuid.New()
