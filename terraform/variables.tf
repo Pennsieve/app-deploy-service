@@ -58,7 +58,7 @@ variable "deployer_task_cpu" {
 }
 
 variable "deployer_task_memory" {
-  default = "20480"
+  default = "24576"
 }
 
 locals {
