@@ -38,8 +38,8 @@ data "template_file" "app_deployer_ecs_task_definition" {
   vars = {
     aws_region                = data.aws_region.current_region.name
     aws_region_shortname      = data.terraform_remote_state.region.outputs.aws_region_shortname
-    container_cpu             = var.container_cpu
-    container_memory          = var.container_memory
+    container_cpu             = var.deployer_task_cpu
+    container_memory          = var.deployer_task_memory
     environment_name          = var.environment_name
     image_tag                 = var.deployer_image_tag
     image_url                 = var.deployer_image_url
