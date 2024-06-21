@@ -46,7 +46,7 @@ variable "deployer_image_url" {
 }
 
 variable "deployer_image_tag" {
-  default = "debug"
+  default = "latest"
 }
 
 variable "deployer_tier" {
