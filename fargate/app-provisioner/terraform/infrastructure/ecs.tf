@@ -12,6 +12,8 @@ resource "aws_ecs_task_definition" "application" {
     {
       name      = "${var.app_slug}-${var.account_id}-${var.env}"
       image     = aws_ecr_repository.app.repository_url
+      cpu       = var.app_cpu
+      memory    = var.app_memory
       essential = true
       portMappings = [
         {
