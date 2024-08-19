@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
@@ -155,8 +157,19 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 		}, nil
 	}
 
+	m, err := json.Marshal(models.ApplicationResponse{
+		Message: "Application deletion initiated",
+	})
+	if err != nil {
+		log.Println(err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: 500,
+			Body:       handlerError(handlerName, ErrMarshaling),
+		}, nil
+	}
+
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: http.StatusAccepted,
-		Body:       string("Application deletion initiated"),
+		Body:       string(m),
 	}, nil
 }

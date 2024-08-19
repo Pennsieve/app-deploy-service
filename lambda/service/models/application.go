@@ -46,3 +46,7 @@ type ApplicationResources struct {
 	CPU    int `json:"cpu"`
 	Memory int `json:"memory"`
 }
+
+type ApplicationResponse struct {
+	Message string `json:"message"`
+}

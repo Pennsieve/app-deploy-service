@@ -226,8 +226,19 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 		}, nil
 	}
 
+	m, err := json.Marshal(models.ApplicationResponse{
+		Message: "Application deployment initiated",
+	})
+	if err != nil {
+		log.Println(err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: 500,
+			Body:       handlerError(handlerName, ErrMarshaling),
+		}, nil
+	}
+
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: http.StatusAccepted,
-		Body:       string("Application deployment initiated"),
+		Body:       string(m),
 	}, nil
 }
