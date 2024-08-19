@@ -90,6 +90,7 @@ func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 					]
 				}`, p.AccountId, *provisionerAccountId.Account)
 
+	// TODO: find a cleaner way to get RoleName
 	output, err := iamClient.PutRolePolicy(context.Background(), &iam.PutRolePolicyInput{
 		PolicyName:     aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
 		PolicyDocument: aws.String(policyDoc),
@@ -111,6 +112,7 @@ func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
 
 	iamClient := iam.NewFromConfig(p.Config)
 
+	// TODO: find a cleaner way to get RoleName
 	output, err := iamClient.GetRolePolicy(context.Background(), &iam.GetRolePolicyInput{
 		PolicyName: aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
 		RoleName:   aws.String(fmt.Sprintf("%s-app-deploy-service-fargate-task-role-use1", p.Env)),
