@@ -28,7 +28,7 @@ func main() {
 	env := os.Getenv("ENV")
 	sourceUrl := os.Getenv("SOURCE_URL")
 	destinationUrl := os.Getenv("DESTINATION_URL")
-	computeNodeEfsId := os.Getenv("COMPUTE_NODE_EFS_ID")
+	storageId := os.Getenv("COMPUTE_NODE_EFS_ID")
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 
@@ -39,7 +39,7 @@ func main() {
 	}
 
 	provisioner := awsProvisioner.NewAWSProvisioner(cfg,
-		accountId, action, env, utils.ExtractGitUrl(sourceUrl), computeNodeEfsId, utils.ExtractRepoName(sourceUrl))
+		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, storageId))
 
 	if action != "DEPLOY" {
 		err = provisioner.Run(ctx)

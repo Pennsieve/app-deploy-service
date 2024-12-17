@@ -1,9 +1,11 @@
 package utils_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/utils"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestExtractGitUrl(t *testing.T) {
@@ -22,4 +24,17 @@ func TestExtractRepoName(t *testing.T) {
 	if got != expected {
 		t.Errorf("expected %s, got %s", expected, got)
 	}
+}
+
+func TestGenerateHash(t *testing.T) {
+	s := "fs-0795cd79bc369ed00"
+	result := utils.GenerateHash(s)
+	assert.Equal(t, "1641283831", fmt.Sprint(result))
+}
+
+func TestAppSlug(t *testing.T) {
+	s := "git://github.com/edmore/cytof-PIPELINE"
+	s2 := "fs-0795cd79bc369ed00"
+	result := utils.AppSlug(s, s2)
+	assert.Equal(t, "cytof-pipeline-1641283831", fmt.Sprint(result))
 }

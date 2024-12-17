@@ -60,6 +60,9 @@ func (r *ApplicationDatabaseStore) Get(ctx context.Context, organizationId strin
 	if sourceUrl, found := params["sourceUrl"]; found {
 		c = c.And(expression.Name("sourceUrl").Equal((expression.Value(sourceUrl))))
 	}
+	if computeNodeEfsId, found := params["computeNodeEfsId"]; found {
+		c = c.And(expression.Name("computeNodeEfsId").Equal((expression.Value(computeNodeEfsId))))
+	}
 
 	expr, err := expression.NewBuilder().WithFilter(c).Build()
 	if err != nil {
