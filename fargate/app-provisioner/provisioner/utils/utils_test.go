@@ -34,7 +34,7 @@ func TestGenerateHash(t *testing.T) {
 
 func TestAppSlug(t *testing.T) {
 	s := "git://github.com/edmore/cytof-PIPELINE"
-	s2 := "fs-0795cd79bc369ed00"
+	s2 := "f03bea87-c766-4ec3-96b9-519fa31c1de9"
 	result := utils.AppSlug(s, s2)
-	assert.Equal(t, "cytof-pipeline-1641283831", fmt.Sprint(result))
+	assert.Equal(t, "cytof-pipeline-2267669434", fmt.Sprint(result))
 }
