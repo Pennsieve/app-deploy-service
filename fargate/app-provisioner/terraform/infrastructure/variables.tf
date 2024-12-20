@@ -19,3 +19,6 @@ variable "compute_node_efs_id" {
 variable "app_slug" {
     type = string
 }
+variable "source_url" {
+    type = string
+}
