@@ -29,6 +29,7 @@ app_cpu = "${APP_CPU:-2048}"
 app_memory = "${APP_MEMORY:-4096}"
 compute_node_efs_id = "$6"
 app_slug = "$7"
+source_url = "$5"
 EOL
 
 echo "Running init and plan ..."
@@ -41,4 +42,5 @@ echo "Running apply ..."
 terraform apply tfplan
 terraform output -json > $OUTPUT_FILE
 
+cat error.log
 echo "DONE RUNNING IN ENVIRONMENT: $ENV"
