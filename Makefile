@@ -18,14 +18,14 @@ help:
 
 # Run dockerized tests (can be used locally)
 test:
-	docker-compose -f docker-compose.test.yml down --remove-orphans
-	docker-compose -f docker-compose.test.yml up --exit-code-from local_tests local_tests
+	docker compose -f docker-compose.test.yml down --remove-orphans
+	docker compose -f docker-compose.test.yml up --exit-code-from local_tests local_tests
 	make clean
 
 # Run dockerized tests (used on Jenkins)
 test-ci:
-	docker-compose -f docker-compose.test.yml down --remove-orphans
-	@IMAGE_TAG=$(IMAGE_TAG) docker-compose -f docker-compose.test.yml up --exit-code-from=ci-tests ci-tests
+	docker compose -f docker-compose.test.yml down --remove-orphans
+	@IMAGE_TAG=$(IMAGE_TAG) docker compose -f docker-compose.test.yml up --exit-code-from=ci-tests ci-tests
 
 # Remove folders created by NEO4J docker container
 clean: docker-clean
@@ -35,7 +35,7 @@ clean: docker-clean
 
 # Spin down active docker containers.
 docker-clean:
-	docker-compose -f docker-compose.test.yml down
+	docker compose -f docker-compose.test.yml down
 
 # Build lambda and create ZIP file
 package:
