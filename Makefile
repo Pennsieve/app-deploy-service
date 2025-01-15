@@ -4,6 +4,8 @@ LAMBDA_BUCKET ?= "pennsieve-cc-lambda-functions-use1"
 WORKING_DIR   ?= "$(shell pwd)"
 SERVICE_NAME ?= "app-deploy-service"
 PACKAGE_NAME  ?= "${SERVICE_NAME}-${IMAGE_TAG}.zip"
+STATUS_PACKAGE_NAME  ?= "${SERVICE_NAME}-status-${IMAGE_TAG}.zip"
+
 
 .DEFAULT: help
 
@@ -40,14 +42,23 @@ docker-clean:
 # Build lambda and create ZIP file
 package:
 	@echo ""
-	@echo "***********************"
-	@echo "*   Building lambda   *"
-	@echo "***********************"
+	@echo "*******************************"
+	@echo "*   Building service lambda   *"
+	@echo "*******************************"
 	@echo ""
 	cd lambda/service; \
   		env GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/service/bootstrap; \
 		cd $(WORKING_DIR)/lambda/bin/service/ ; \
 			zip -r $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) .
+	@echo ""
+	@echo "******************************"
+	@echo "*   Building status lambda   *"
+	@echo "******************************"
+	@echo ""
+	cd lambda/status; \
+  		env GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/status/bootstrap; \
+		cd $(WORKING_DIR)/lambda/bin/status/ ; \
+			zip -r $(WORKING_DIR)/lambda/bin/status/$(STATUS_PACKAGE_NAME) .
 	@echo ""
 	@echo "***********************"
 	@echo "*   Building Fargate   *"
@@ -55,7 +66,6 @@ package:
 	@echo ""
 	cd $(WORKING_DIR)/fargate/app-provisioner; \
 		docker build -t pennsieve/app-provisioner:${IMAGE_TAG} . ;\
-		docker push pennsieve/app-provisioner:${IMAGE_TAG} ;\
 
 	@echo "Done"		
 
@@ -63,16 +73,36 @@ package:
 publish:
 	@make package
 	@echo ""
-	@echo "*************************"
-	@echo "*   Publishing lambda   *"
-	@echo "*************************"
+	@echo "*********************************"
+	@echo "*   Publishing service lambda   *"
+	@echo "*********************************"
 	@echo ""
 	@echo "starting cp"
 	ls $(WORKING_DIR)/lambda/bin/service/
 	aws s3 cp $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) s3://$(LAMBDA_BUCKET)/$(SERVICE_NAME)/ --output json
 	@echo "done cp"
 	rm -rf $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) $(WORKING_DIR)/lambda/bin/service/bootstrap
+	@make package
+	@echo ""
+	@echo "********************************"
+	@echo "*   Publishing status lambda   *"
+	@echo "********************************"
+	@echo ""
+	@echo "starting cp"
+	ls $(WORKING_DIR)/lambda/bin/status/
+	aws s3 cp $(WORKING_DIR)/lambda/bin/status/$(STATUS_PACKAGE_NAME) s3://$(LAMBDA_BUCKET)/$(SERVICE_NAME)/ --output json
+	@echo "done cp"
+	rm -rf $(WORKING_DIR)/lambda/bin/status/$(STATUS_PACKAGE_NAME) $(WORKING_DIR)/lambda/bin/status/bootstrap
+	@echo ""
+	@echo "**************************"
+	@echo "*   Publishing Fargate   *"
+	@echo "**************************"
+	@echo ""
+	docker push pennsieve/app-provisioner:${IMAGE_TAG}
+	@echo "Done"
 
 # Run go mod tidy on modules
 tidy:
 	cd ${WORKING_DIR}/lambda/service; go mod tidy
+	cd ${WORKING_DIR}/lambda/status; go mod tidy
+
