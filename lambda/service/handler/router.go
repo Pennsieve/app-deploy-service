@@ -16,6 +16,7 @@ type Router interface {
 	POST(string, RouterHandlerFunc)
 	GET(string, RouterHandlerFunc)
 	DELETE(string, RouterHandlerFunc)
+	PUT(string, RouterHandlerFunc)
 	Start(context.Context, events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error)
 }
 
@@ -23,10 +24,12 @@ type LambdaRouter struct {
 	getRoutes    map[string]RouterHandlerFunc
 	postRoutes   map[string]RouterHandlerFunc
 	deleteRoutes map[string]RouterHandlerFunc
+	putRoutes    map[string]RouterHandlerFunc
 }
 
 func NewLambdaRouter() Router {
 	return &LambdaRouter{
+		make(map[string]RouterHandlerFunc),
 		make(map[string]RouterHandlerFunc),
 		make(map[string]RouterHandlerFunc),
 		make(map[string]RouterHandlerFunc),
@@ -43,6 +46,10 @@ func (r *LambdaRouter) GET(routeKey string, handler RouterHandlerFunc) {
 
 func (r *LambdaRouter) DELETE(routeKey string, handler RouterHandlerFunc) {
 	r.deleteRoutes[routeKey] = handler
+}
+
+func (r *LambdaRouter) PUT(routeKey string, handler RouterHandlerFunc) {
+	r.putRoutes[routeKey] = handler
 }
 
 func (r *LambdaRouter) Start(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -67,6 +74,12 @@ func (r *LambdaRouter) Start(ctx context.Context, request events.APIGatewayV2HTT
 	case http.MethodDelete:
 		f, ok := r.deleteRoutes[routeKey]
 		if ok {
+			return f(ctx, request)
+		} else {
+			return handleError()
+		}
+	case http.MethodPut:
+		if f, ok := r.putRoutes[routeKey]; ok {
 			return f(ctx, request)
 		} else {
 			return handleError()
