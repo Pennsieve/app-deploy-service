@@ -18,6 +18,9 @@ import (
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/utils"
 )
 
+const ApplicationUUIDTag = "ApplicationUUID"
+const ActionTag = "Action"
+
 func main() {
 	log.Println("Running app provisioner")
 	ctx := context.Background()
@@ -129,6 +132,10 @@ func main() {
 				},
 			},
 			LaunchType: types.LaunchTypeFargate,
+			Tags: []types.Tag{
+				{Key: aws.String(ApplicationUUIDTag), Value: aws.String(applicationUuid)},
+				{Key: aws.String(ActionTag), Value: aws.String(action)},
+			},
 		}
 		runner := runner.NewECSTaskRunner(escClient, runTaskIn)
 		if err := runner.Run(ctx); err != nil {
@@ -200,6 +207,10 @@ func main() {
 				},
 			},
 			LaunchType: types.LaunchTypeFargate,
+			Tags: []types.Tag{
+				{Key: aws.String(ApplicationUUIDTag), Value: aws.String(applicationUuid)},
+				{Key: aws.String(ActionTag), Value: aws.String(action)},
+			},
 		}
 		runner := runner.NewECSTaskRunner(escClient, runTaskIn)
 		if err := runner.Run(ctx); err != nil {
