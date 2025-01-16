@@ -70,8 +70,7 @@ package:
 	@echo "Done"		
 
 # Copy Service lambda to S3 location
-publish:
-	@make package
+publish: package
 	@echo ""
 	@echo "*********************************"
 	@echo "*   Publishing service lambda   *"
@@ -82,7 +81,6 @@ publish:
 	aws s3 cp $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) s3://$(LAMBDA_BUCKET)/$(SERVICE_NAME)/ --output json
 	@echo "done cp"
 	rm -rf $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) $(WORKING_DIR)/lambda/bin/service/bootstrap
-	@make package
 	@echo ""
 	@echo "********************************"
 	@echo "*   Publishing status lambda   *"
