@@ -22,18 +22,15 @@ help:
 test:
 	docker compose -f docker-compose.test.yml down --remove-orphans
 	docker compose -f docker-compose.test.yml up --exit-code-from local_tests local_tests
-	make clean
 
 # Run dockerized tests (used on Jenkins)
 test-ci:
 	docker compose -f docker-compose.test.yml down --remove-orphans
 	@IMAGE_TAG=$(IMAGE_TAG) docker compose -f docker-compose.test.yml up --exit-code-from=ci-tests ci-tests
 
-# Remove folders created by NEO4J docker container
+# Remove folders created by build
 clean: docker-clean
-	rm -rf conf
-	rm -rf data
-	rm -rf plugins
+	rm -rf $(WORKING_DIR)/lambda/bin
 
 # Spin down active docker containers.
 docker-clean:
