@@ -79,7 +79,7 @@ func main() {
 
 		// Build and deploy
 		escClient := ecs.NewFromConfig(cfg)
-		log.Println("Initiating new Deployment Fargate Task.")
+		log.Println("Initiating new Deployment Fargate Task:", action)
 		creds, err := provisioner.AssumeRole(ctx)
 		if err != nil {
 			log.Fatal(err.Error())
@@ -154,7 +154,7 @@ func main() {
 	case "DEPLOY":
 		// Build and deploy
 		escClient := ecs.NewFromConfig(cfg)
-		log.Println("Initiating new Deployment Fargate Task.")
+		log.Println("Initiating new Deployment Fargate Task:", action)
 		creds, err := provisioner.AssumeRole(ctx)
 		if err != nil {
 			log.Fatal(err.Error())
