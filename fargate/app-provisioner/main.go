@@ -67,7 +67,7 @@ func main() {
 			ApplicationId:            outputs.AppTaskDefn.Value,
 			ApplicationContainerName: outputs.AppContainerName.Value,
 			DestinationUrl:           outputs.AppEcrUrl.Value,
-			Status:                   "registered",
+			Status:                   "deploying",
 		}
 		err = applicationsStore.Update(ctx, store_application, applicationUuid)
 		if err != nil {
@@ -147,6 +147,7 @@ func main() {
 	case "DEPLOY":
 		// Build and deploy
 		escClient := ecs.NewFromConfig(cfg)
+		dynamoDBClient := dynamodb.NewFromConfig(cfg)
 		log.Println("Initiating new Deployment Fargate Task:", action)
 		creds, err := provisioner.AssumeRole(ctx)
 		if err != nil {
@@ -201,10 +202,13 @@ func main() {
 			},
 			LaunchType: types.LaunchTypeFargate,
 		}
+		applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
+		if err := applicationsStore.UpdateStatus(ctx, "re-deploying", applicationUuid); err != nil {
+			log.Fatalf("error updating status of application %s to `re-deploying`: %v", applicationUuid, err)
+		}
 		runner := runner.NewECSTaskRunner(escClient, runTaskIn)
 		if err := runner.Run(ctx); err != nil {
 			log.Fatal(err)
-
 		}
 
 	default:
