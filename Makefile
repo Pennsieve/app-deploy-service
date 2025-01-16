@@ -1,4 +1,4 @@
-.PHONY: help clean test test-ci package publish
+.PHONY: help clean test test-ci package publish tidy vet
 
 LAMBDA_BUCKET ?= "pennsieve-cc-lambda-functions-use1"
 WORKING_DIR   ?= "$(shell pwd)"
@@ -105,4 +105,9 @@ publish:
 tidy:
 	cd ${WORKING_DIR}/lambda/service; go mod tidy
 	cd ${WORKING_DIR}/lambda/status; go mod tidy
+
+# Run go vet on modules
+vet:
+	cd ${WORKING_DIR}/lambda/service; go vet ./...
+	cd ${WORKING_DIR}/lambda/status; go vet ./...
 
