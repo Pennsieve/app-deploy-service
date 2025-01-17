@@ -126,7 +126,9 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
 
     resources = [
       aws_dynamodb_table.applications_table.arn,
-      "${aws_dynamodb_table.applications_table.arn}/*"
+      "${aws_dynamodb_table.applications_table.arn}/*",
+      aws_dynamodb_table.deployments_table.arn,
+      "${aws_dynamodb_table.deployments_table.arn}/*"
     ]
 
   }
@@ -191,6 +193,28 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
       "ec2:UnassignPrivateIpAddresses"
     ]
     resources = ["*"]
+  }
+
+  statement {
+    sid    = "StatusLambdaAccessToDynamoDB"
+    effect = "Allow"
+
+    actions = [
+      "dynamodb:BatchGetItem",
+      "dynamodb:GetItem",
+      "dynamodb:Query",
+      "dynamodb:BatchWriteItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem"
+    ]
+
+    resources = [
+      aws_dynamodb_table.applications_table.arn,
+      "${aws_dynamodb_table.applications_table.arn}/*",
+      aws_dynamodb_table.deployments_table.arn,
+      "${aws_dynamodb_table.deployments_table.arn}/*"
+    ]
+
   }
 
 }

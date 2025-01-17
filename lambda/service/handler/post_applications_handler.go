@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"github.com/pennsieve/app-deploy-service/service/mappers"
 	"log"
 	"net/http"
 	"os"
@@ -47,6 +48,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	SecurityGroup := os.Getenv("SECURITY_GROUP")
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
 	DeployerTaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
 	organizationId := claims.OrgClaim.NodeId
@@ -187,6 +189,16 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	}
 
 	applicationIdKey := "APPLICATION_UUID"
+	deploymentId := uuid.NewString()
+
+	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
+		Id:            deploymentId,
+		ApplicationId: applicationId,
+		CreatedAt:     time.Now().UTC(),
+	}); err != nil {
+		log.Fatalf("error creating deployment record: %v", err)
+	}
 
 	environment := []types.KeyValuePair{
 		{
@@ -289,6 +301,10 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 			Name:  &memoryKey,
 			Value: &memoryValueStr,
 		},
+		{
+			Name:  aws.String(deploymentIdKey),
+			Value: aws.String(deploymentId),
+		},
 	}
 
 	runTaskIn := &ecs.RunTaskInput{
@@ -312,17 +328,36 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		LaunchType: types.LaunchTypeFargate,
 	}
 
-	runner := runner.NewECSTaskRunner(client, runTaskIn)
-	if err := runner.Run(ctx); err != nil {
+	taskRunner := runner.NewECSTaskRunner(client, runTaskIn)
+	runTaskOut, err := taskRunner.Run(ctx)
+	if err != nil {
 		log.Println(err)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
 			Body:       handlerError(handlerName, ErrRunningFargateTask),
 		}, nil
 	}
+	if err := runner.GetRunFailures(runTaskOut); err != nil {
+		log.Println(err)
+		// assuming here that if there were failures, then no tasks started.
+		// seems safe since for now we are only starting one task
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: 500,
+			Body:       handlerError(handlerName, ErrRunningFargateTask),
+		}, nil
+	}
+	// we expect one task
+	if len(runTaskOut.Tasks) > 0 {
+		log.Printf("started provisioning and deployment %s of application %s from %s in task %s",
+			deploymentId,
+			applicationId,
+			sourceUrlValue,
+			aws.StringValue(runTaskOut.Tasks[0].TaskArn))
+	}
 
-	m, err := json.Marshal(models.ApplicationResponse{
-		Message: "Application creation initiated",
+	m, err := json.Marshal(models.RegisterApplicationResponse{
+		Application:  mappers.DynamoDBApplicationToJsonApplication(store_applications),
+		DeploymentId: deploymentId,
 	})
 	if err != nil {
 		log.Println(err.Error())

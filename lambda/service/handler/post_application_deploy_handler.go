@@ -3,10 +3,14 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/google/uuid"
+	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -42,6 +46,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	SecurityGroup := os.Getenv("SECURITY_GROUP")
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
 	DeployerTaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
 	organizationId := claims.OrgClaim.NodeId
@@ -106,6 +111,17 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	securityGroupValue := SecurityGroup
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
+
+	deploymentId := uuid.NewString()
+	dynamoDBClient := dynamodb.NewFromConfig(cfg)
+	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
+		Id:            deploymentId,
+		ApplicationId: application.ApplicationId,
+		CreatedAt:     time.Now().UTC(),
+	}); err != nil {
+		log.Fatalf("error creating deployment record: %v", err)
+	}
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -210,6 +226,10 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 							Name:  &deployertaskDefnContainerKey,
 							Value: &deployertaskDefnContainerValue,
 						},
+						{
+							Name:  aws.String(deploymentIdKey),
+							Value: aws.String(deploymentId),
+						},
 					},
 				},
 			},
@@ -217,18 +237,34 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 		LaunchType: types.LaunchTypeFargate,
 	}
 
-	runner := runner.NewECSTaskRunner(client, runTaskIn)
-	if err := runner.Run(ctx); err != nil {
+	taskRunner := runner.NewECSTaskRunner(client, runTaskIn)
+	runTaskOut, err := taskRunner.Run(ctx)
+	if err != nil {
 		log.Println(err)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
 			Body:       handlerError(handlerName, ErrRunningFargateTask),
 		}, nil
 	}
+	if err := runner.GetRunFailures(runTaskOut); err != nil {
+		log.Println(err)
+		// assuming here that if there were failures, then no tasks started.
+		// seems safe since for now we are only starting one task
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: 500,
+			Body:       handlerError(handlerName, ErrRunningFargateTask),
+		}, nil
+	}
+	// we expect one task
+	if len(runTaskOut.Tasks) > 0 {
+		log.Printf("started re-deployment %s of application %s from %s in task %s",
+			deploymentId,
+			application.ApplicationId,
+			sourceUrlValue,
+			aws.StringValue(runTaskOut.Tasks[0].TaskArn))
+	}
 
-	m, err := json.Marshal(models.ApplicationResponse{
-		Message: "Application deployment initiated",
-	})
+	m, err := json.Marshal(models.DeployApplicationResponse{DeploymentId: deploymentId})
 	if err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{

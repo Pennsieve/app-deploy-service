@@ -50,3 +50,12 @@ type ApplicationResources struct {
 type ApplicationResponse struct {
 	Message string `json:"message"`
 }
+
+type RegisterApplicationResponse struct {
+	Application  Application `json:"application"`
+	DeploymentId string      `json:"deploymentId"`
+}
+
+type DeployApplicationResponse struct {
+	DeploymentId string `json:"deploymentId"`
+}
