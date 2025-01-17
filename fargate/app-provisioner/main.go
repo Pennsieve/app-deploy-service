@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner"
 	"log"
 	"os"
 	"strings"
@@ -19,7 +20,7 @@ import (
 )
 
 func main() {
-	log.Println("Running app provisioner")
+	log.Println("Running app Provisioner")
 	ctx := context.Background()
 
 	applicationUuid := os.Getenv("APPLICATION_UUID")
@@ -39,13 +40,13 @@ func main() {
 		log.Fatalf("LoadDefaultConfig: %v\n", err)
 	}
 
-	provisioner := awsProvisioner.NewAWSProvisioner(cfg,
+	appProvisioner := awsProvisioner.NewAWSProvisioner(cfg,
 		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid))
 
 	if action != "DEPLOY" {
-		err = provisioner.Run(ctx)
+		err = appProvisioner.Run(ctx)
 		if err != nil {
-			log.Fatal("error running provisioner", err.Error())
+			log.Fatal("error running appProvisioner", err.Error())
 		}
 	}
 
@@ -77,7 +78,7 @@ func main() {
 		// Build and deploy
 		escClient := ecs.NewFromConfig(cfg)
 		log.Println("Initiating new Deployment Fargate Task:", action)
-		creds, err := provisioner.AssumeRole(ctx)
+		creds, err := appProvisioner.AssumeRole(ctx)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
@@ -95,6 +96,7 @@ func main() {
 		cluster := os.Getenv("CLUSTER_ARN")
 		SecurityGroup := os.Getenv("SECURITY_GROUP")
 		TaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+		deploymentId := os.Getenv(provisioner.DeploymentIdKey)
 
 		runTaskIn := &ecs.RunTaskInput{
 			TaskDefinition: aws.String(TaskDefinitionArn),
@@ -129,9 +131,17 @@ func main() {
 				},
 			},
 			LaunchType: types.LaunchTypeFargate,
+			Tags: []types.Tag{
+				{Key: aws.String(provisioner.DeploymentIdTag), Value: aws.String(deploymentId)},
+				{Key: aws.String(provisioner.ApplicationIdTag), Value: aws.String(applicationUuid)},
+			},
 		}
-		runner := runner.NewECSTaskRunner(escClient, runTaskIn)
-		if err := runner.Run(ctx); err != nil {
+		taskRunner := runner.NewECSTaskRunner(escClient, runTaskIn)
+		runTaskOut, err := taskRunner.Run(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := runner.GetRunFailures(runTaskOut); err != nil {
 			log.Fatal(err)
 		}
 
@@ -149,7 +159,7 @@ func main() {
 		escClient := ecs.NewFromConfig(cfg)
 		dynamoDBClient := dynamodb.NewFromConfig(cfg)
 		log.Println("Initiating new Deployment Fargate Task:", action)
-		creds, err := provisioner.AssumeRole(ctx)
+		creds, err := appProvisioner.AssumeRole(ctx)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
@@ -167,6 +177,7 @@ func main() {
 		cluster := os.Getenv("CLUSTER_ARN")
 		SecurityGroup := os.Getenv("SECURITY_GROUP")
 		TaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+		deploymentId := os.Getenv(provisioner.DeploymentIdKey)
 
 		runTaskIn := &ecs.RunTaskInput{
 			TaskDefinition: aws.String(TaskDefinitionArn),
@@ -201,13 +212,21 @@ func main() {
 				},
 			},
 			LaunchType: types.LaunchTypeFargate,
+			Tags: []types.Tag{
+				{Key: aws.String(provisioner.DeploymentIdTag), Value: aws.String(deploymentId)},
+				{Key: aws.String(provisioner.ApplicationIdTag), Value: aws.String(applicationUuid)},
+			},
 		}
 		applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 		if err := applicationsStore.UpdateStatus(ctx, "re-deploying", applicationUuid); err != nil {
 			log.Fatalf("error updating status of application %s to `re-deploying`: %v", applicationUuid, err)
 		}
-		runner := runner.NewECSTaskRunner(escClient, runTaskIn)
-		if err := runner.Run(ctx); err != nil {
+		taskRunner := runner.NewECSTaskRunner(escClient, runTaskIn)
+		runTaskOut, err := taskRunner.Run(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := runner.GetRunFailures(runTaskOut); err != nil {
 			log.Fatal(err)
 		}
 

@@ -333,6 +333,7 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
       "ecs:DescribeTasks",
       "ecs:RunTask",
       "ecs:ListTasks",
+      "ecs:TagResource",
       "iam:PassRole",
       "iam:PutRolePolicy",
       "iam:GetRolePolicy",

@@ -8,4 +8,5 @@ type Deployment struct {
 	CreatedAt       time.Time `dynamodbav:"createdAt"`
 	WorkspaceNodeId string    `dynamodbav:"workspaceNodeId"`
 	UserNodeId      string    `dynamodbav:"userNodeId"`
+	Action          string    `dynamodbav:"action"`
 }

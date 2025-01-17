@@ -132,6 +132,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 		CreatedAt:       time.Now().UTC(),
 		WorkspaceNodeId: organizationId,
 		UserNodeId:      userId,
+		Action:          actionValue,
 	}); err != nil {
 		log.Fatalf("error creating deployment record: %v", err)
 	}
