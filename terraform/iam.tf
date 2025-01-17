@@ -183,7 +183,7 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
   }
 
   statement {
-    sid    = "AppDeployServiceLambdaEC2Permissions"
+    sid    = "AppDeployStatusLambdaEC2Permissions"
     effect = "Allow"
     actions = [
       "ec2:CreateNetworkInterface",
@@ -215,6 +215,15 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
       "${aws_dynamodb_table.deployments_table.arn}/*"
     ]
 
+  }
+
+  statement {
+    sid    = "AppDeployStatusLambdaECSPermissions"
+    effect = "Allow"
+    actions = [
+      "ecs:DescribeTasks",
+    ]
+    resources = ["*"]
   }
 
 }

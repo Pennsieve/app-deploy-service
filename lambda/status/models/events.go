@@ -32,6 +32,8 @@ type Detail struct {
 	TaskDefinitionArn string `json:"taskDefinitionArn"`
 	Version           int    `json:"version"`
 
+	ClusterArn string `json:"clusterArn"`
+
 	Containers []Container `json:"containers"`
 	// CreatedAt The timestamp for the time when the task was created.
 	// More specifically, it's for the time when the task entered the PENDING state.
@@ -58,6 +60,15 @@ type Detail struct {
 	StoppedReason string `json:"stoppedReason"`
 }
 
+func (d Detail) Errored() bool {
+	for _, c := range d.Containers {
+		if c.Errored() {
+			return true
+		}
+	}
+	return false
+}
+
 // Container may be the only way we can distinguish an error during kaniko's run.
 // The StopCode in Detail seems to be "EssentialContainerExited" both
 // when the deployment task succeeded and when it failed for something like a
@@ -68,4 +79,8 @@ type Container struct {
 	Image      string `json:"image"`
 	LastStatus string `json:"lastStatus"`
 	TaskArn    string `json:"taskArn"`
+}
+
+func (c Container) Errored() bool {
+	return c.ExitCode != 0
 }
