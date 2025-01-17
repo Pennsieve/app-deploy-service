@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
+	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 	"log"
 	"net/http"
 	"os"
@@ -49,6 +50,16 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
+	// Maybe we should check for role.Writer instead here, but I'm not
+	// sure if there is a difference for org roles.
+	// So just making sure the user is not a guest
+	if !authorizer.HasOrgRole(claims, role.Viewer) {
+		log.Printf("user not permitted to deploy application with claims: %+v", claims)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusUnauthorized,
+			Body:       handlerError(handlerName, ErrNotPermitted),
+		}, nil
+	}
 	organizationId := claims.OrgClaim.NodeId
 	userId := claims.UserClaim.NodeId
 
@@ -116,9 +127,11 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
-		Id:            deploymentId,
-		ApplicationId: application.ApplicationId,
-		CreatedAt:     time.Now().UTC(),
+		Id:              deploymentId,
+		ApplicationId:   application.ApplicationId,
+		CreatedAt:       time.Now().UTC(),
+		WorkspaceNodeId: organizationId,
+		UserNodeId:      userId,
 	}); err != nil {
 		log.Fatalf("error creating deployment record: %v", err)
 	}

@@ -17,6 +17,7 @@ var ErrNoRecordsFound = errors.New("error no records found")
 var ErrRecordExists = errors.New("error record already exists")
 var ErrMarshaling = errors.New("error marshaling item")
 var ErrDynamoDB = errors.New("error performing action on DynamoDB table")
+var ErrNotPermitted = errors.New("not permitted")
 
 func handlerError(handlerName string, errorMessage error) string {
 	log.Printf("%s: %s", handlerName, errorMessage.Error())
