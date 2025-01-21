@@ -133,6 +133,7 @@ func main() {
 			LaunchType: types.LaunchTypeFargate,
 			Tags: []types.Tag{
 				{Key: aws.String(provisioner.DeploymentIdTag), Value: aws.String(deploymentId)},
+				{Key: aws.String(provisioner.ApplicationIdTag), Value: aws.String(applicationUuid)},
 			},
 		}
 		taskRunner := runner.NewECSTaskRunner(escClient, runTaskIn)
@@ -213,6 +214,7 @@ func main() {
 			LaunchType: types.LaunchTypeFargate,
 			Tags: []types.Tag{
 				{Key: aws.String(provisioner.DeploymentIdTag), Value: aws.String(deploymentId)},
+				{Key: aws.String(provisioner.ApplicationIdTag), Value: aws.String(applicationUuid)},
 			},
 		}
 		applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
