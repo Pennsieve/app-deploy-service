@@ -14,7 +14,7 @@ import (
 	"os"
 )
 
-func PutApplicationHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+func PutApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "PutApplicationHandler"
 	uuid := request.PathParameters["id"]
 
