@@ -33,20 +33,6 @@ func NewAWSProvisioner(cfg aws.Config, accountId string, action string, env stri
 	return &AWSProvisioner{Config: cfg, AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, AppSlug: app_slug}
 }
 
-func (p *AWSProvisioner) Run(ctx context.Context) error {
-	log.Println("Starting to provision infrastructure ...")
-
-	switch p.Action {
-	case "CREATE":
-		return p.create(ctx)
-	case "DELETE":
-		return p.delete(ctx)
-	default:
-		return fmt.Errorf("action not supported: %s", p.Action)
-	}
-
-}
-
 func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error) {
 	log.Println("assuming role ...")
 
@@ -125,7 +111,7 @@ func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
 	return output.PolicyDocument, err
 }
 
-func (p *AWSProvisioner) create(ctx context.Context) error {
+func (p *AWSProvisioner) Create(ctx context.Context) error {
 	log.Println("creating infrastructure ...")
 
 	_, err := p.GetPolicy(context.Background())
@@ -183,7 +169,7 @@ func (p *AWSProvisioner) create(ctx context.Context) error {
 	return nil
 }
 
-func (p *AWSProvisioner) delete(ctx context.Context) error {
+func (p *AWSProvisioner) Delete(ctx context.Context) error {
 	fmt.Println("destroying infrastructure")
 
 	creds, err := p.AssumeRole(ctx)
