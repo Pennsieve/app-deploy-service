@@ -69,7 +69,7 @@ type FinalState struct {
 
 func (f *FinalState) Status() string {
 	if f.Errored {
-		return "deployment error"
+		return "error"
 	}
 	return "deployed"
 }
