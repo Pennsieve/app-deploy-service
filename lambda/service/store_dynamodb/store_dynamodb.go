@@ -3,6 +3,7 @@ package store_dynamodb
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -14,6 +15,7 @@ type DynamoDBStore interface {
 	GetById(context.Context, string) (Application, error)
 	Get(context.Context, string, map[string]string) ([]Application, error)
 	Insert(context.Context, Application) error
+	UpdateStatus(ctx context.Context, newStatus string, applicationUuid string) error
 }
 
 type ApplicationDatabaseStore struct {
@@ -95,6 +97,27 @@ func (r *ApplicationDatabaseStore) Insert(ctx context.Context, application Appli
 	})
 	if err != nil {
 		return fmt.Errorf("error inserting application: %w", err)
+	}
+
+	return nil
+}
+
+func (r *ApplicationDatabaseStore) UpdateStatus(ctx context.Context, newStatus string, applicationUuid string) error {
+	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: applicationUuid})
+	if err != nil {
+		return fmt.Errorf("error marshaling key for status update: %w", err)
+	}
+
+	_, err = r.DB.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(r.TableName),
+		Key:       key,
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":s": &types.AttributeValueMemberS{Value: newStatus},
+		},
+		UpdateExpression: aws.String("set registrationStatus = :s"),
+	})
+	if err != nil {
+		return fmt.Errorf("error updating application status: %w", err)
 	}
 
 	return nil
