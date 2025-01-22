@@ -56,8 +56,8 @@ type Detail struct {
 	// ExecutionStoppedAt The timestamp for the time when the task execution stopped.
 	ExecutionStoppedAt *time.Time `json:"executionStoppedAt,omitempty"`
 
-	StopCode      string `json:"stopCode"`
-	StoppedReason string `json:"stoppedReason"`
+	StopCode      string `json:"stopCode,omitempty"`
+	StoppedReason string `json:"stoppedReason,omitempty"`
 }
 
 func (d Detail) Errored() bool {

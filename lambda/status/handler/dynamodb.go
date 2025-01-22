@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/pennsieve/app-deploy-service/status/dydbutils"
 	"github.com/pennsieve/app-deploy-service/status/models"
+	"time"
 )
 
 func (h *DeployTaskStateChangeHandler) UpdateDeploymentsTable(ctx context.Context, deploymentId string, event models.TaskStateChangeEvent) error {
@@ -17,6 +18,8 @@ func (h *DeployTaskStateChangeHandler) UpdateDeploymentsTable(ctx context.Contex
 
 	updateBuilder := DeploymentUpdateBuilder(event)
 
+	// Condition: Only update if item already exists (no upsert) and if
+	// this is first update (no version value exists yet) or existing version is less than our version
 	expressions, err := expression.NewBuilder().
 		WithCondition(
 			expression.AttributeExists(expression.Name(models.DeploymentKeyField)).
@@ -60,12 +63,35 @@ func (h *DeployTaskStateChangeHandler) UpdateDeploymentsTable(ctx context.Contex
 
 func DeploymentUpdateBuilder(event models.TaskStateChangeEvent) expression.UpdateBuilder {
 	detail := event.Detail
-	updateExpressionBuilder :=
-		expression.Set(expression.Name(models.DeploymentTaskArnField), expression.Value(detail.TaskArn)).
-			Set(expression.Name(models.DeploymentVersionField), expression.Value(detail.Version)).
-			Set(expression.Name(models.DeploymentLastStatusField), expression.Value(detail.LastStatus)).
-			Set(expression.Name(models.DeploymentDesiredStatusField), expression.Value(detail.DesiredStatus))
-	return updateExpressionBuilder
+	builder := expression.Set(expression.Name(models.DeploymentTaskArnField), expression.Value(detail.TaskArn)).
+		Set(expression.Name(models.DeploymentVersionField), expression.Value(detail.Version)).
+		Set(expression.Name(models.DeploymentLastStatusField), expression.Value(detail.LastStatus)).
+		Set(expression.Name(models.DeploymentDesiredStatusField), expression.Value(detail.DesiredStatus))
+
+	setOptionalTime(builder, models.DeploymentUpdatedAtField, detail.UpdatedAt)
+	setOptionalTime(builder, models.DeploymentCreatedAtField, detail.CreatedAt)
+	setOptionalTime(builder, models.DeploymentStartedAtField, detail.StartedAt)
+	setOptionalTime(builder, models.DeploymentStoppedAtField, detail.StoppedAt)
+
+	setOptionalString(builder, models.DeploymentStopCodeField, detail.StopCode)
+	setOptionalString(builder, models.DeploymentStoppedReasonField, detail.StoppedReason)
+
+	if finalState := IsFinalState(event); finalState != nil {
+		builder.Set(expression.Name(models.DeploymentErroredField), expression.Value(finalState.Errored))
+	}
+	return builder
+}
+
+func setOptionalTime(updateBuilder expression.UpdateBuilder, name string, optionalTime *time.Time) {
+	if optionalTime != nil {
+		updateBuilder.Set(expression.Name(name), expression.Value(*optionalTime))
+	}
+}
+
+func setOptionalString(updateBuilder expression.UpdateBuilder, name string, optionalValue string) {
+	if len(optionalValue) > 0 {
+		updateBuilder.Set(expression.Name(name), expression.Value(optionalValue))
+	}
 }
 
 func (h *DeployTaskStateChangeHandler) UpdateApplicationsTable(ctx context.Context, applicationId string, finalState *FinalState) error {

@@ -11,6 +11,7 @@ import (
 	"github.com/pennsieve/app-deploy-service/status/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
 	"time"
 )
@@ -78,22 +79,134 @@ func TestDeployTaskStateChangeHandler_UpdateApplicationsTable_Expressions(t *tes
 	assert.Equal(t, fmt.Sprintf("SET %s = %s\n", statusName, statusValueName), actualUpdate)
 }
 
-func TestDeploymentUpdateBuilder(t *testing.T) {
-	// Not really a test, just debugging
+func TestDeploymentUpdateBuilder_PartialUpdate(t *testing.T) {
+	createdAt := time.Now().UTC()
 	event := models.TaskStateChangeEvent{
-		Id:         "",
-		Version:    "",
-		Time:       time.Time{},
-		DetailType: "",
-		Region:     "",
-		Resources:  nil,
-		Source:     "",
-		Account:    "",
-		Detail:     models.Detail{},
+		Detail: models.Detail{
+			LastStatus:    "PENDING",
+			DesiredStatus: "RUNNING",
+			TaskArn:       uuid.NewString(),
+			Version:       1,
+			CreatedAt:     &createdAt,
+			StartedAt:     nil,
+			UpdatedAt:     nil,
+			StoppedAt:     nil,
+			StopCode:      "",
+			StoppedReason: "",
+		},
 	}
 	updateBuilder := DeploymentUpdateBuilder(event)
 
-	updateExpression, err := expression.NewBuilder().WithUpdate(updateBuilder).Build()
+	update, err := expression.NewBuilder().WithUpdate(updateBuilder).Build()
 	require.NoError(t, err)
-	fmt.Println(updateExpression)
+	// First 4 are always expected.
+	// Last 2 are only expected because the values in event.Detail are
+	// non-nil/non-empty
+	expectedNames := []string{
+		models.DeploymentTaskArnField,
+		models.DeploymentVersionField,
+		models.DeploymentLastStatusField,
+		models.DeploymentDesiredStatusField,
+		models.DeploymentCreatedAtField,
+	}
+	assert.Len(t, update.Names(), len(expectedNames))
+
+	for _, expectedName := range expectedNames {
+		found := false
+		for _, actualName := range update.Names() {
+			if actualName == expectedName {
+				found = true
+			}
+		}
+		assert.True(t, found, "update expression names missing expected name: %s", expectedName)
+	}
+
+	updateExpression := aws.ToString(update.Update())
+	assert.True(t, strings.HasPrefix(updateExpression, "SET"))
+	assert.Equal(t, len(expectedNames), strings.Count(updateExpression, "="))
+}
+
+func TestDeploymentUpdateBuilder_FullUpdate(t *testing.T) {
+	createdAt := time.Now().UTC()
+	startedAt := createdAt.Add(1 * time.Minute)
+	updatedAt := startedAt.Add(30 * time.Second)
+	detail := models.Detail{
+		LastStatus:    models.StateStopped,
+		DesiredStatus: models.StateStopped,
+		TaskArn:       uuid.NewString(),
+		Version:       6,
+		CreatedAt:     &createdAt,
+		StartedAt:     &startedAt,
+		UpdatedAt:     &updatedAt,
+		StoppedAt:     &updatedAt,
+		StopCode:      uuid.NewString(),
+		StoppedReason: uuid.NewString(),
+	}
+
+	for scenario, exitCode := range map[string]int{
+		"no error": 0,
+		"error":    1,
+	} {
+		t.Run(scenario, func(t *testing.T) {
+			detail.Containers = []models.Container{
+				{ExitCode: exitCode},
+			}
+			event := models.TaskStateChangeEvent{
+				Detail: detail,
+			}
+			updateBuilder := DeploymentUpdateBuilder(event)
+
+			update, err := expression.NewBuilder().WithUpdate(updateBuilder).Build()
+			require.NoError(t, err)
+			// First 4 are always expected.
+			// Remaining are expected because the values in event.Detail are
+			// non-nil/non-empty
+			expectedNames := []string{
+				models.DeploymentTaskArnField,
+				models.DeploymentVersionField,
+				models.DeploymentLastStatusField,
+				models.DeploymentDesiredStatusField,
+				models.DeploymentCreatedAtField,
+				models.DeploymentStartedAtField,
+				models.DeploymentUpdatedAtField,
+				models.DeploymentStoppedAtField,
+				models.DeploymentStopCodeField,
+				models.DeploymentStoppedReasonField,
+				models.DeploymentErroredField,
+			}
+			assert.Len(t, update.Names(), len(expectedNames))
+			var errorAlias string
+
+			for _, expectedName := range expectedNames {
+				found := false
+				for actualAlias, actualName := range update.Names() {
+					if actualName == expectedName {
+						found = true
+					}
+					if actualName == models.DeploymentErroredField {
+						errorAlias = actualAlias
+					}
+				}
+				assert.True(t, found, "update expression names missing expected name: %s", expectedName)
+			}
+
+			updateExpression := aws.ToString(update.Update())
+			assert.True(t, strings.HasPrefix(updateExpression, "SET"))
+			assert.Equal(t, len(expectedNames), strings.Count(updateExpression, "="))
+
+			assert.NotEmpty(t, errorAlias)
+			errorValueAlias := strings.ReplaceAll(errorAlias, "#", ":")
+			// checking assumption that the value alias is the same as the name alias with '#' replaced by ':'
+			assert.Contains(t, updateExpression, fmt.Sprintf("%s = %s", errorAlias, errorValueAlias))
+
+			updateValues := update.Values()
+			assert.Contains(t, updateValues, errorValueAlias)
+
+			errorValueAV := updateValues[errorValueAlias]
+			errorValueAVBOOL, isBoolean := errorValueAV.(*types.AttributeValueMemberBOOL)
+			assert.True(t, isBoolean)
+			assert.Equal(t, exitCode != 0, errorValueAVBOOL.Value)
+		})
+	}
+
 }
