@@ -388,7 +388,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
+			Body:       handlerError(handlerName, ErrRunningFargateTask),
 		}, nil
 	}
 

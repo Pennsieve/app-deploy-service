@@ -289,7 +289,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 		log.Println("error marshalling response: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       errorHandler.handleError(ctx, ErrMarshaling),
+			Body:       handlerError(handlerName, ErrMarshaling),
 		}, nil
 	}
 
