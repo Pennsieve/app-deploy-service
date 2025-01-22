@@ -5,49 +5,50 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 )
 
-func DynamoDBApplicationToJsonApplication(dynamoApplication store_dynamodb.Application) models.Application {
+func StoreToModel(a store_dynamodb.Application) models.Application {
 	return models.Application{
-		Uuid:                     dynamoApplication.Uuid,
-		ApplicationId:            dynamoApplication.ApplicationId,
-		ApplicationContainerName: dynamoApplication.ApplicationContainerName,
-		Name:                     dynamoApplication.Name,
-		Description:              dynamoApplication.Description,
+		Uuid:                     a.Uuid,
+		ApplicationId:            a.ApplicationId,
+		ApplicationContainerName: a.ApplicationContainerName,
+		Name:                     a.Name,
+		Description:              a.Description,
 		Resources: models.ApplicationResources{
-			CPU:    dynamoApplication.CPU,
-			Memory: dynamoApplication.Memory,
+			CPU:    a.CPU,
+			Memory: a.Memory,
 		},
-		ApplicationType: dynamoApplication.ApplicationType,
+		ApplicationType: a.ApplicationType,
 		Account: models.Account{
-			Uuid:        dynamoApplication.AccountUuid,
-			AccountId:   dynamoApplication.AccountId,
-			AccountType: dynamoApplication.AccountType,
+			Uuid:        a.AccountUuid,
+			AccountId:   a.AccountId,
+			AccountType: a.AccountType,
 		},
 		ComputeNode: models.ComputeNode{
-			Uuid:  dynamoApplication.ComputeNodeUuid,
-			EfsId: dynamoApplication.ComputeNodeEfsId,
+			Uuid:  a.ComputeNodeUuid,
+			EfsId: a.ComputeNodeEfsId,
 		},
 		Source: models.Source{
-			SourceType: dynamoApplication.SourceType,
-			Url:        dynamoApplication.SourceUrl,
+			SourceType: a.SourceType,
+			Url:        a.SourceUrl,
 		},
 		Destination: models.Destination{
-			DestinationType: dynamoApplication.DestinationType,
-			Url:             dynamoApplication.DestinationUrl,
+			DestinationType: a.DestinationType,
+			Url:             a.DestinationUrl,
 		},
-		Params:           dynamoApplication.Params,
-		CommandArguments: dynamoApplication.CommandArguments,
-		Env:              dynamoApplication.Env,
-		CreatedAt:        dynamoApplication.CreatedAt,
-		OrganizationId:   dynamoApplication.OrganizationId,
-		UserId:           dynamoApplication.UserId,
-		Status:           dynamoApplication.Status,
+		Params:           a.Params,
+		CommandArguments: a.CommandArguments,
+		Env:              a.Env,
+		CreatedAt:        a.CreatedAt,
+		OrganizationId:   a.OrganizationId,
+		UserId:           a.UserId,
+		Status:           a.Status,
 	}
 }
-func DynamoDBApplicationsToJsonApplications(dynamoApplications []store_dynamodb.Application) []models.Application {
+
+func DynamoDBApplicationToJsonApplication(dynamoApplications []store_dynamodb.Application) []models.Application {
 	applications := []models.Application{}
 
 	for _, a := range dynamoApplications {
-		applications = append(applications, DynamoDBApplicationToJsonApplication(a))
+		applications = append(applications, StoreToModel(a))
 	}
 
 	return applications

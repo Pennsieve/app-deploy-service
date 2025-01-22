@@ -370,7 +370,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	}
 
 	m, err := json.Marshal(models.RegisterApplicationResponse{
-		Application:  mappers.DynamoDBApplicationToJsonApplication(store_applications),
+		Application:  mappers.StoreToModel(store_applications),
 		DeploymentId: deploymentId,
 	})
 	if err != nil {

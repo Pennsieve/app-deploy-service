@@ -48,7 +48,7 @@ func GetApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTP
 		}, nil
 	}
 
-	m, err := json.Marshal(mappers.DynamoDBApplicationsToJsonApplications(dynamoApplications))
+	m, err := json.Marshal(mappers.DynamoDBApplicationToJsonApplication(dynamoApplications))
 	if err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
