@@ -7,11 +7,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go/aws"
 	awsProvisioner "github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/aws"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/parser"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/runner"

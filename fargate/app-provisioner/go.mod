@@ -3,7 +3,6 @@ module github.com/pennsieve/app-deploy-service/app-provisioner
 go 1.21.3
 
 require (
-	github.com/aws/aws-sdk-go v1.51.31
 	github.com/aws/aws-sdk-go-v2 v1.27.0
 	github.com/aws/aws-sdk-go-v2/config v1.27.11
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.11

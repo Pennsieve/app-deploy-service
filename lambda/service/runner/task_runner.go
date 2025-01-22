@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 )
@@ -28,9 +28,9 @@ func GetRunFailures(runTaskOut *ecs.RunTaskOutput) error {
 	var errs []error
 	for _, failure := range runTaskOut.Failures {
 		errs = append(errs, fmt.Errorf("run task failure: arn: %s, reason: %s, detail: %s",
-			aws.StringValue(failure.Arn),
-			aws.StringValue(failure.Reason),
-			aws.StringValue(failure.Detail)))
+			aws.ToString(failure.Arn),
+			aws.ToString(failure.Reason),
+			aws.ToString(failure.Detail)))
 	}
 	return errors.Join(errs...)
 }

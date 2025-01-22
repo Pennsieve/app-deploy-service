@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
@@ -275,7 +275,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 			deploymentId,
 			application.ApplicationId,
 			sourceUrlValue,
-			aws.StringValue(runTaskOut.Tasks[0].TaskArn))
+			aws.ToString(runTaskOut.Tasks[0].TaskArn))
 	}
 
 	m, err := json.Marshal(models.DeployApplicationResponse{DeploymentId: deploymentId})

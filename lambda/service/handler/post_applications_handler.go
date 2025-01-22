@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
@@ -366,7 +366,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 			deploymentId,
 			applicationId,
 			sourceUrlValue,
-			aws.StringValue(runTaskOut.Tasks[0].TaskArn))
+			aws.ToString(runTaskOut.Tasks[0].TaskArn))
 	}
 
 	m, err := json.Marshal(models.RegisterApplicationResponse{
