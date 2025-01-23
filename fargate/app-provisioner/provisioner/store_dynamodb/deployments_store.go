@@ -12,7 +12,6 @@ import (
 // DeploymentsTableAPI is an interface only containing the
 // DynamoDB client methods used by DeploymentsStore
 type DeploymentsTableAPI interface {
-	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 }
 
@@ -26,21 +25,6 @@ func NewDeploymentsStore(api DeploymentsTableAPI, tableName string) *Deployments
 		api:       api,
 		tableName: tableName,
 	}
-}
-
-func (s *DeploymentsStore) Insert(ctx context.Context, newDeployment Deployment) error {
-	item, err := attributevalue.MarshalMap(newDeployment)
-	if err != nil {
-		return fmt.Errorf("error marshaling deployment: %w", err)
-	}
-	_, err = s.api.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(s.tableName), Item: item,
-	})
-	if err != nil {
-		return fmt.Errorf("error inserting deployment: %w", err)
-	}
-
-	return nil
 }
 
 func (s *DeploymentsStore) SetErrored(ctx context.Context, deploymentId string) error {

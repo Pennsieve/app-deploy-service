@@ -41,6 +41,10 @@ type Application struct {
 	Status string `dynamodbav:"registrationStatus"`
 }
 
+type ApplicationKey struct {
+	Uuid string `dynamodbav:"uuid"`
+}
+
 func (i Application) GetKey() map[string]types.AttributeValue {
 	uuid, err := attributevalue.Marshal(i.Uuid)
 	if err != nil {

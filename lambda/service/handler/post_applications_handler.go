@@ -196,7 +196,11 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	}
 	err = applicationsStore.Insert(ctx, store_applications)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Println("error inserting application: ", err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrStoringApplication),
+		}, nil
 	}
 
 	applicationIdKey := "APPLICATION_UUID"
@@ -204,15 +208,22 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
-		Id:              deploymentId,
+		DeploymentKey:   store_dynamodb.DeploymentKey{Id: deploymentId},
 		ApplicationId:   applicationId,
 		CreatedAt:       time.Now().UTC(),
 		WorkspaceNodeId: organizationId,
 		UserNodeId:      userId,
 		Action:          actionValue,
+		LastStatus:      "NOT_STARTED",
 	}); err != nil {
-		log.Fatalf("error creating deployment record: %v", err)
+		log.Println("error inserting deployment: ", err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrStoringDeployment),
+		}, nil
 	}
+
+	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, applicationId, deploymentId)
 
 	environment := []types.KeyValuePair{
 		{
@@ -348,7 +359,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		log.Println(err)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	if err := runner.GetRunFailures(runTaskOut); err != nil {
@@ -357,7 +368,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		// seems safe since for now we are only starting one task
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	// we expect one task
@@ -377,7 +388,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrMarshaling),
+			Body:       handlerError(handlerName, ErrRunningFargateTask),
 		}, nil
 	}
 

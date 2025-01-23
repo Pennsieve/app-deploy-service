@@ -3,24 +3,23 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/google/uuid"
+	"github.com/pennsieve/app-deploy-service/service/models"
+	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
+	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
-
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/ecs"
-	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/pennsieve/app-deploy-service/service/models"
-	"github.com/pennsieve/app-deploy-service/service/runner"
-	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
 
 func PostApplicationDeployHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -48,6 +47,16 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
 	DeployerTaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
 	deploymentsTable := os.Getenv(deploymentsTableNameKey)
+	deploymentId := uuid.NewString()
+
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Println(err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrConfig),
+		}, nil
+	}
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
 	// Maybe we should check for role.Writer instead here, but I'm not
@@ -62,15 +71,6 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	}
 	organizationId := claims.OrgClaim.NodeId
 	userId := claims.UserClaim.NodeId
-
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		log.Println(err.Error())
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrConfig),
-		}, nil
-	}
 
 	client := ecs.NewFromConfig(cfg)
 	log.Println("Initiating new Provisioning Fargate Task.")
@@ -123,19 +123,25 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
 
-	deploymentId := uuid.NewString()
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
-		Id:              deploymentId,
-		ApplicationId:   application.ApplicationId,
+		DeploymentKey:   store_dynamodb.DeploymentKey{Id: deploymentId},
+		ApplicationId:   application.Uuid,
 		CreatedAt:       time.Now().UTC(),
 		WorkspaceNodeId: organizationId,
 		UserNodeId:      userId,
 		Action:          actionValue,
+		LastStatus:      "NOT_STARTED",
 	}); err != nil {
-		log.Fatalf("error creating deployment record: %v", err)
+		log.Println("error creating deployment record: ", err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrStoringDeployment),
+		}, nil
 	}
+	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, tableValue)
+	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, application.Uuid, deploymentId)
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -254,19 +260,19 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	taskRunner := runner.NewECSTaskRunner(client, runTaskIn)
 	runTaskOut, err := taskRunner.Run(ctx)
 	if err != nil {
-		log.Println(err)
+		log.Println("error running task: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	if err := runner.GetRunFailures(runTaskOut); err != nil {
-		log.Println(err)
+		log.Println("run failures from task: ", err.Error())
 		// assuming here that if there were failures, then no tasks started.
 		// seems safe since for now we are only starting one task
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	// we expect one task
@@ -280,7 +286,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 
 	m, err := json.Marshal(models.DeployApplicationResponse{DeploymentId: deploymentId})
 	if err != nil {
-		log.Println(err.Error())
+		log.Println("error marshalling response: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
 			Body:       handlerError(handlerName, ErrMarshaling),
