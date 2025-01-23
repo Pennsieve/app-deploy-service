@@ -9,7 +9,7 @@ type DeploymentKey struct {
 type Deployment struct {
 	DeploymentKey
 	ApplicationId   string    `dynamodbav:"applicationId"`
-	CreatedAt       time.Time `dynamodbav:"createdAt"`
+	InitiatedAt     time.Time `dynamodbav:"initiatedAt"`
 	WorkspaceNodeId string    `dynamodbav:"workspaceNodeId"`
 	UserNodeId      string    `dynamodbav:"userNodeId"`
 	Action          string    `dynamodbav:"action"`
