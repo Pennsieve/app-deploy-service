@@ -14,6 +14,7 @@ import (
 type DeploymentsTableAPI interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(options *dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 }
 
 type DeploymentsStore struct {
@@ -62,4 +63,28 @@ func (s *DeploymentsStore) SetErrored(ctx context.Context, deploymentId string) 
 	}
 
 	return nil
+}
+
+func (s *DeploymentsStore) Get(ctx context.Context, deploymentId string) (*Deployment, error) {
+	deploymentKey, err := attributevalue.MarshalMap(DeploymentKey{Id: deploymentId})
+	if err != nil {
+		return nil, fmt.Errorf("error marshalling deployment key: %w", err)
+	}
+	getItemOut, err := s.api.GetItem(ctx, &dynamodb.GetItemInput{
+		Key:       deploymentKey,
+		TableName: aws.String(s.tableName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error getting deployment: %w", err)
+	}
+	if len(getItemOut.Item) == 0 {
+		return nil, nil
+	}
+
+	var deployment Deployment
+	if err = attributevalue.UnmarshalMap(getItemOut.Item, &deployment); err != nil {
+		return nil, fmt.Errorf("error unmarshaling deployment item: %w", err)
+	}
+
+	return &deployment, nil
 }
