@@ -128,7 +128,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
 		DeploymentKey:   store_dynamodb.DeploymentKey{Id: deploymentId},
 		ApplicationId:   application.Uuid,
-		CreatedAt:       time.Now().UTC(),
+		InitiatedAt:     time.Now().UTC(),
 		WorkspaceNodeId: organizationId,
 		UserNodeId:      userId,
 		Action:          actionValue,
