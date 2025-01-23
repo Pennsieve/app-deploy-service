@@ -330,6 +330,10 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 			Name:  aws.String(deploymentIdKey),
 			Value: aws.String(deploymentId),
 		},
+		{
+			Name:  aws.String(deploymentsTableNameKey),
+			Value: aws.String(deploymentsTable),
+		},
 	}
 
 	runTaskIn := &ecs.RunTaskInput{

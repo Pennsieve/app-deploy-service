@@ -34,6 +34,8 @@ func main() {
 	computeNodeUuid := os.Getenv("COMPUTE_NODE_UUID")
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
+	deploymentId := os.Getenv(provisioner.DeploymentIdKey)
 
 	// Initializing environment
 	cfg, err := config.LoadDefaultConfig(context.Background())
@@ -45,14 +47,15 @@ func main() {
 		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid))
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
+	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 
 	// POST provisioning actions
 	switch action {
 	case "CREATE":
 		ecsClient := ecs.NewFromConfig(cfg)
-		if err := Create(ctx, applicationUuid, sourceUrl, appProvisioner, applicationsStore, ecsClient); err != nil {
-			if statusErr := applicationsStore.UpdateStatus(ctx, err.Error(), applicationUuid); statusErr != nil {
-				log.Println("warning: unable to update applications with create error: ", statusErr.Error())
+		if err := Create(ctx, applicationUuid, deploymentId, sourceUrl, appProvisioner, applicationsStore, ecsClient); err != nil {
+			if statusErr := StoreError(ctx, err, applicationUuid, deploymentId, applicationsStore, deploymentsStore); statusErr != nil {
+				log.Println("warning: unable to update states with create error: ", statusErr.Error())
 			}
 			log.Fatal(err)
 		}
@@ -66,8 +69,8 @@ func main() {
 	case "DEPLOY":
 		// Build and deploy
 		ecsClient := ecs.NewFromConfig(cfg)
-		if err := Redeploy(ctx, applicationUuid, sourceUrl, destinationUrl, appProvisioner, applicationsStore, ecsClient); err != nil {
-			if statusErr := applicationsStore.UpdateStatus(ctx, err.Error(), applicationUuid); statusErr != nil {
+		if err := Redeploy(ctx, applicationUuid, deploymentId, sourceUrl, destinationUrl, appProvisioner, applicationsStore, ecsClient); err != nil {
+			if statusErr := StoreError(ctx, err, applicationUuid, deploymentId, applicationsStore, deploymentsStore); statusErr != nil {
 				log.Println("warning: unable to update applications with re-deploy error: ", statusErr.Error())
 			}
 			log.Fatal(err)
@@ -83,7 +86,7 @@ func main() {
 	log.Println("provisioning complete")
 }
 
-func Create(ctx context.Context, applicationUuid string, sourceUrl string, appProvisioner provisioner.Provisioner, applicationsStore store_dynamodb.DynamoDBStore, ecsClient *ecs.Client) error {
+func Create(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, appProvisioner provisioner.Provisioner, applicationsStore store_dynamodb.DynamoDBStore, ecsClient *ecs.Client) error {
 	if err := appProvisioner.Create(ctx); err != nil {
 		return fmt.Errorf("error creating infrastructure: %w", err)
 	}
@@ -108,25 +111,25 @@ func Create(ctx context.Context, applicationUuid string, sourceUrl string, appPr
 
 	// Build and deploy
 	log.Println("Initiating new Deployment Fargate Task: CREATE")
-	if err := Deploy(ctx, applicationUuid, sourceUrl, store_application.DestinationUrl, appProvisioner, ecsClient); err != nil {
+	if err := Deploy(ctx, applicationUuid, deploymentId, sourceUrl, store_application.DestinationUrl, appProvisioner, ecsClient); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func Redeploy(ctx context.Context, applicationUuid string, sourceUrl string, destinationUrl string, appProvisioner provisioner.Provisioner, applicationsStore store_dynamodb.DynamoDBStore, ecsClient *ecs.Client) error {
+func Redeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, destinationUrl string, appProvisioner provisioner.Provisioner, applicationsStore store_dynamodb.DynamoDBStore, ecsClient *ecs.Client) error {
 	log.Println("Initiating new Deployment Fargate Task: DEPLOY")
 	if err := applicationsStore.UpdateStatus(ctx, "re-deploying", applicationUuid); err != nil {
 		return fmt.Errorf("error updating status of application %s to `re-deploying`: %w", applicationUuid, err)
 	}
-	if err := Deploy(ctx, applicationUuid, sourceUrl, destinationUrl, appProvisioner, ecsClient); err != nil {
+	if err := Deploy(ctx, applicationUuid, deploymentId, sourceUrl, destinationUrl, appProvisioner, ecsClient); err != nil {
 		return err
 	}
 	return nil
 }
 
-func Deploy(ctx context.Context, applicationUuid string, sourceUrl string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+func Deploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
 	creds, err := appProvisioner.AssumeRole(ctx)
 	if err != nil {
 		return fmt.Errorf("error assuming role: %w", err)
@@ -145,7 +148,6 @@ func Deploy(ctx context.Context, applicationUuid string, sourceUrl string, desti
 	cluster := os.Getenv("CLUSTER_ARN")
 	SecurityGroup := os.Getenv("SECURITY_GROUP")
 	TaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
-	deploymentId := os.Getenv(provisioner.DeploymentIdKey)
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -206,6 +208,22 @@ func Delete(ctx context.Context, applicationUuid string, appProvisioner provisio
 
 	if err := applicationsStore.Delete(ctx, applicationUuid); err != nil {
 		return fmt.Errorf("error deleting application from store: %w", err)
+	}
+	return nil
+}
+
+func StoreError(ctx context.Context, err error, applicationUuid string, deploymentId string, applicationsStore store_dynamodb.DynamoDBStore, deploymentsStore *store_dynamodb.DeploymentsStore) error {
+	var statusErr error
+	if statusErr = applicationsStore.UpdateStatus(ctx, err.Error(), applicationUuid); statusErr != nil {
+		return fmt.Errorf("error while updating application %s with error %s: %w",
+			applicationUuid,
+			err.Error(),
+			statusErr)
+	}
+	if statusErr = deploymentsStore.SetErrored(ctx, deploymentId); statusErr != nil {
+		return fmt.Errorf("error while setting 'errored' on deployment %s: %w",
+			deploymentId,
+			statusErr)
 	}
 	return nil
 }

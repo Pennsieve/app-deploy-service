@@ -250,6 +250,10 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 							Name:  aws.String(deploymentIdKey),
 							Value: aws.String(deploymentId),
 						},
+						{
+							Name:  aws.String(deploymentsTableNameKey),
+							Value: aws.String(deploymentsTable),
+						},
 					},
 				},
 			},
