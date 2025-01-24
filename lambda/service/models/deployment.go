@@ -30,3 +30,7 @@ type Deployment struct {
 	StoppedReason string `json:"stoppedReason,omitempty"`
 	Errored       bool   `json:"errored,omitempty"`
 }
+
+type Deployments struct {
+	Deployments []Deployment `json:"deployments"`
+}

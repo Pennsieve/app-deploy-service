@@ -17,7 +17,7 @@ import (
 	"os"
 )
 
-func GetDeploymentStatusHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+func GetDeploymentHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "GetDeploymentHandler"
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
@@ -83,7 +83,7 @@ func GetDeploymentStatusHandler(ctx context.Context, request events.APIGatewayV2
 		}, nil
 	}
 
-	if deploymentItem.WorkspaceNodeId != expectedOrganizationId {
+	if !IsAuthorized(expectedOrganizationId, *deploymentItem) {
 		responseErr := logError(handlerName, "user not permitted to view deployment", nil)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusUnauthorized,

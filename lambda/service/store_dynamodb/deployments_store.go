@@ -15,6 +15,7 @@ type DeploymentsTableAPI interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(options *dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(options *dynamodb.Options)) (*dynamodb.QueryOutput, error)
 }
 
 type DeploymentsStore struct {
@@ -93,4 +94,10 @@ func (s *DeploymentsStore) Get(ctx context.Context, applicationId, deploymentId 
 	}
 
 	return &deployment, nil
+}
+
+func (s *DeploymentsStore) GetHistory(ctx context.Context, applicationId string) ([]Deployment, error) {
+	var deployments []Deployment
+	// TODO implement
+	return deployments, nil
 }

@@ -15,6 +15,8 @@ type ArgCaptureDeploymentsTableAPI struct {
 	putItemInput    *dynamodb.PutItemInput
 	updateItemInput *dynamodb.UpdateItemInput
 	getItemInput    *dynamodb.GetItemInput
+	// Query may be paginated, so use a slice to collect all the inputs received by one GetHistory call
+	queryInputs []*dynamodb.QueryInput
 }
 
 func (a *ArgCaptureDeploymentsTableAPI) PutItem(_ context.Context, params *dynamodb.PutItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
@@ -30,6 +32,11 @@ func (a *ArgCaptureDeploymentsTableAPI) UpdateItem(_ context.Context, params *dy
 func (a *ArgCaptureDeploymentsTableAPI) GetItem(_ context.Context, params *dynamodb.GetItemInput, _ ...func(options *dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
 	a.getItemInput = params
 	return &dynamodb.GetItemOutput{}, nil
+}
+
+func (a *ArgCaptureDeploymentsTableAPI) Query(_ context.Context, params *dynamodb.QueryInput, _ ...func(options *dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+	a.queryInputs = append(a.queryInputs, params)
+	return &dynamodb.QueryOutput{}, nil
 }
 
 func TestDeploymentsStore_Get(t *testing.T) {

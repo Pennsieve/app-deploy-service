@@ -23,3 +23,11 @@ func DeploymentItemToModel(item store_dynamodb.Deployment) models.Deployment {
 		Errored:       item.Errored,
 	}
 }
+
+func DeploymentItemsToModels(items []store_dynamodb.Deployment) []models.Deployment {
+	var ms []models.Deployment
+	for _, item := range items {
+		ms = append(ms, DeploymentItemToModel(item))
+	}
+	return ms
+}
