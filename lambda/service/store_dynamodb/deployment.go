@@ -4,7 +4,8 @@ import "time"
 
 // *Field consts should match the dynamodbav struct tag for the field
 
-const DeploymentKeyField = "id"
+const DeploymentIdField = "deploymentId"
+const DeploymentApplicationIdField = "applicationId"
 
 type DeploymentKey struct {
 	ApplicationId string `dynamodbav:"applicationId"`

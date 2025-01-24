@@ -36,13 +36,17 @@ func TestDeploymentsStore_Get(t *testing.T) {
 	argCaptureAPI := new(ArgCaptureDeploymentsTableAPI)
 	tableName := uuid.NewString()
 	store := NewDeploymentsStore(argCaptureAPI, tableName)
+	applicationId := uuid.NewString()
 	deploymentId := uuid.NewString()
-	deployment, err := store.Get(context.Background(), deploymentId)
+	deployment, err := store.Get(context.Background(), applicationId, deploymentId)
 	require.NoError(t, err)
 	assert.Nil(t, deployment)
 
 	getItemInput := argCaptureAPI.getItemInput
 	assert.Equal(t, tableName, aws.ToString(getItemInput.TableName))
-	expectedKey := map[string]types.AttributeValue{DeploymentKeyField: &types.AttributeValueMemberS{Value: deploymentId}}
+	expectedKey := map[string]types.AttributeValue{
+		DeploymentApplicationIdField: &types.AttributeValueMemberS{Value: applicationId},
+		DeploymentIdField:            &types.AttributeValueMemberS{Value: deploymentId},
+	}
 	assert.Equal(t, expectedKey, getItemInput.Key)
 }

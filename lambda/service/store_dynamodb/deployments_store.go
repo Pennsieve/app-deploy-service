@@ -68,8 +68,11 @@ func (s *DeploymentsStore) SetErrored(ctx context.Context, applicationId string,
 	return nil
 }
 
-func (s *DeploymentsStore) Get(ctx context.Context, deploymentId string) (*Deployment, error) {
-	deploymentKey, err := attributevalue.MarshalMap(DeploymentKey{Id: deploymentId})
+func (s *DeploymentsStore) Get(ctx context.Context, applicationId, deploymentId string) (*Deployment, error) {
+	deploymentKey, err := attributevalue.MarshalMap(DeploymentKey{
+		ApplicationId: applicationId,
+		DeploymentId:  deploymentId,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling deployment key: %w", err)
 	}

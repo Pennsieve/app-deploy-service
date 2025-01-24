@@ -7,7 +7,7 @@ import (
 
 func DeploymentItemToModel(item store_dynamodb.Deployment) models.Deployment {
 	return models.Deployment{
-		Id:            item.Id,
+		DeploymentId:  item.DeploymentId,
 		ApplicationId: item.ApplicationId,
 		InitiatedAt:   item.InitiatedAt,
 		Version:       item.Version,

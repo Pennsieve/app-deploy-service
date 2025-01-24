@@ -3,7 +3,7 @@ package models
 import "time"
 
 type Deployment struct {
-	Id            string    `json:"id"`
+	DeploymentId  string    `json:"deploymentId"`
 	ApplicationId string    `json:"applicationId"`
 	InitiatedAt   time.Time `json:"initiatedAt"`
 	Version       int       `json:"version"`

@@ -66,7 +66,7 @@ func GetDeploymentStatusHandler(ctx context.Context, request events.APIGatewayV2
 		}, nil
 	}
 
-	deploymentItem, err := deploymentsStore.Get(ctx, deploymentId)
+	deploymentItem, err := deploymentsStore.Get(ctx, applicationId, deploymentId)
 	if err != nil {
 		responseErr := logError(handlerName, fmt.Sprintf("error getting deployment %s", deploymentId), err)
 		return events.APIGatewayV2HTTPResponse{
@@ -87,14 +87,6 @@ func GetDeploymentStatusHandler(ctx context.Context, request events.APIGatewayV2
 		responseErr := logError(handlerName, "user not permitted to view deployment", nil)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, responseErr),
-		}, nil
-	}
-
-	if deploymentItem.ApplicationId != applicationId {
-		responseErr := logError(handlerName, "invalid application id provided", nil)
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusBadRequest,
 			Body:       handlerError(handlerName, responseErr),
 		}, nil
 	}
