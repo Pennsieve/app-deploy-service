@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
@@ -97,7 +98,49 @@ func (s *DeploymentsStore) Get(ctx context.Context, applicationId, deploymentId 
 }
 
 func (s *DeploymentsStore) GetHistory(ctx context.Context, applicationId string) ([]Deployment, error) {
+	expressions, err := expression.NewBuilder().
+		WithKeyCondition(expression.KeyEqual(
+			expression.Key(DeploymentApplicationIdField), expression.Value(applicationId))).Build()
+	if err != nil {
+		return nil, fmt.Errorf("error building key condition for query of application %s: %w", applicationId, err)
+	}
+	queryIn := &dynamodb.QueryInput{
+		TableName:                 aws.String(s.tableName),
+		ExpressionAttributeNames:  expressions.Names(),
+		ExpressionAttributeValues: expressions.Values(),
+		KeyConditionExpression:    expressions.KeyCondition(),
+	}
+	queryOut, err := s.api.Query(ctx, queryIn)
+	if err != nil {
+		return nil, fmt.Errorf("error getting deployments for application %s: %w", applicationId, err)
+	}
 	var deployments []Deployment
-	// TODO implement
+	deployments, err = fromItems(queryOut.Items, deployments)
+	if err != nil {
+		return nil, err
+	}
+	for lastEvaluatedKey, page := queryOut.LastEvaluatedKey, 2; len(lastEvaluatedKey) > 0; page++ {
+		queryIn.ExclusiveStartKey = lastEvaluatedKey
+		queryOut, err := s.api.Query(ctx, queryIn)
+		if err != nil {
+			return nil, fmt.Errorf("error getting page %d of deployments for application %s: %w", page, applicationId, err)
+		}
+		deployments, err = fromItems(queryOut.Items, deployments)
+		if err != nil {
+			return nil, err
+		}
+		lastEvaluatedKey = queryOut.LastEvaluatedKey
+	}
+	return deployments, nil
+}
+
+func fromItems(items []map[string]types.AttributeValue, deployments []Deployment) ([]Deployment, error) {
+	for _, item := range items {
+		var deployment Deployment
+		if err := attributevalue.UnmarshalMap(item, &deployment); err != nil {
+			return nil, fmt.Errorf("error unmarshalling deployment from item: %w", err)
+		}
+		deployments = append(deployments, deployment)
+	}
 	return deployments, nil
 }
