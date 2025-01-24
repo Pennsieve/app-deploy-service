@@ -2,6 +2,10 @@ package store_dynamodb
 
 import "time"
 
+// *Field consts should match the dynamodbav struct tag for the field
+
+const DeploymentKeyField = "id"
+
 type DeploymentKey struct {
 	Id string `dynamodbav:"id"`
 }
