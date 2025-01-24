@@ -13,8 +13,8 @@ import (
 	"time"
 )
 
-func (h *DeployTaskStateChangeHandler) UpdateDeploymentsTable(ctx context.Context, deploymentId string, event models.TaskStateChangeEvent) error {
-	key := models.DeploymentKey(deploymentId)
+func (h *DeployTaskStateChangeHandler) UpdateDeploymentsTable(ctx context.Context, applicationId, deploymentId string, event models.TaskStateChangeEvent) error {
+	key := models.DeploymentKeyItem(applicationId, deploymentId)
 
 	updateBuilder := DeploymentUpdateBuilder(event)
 
@@ -22,7 +22,8 @@ func (h *DeployTaskStateChangeHandler) UpdateDeploymentsTable(ctx context.Contex
 	// this is first update (no version value exists yet) or existing version is less than our version
 	expressions, err := expression.NewBuilder().
 		WithCondition(
-			expression.AttributeExists(expression.Name(models.DeploymentKeyField)).
+			expression.AttributeExists(expression.Name(models.DeploymentApplicationIdField)).And(
+				expression.AttributeExists(expression.Name(models.DeploymentIdField))).
 				And(expression.Or(
 					expression.AttributeNotExists(expression.Name(models.DeploymentVersionField)),
 					expression.LessThan(expression.Name(models.DeploymentVersionField), expression.Value(event.Detail.Version))))).

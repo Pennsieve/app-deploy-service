@@ -37,7 +37,7 @@ func (h *DeployTaskStateChangeHandler) Handle(ctx context.Context, event models.
 		slog.String("deploymentId", deploymentId),
 		slog.String("applicationId", applicationId))
 
-	if err := h.UpdateDeploymentsTable(ctx, deploymentId, event); err != nil {
+	if err := h.UpdateDeploymentsTable(ctx, applicationId, deploymentId, event); err != nil {
 		var conflict *DeploymentUpdateConflict
 		if errors.As(err, &conflict) {
 			if unmarshalError := conflict.UnmarshallingError; unmarshalError != nil {

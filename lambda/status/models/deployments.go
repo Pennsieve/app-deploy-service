@@ -8,7 +8,8 @@ import (
 
 // These *Field const must match the values in the dynamodbav struct tags in Deployment
 
-const DeploymentKeyField = "id"
+const DeploymentApplicationIdField = "applicationId"
+const DeploymentIdField = "deploymentId"
 const DeploymentVersionField = "version"
 const DeploymentTaskArnField = "taskArn"
 const DeploymentLastStatusField = "lastStatus"
@@ -21,9 +22,13 @@ const DeploymentStopCodeField = "stopCode"
 const DeploymentStoppedReasonField = "stoppedReason"
 const DeploymentErroredField = "errored"
 
-type Deployment struct {
-	Id            string `dynamodbav:"id"`
+type DeploymentKey struct {
 	ApplicationId string `dynamodbav:"applicationId"`
+	DeploymentId  string `dynamodbav:"deploymentId"`
+}
+
+type Deployment struct {
+	DeploymentKey
 	Version       int    `dynamodbav:"version"`
 	LastStatus    string `dynamodbav:"lastStatus"`
 	DesiredStatus string `dynamodbav:"desiredStatus"`
@@ -49,6 +54,9 @@ type Deployment struct {
 	Errored       bool   `dynamodbav:"errored,omitempty"`
 }
 
-func DeploymentKey(deploymentId string) map[string]types.AttributeValue {
-	return map[string]types.AttributeValue{"id": dydbutils.StringAttributeValue(deploymentId)}
+func DeploymentKeyItem(applicationId, deploymentId string) map[string]types.AttributeValue {
+	return map[string]types.AttributeValue{
+		DeploymentApplicationIdField: dydbutils.StringAttributeValue(applicationId),
+		DeploymentIdField:            dydbutils.StringAttributeValue(deploymentId),
+	}
 }
