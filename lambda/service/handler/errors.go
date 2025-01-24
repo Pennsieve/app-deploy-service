@@ -54,7 +54,7 @@ func (h *ErrorHandler) handleError(ctx context.Context, err error) string {
 	if appStoreErr := h.ApplicationsStore.UpdateStatus(ctx, msg, h.ApplicationId); appStoreErr != nil {
 		log.Printf("warning: error updating applications table with error: %s: %s\n", msg, appStoreErr.Error())
 	}
-	if deployStoreErr := h.DeploymentsStore.SetErrored(ctx, h.DeploymentId); deployStoreErr != nil {
+	if deployStoreErr := h.DeploymentsStore.SetErrored(ctx, h.ApplicationId, h.DeploymentId); deployStoreErr != nil {
 		log.Printf("warning: error setting errored on deployments table: %s\n", deployStoreErr.Error())
 	}
 	return handlerError(h.HandlerName, err)

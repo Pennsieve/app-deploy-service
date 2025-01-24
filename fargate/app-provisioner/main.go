@@ -220,7 +220,7 @@ func StoreError(ctx context.Context, err error, applicationUuid string, deployme
 			err.Error(),
 			statusErr)
 	}
-	if statusErr = deploymentsStore.SetErrored(ctx, deploymentId); statusErr != nil {
+	if statusErr = deploymentsStore.SetErrored(ctx, applicationUuid, deploymentId); statusErr != nil {
 		return fmt.Errorf("error while setting 'errored' on deployment %s: %w",
 			deploymentId,
 			statusErr)

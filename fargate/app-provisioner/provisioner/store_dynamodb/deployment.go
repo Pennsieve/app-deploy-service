@@ -1,7 +1,8 @@
 package store_dynamodb
 
 type DeploymentKey struct {
-	Id string `dynamodbav:"id"`
+	ApplicationId string `dynamodbav:"applicationId"`
+	DeploymentId  string `dynamodbav:"deploymentId"`
 }
 
 type Deployment struct {

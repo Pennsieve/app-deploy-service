@@ -7,12 +7,12 @@ import "time"
 const DeploymentKeyField = "id"
 
 type DeploymentKey struct {
-	Id string `dynamodbav:"id"`
+	ApplicationId string `dynamodbav:"applicationId"`
+	DeploymentId  string `dynamodbav:"deploymentId"`
 }
 
 type Deployment struct {
 	DeploymentKey
-	ApplicationId   string    `dynamodbav:"applicationId"`
 	InitiatedAt     time.Time `dynamodbav:"initiatedAt"`
 	WorkspaceNodeId string    `dynamodbav:"workspaceNodeId"`
 	UserNodeId      string    `dynamodbav:"userNodeId"`

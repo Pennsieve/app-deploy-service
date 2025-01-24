@@ -126,8 +126,10 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
-		DeploymentKey:   store_dynamodb.DeploymentKey{Id: deploymentId},
-		ApplicationId:   application.Uuid,
+		DeploymentKey: store_dynamodb.DeploymentKey{
+			DeploymentId:  deploymentId,
+			ApplicationId: application.Uuid,
+		},
 		InitiatedAt:     time.Now().UTC(),
 		WorkspaceNodeId: organizationId,
 		UserNodeId:      userId,

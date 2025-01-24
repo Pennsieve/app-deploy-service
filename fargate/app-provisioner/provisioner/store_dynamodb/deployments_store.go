@@ -27,8 +27,11 @@ func NewDeploymentsStore(api DeploymentsTableAPI, tableName string) *Deployments
 	}
 }
 
-func (s *DeploymentsStore) SetErrored(ctx context.Context, deploymentId string) error {
-	key, err := attributevalue.MarshalMap(DeploymentKey{Id: deploymentId})
+func (s *DeploymentsStore) SetErrored(ctx context.Context, applicationId string, deploymentId string) error {
+	key, err := attributevalue.MarshalMap(DeploymentKey{
+		ApplicationId: applicationId,
+		DeploymentId:  deploymentId,
+	})
 	if err != nil {
 		return fmt.Errorf("error marshaling key for deployment errored update: %w", err)
 	}
