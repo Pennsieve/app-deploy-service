@@ -126,7 +126,9 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
 
     resources = [
       aws_dynamodb_table.applications_table.arn,
-      "${aws_dynamodb_table.applications_table.arn}/*"
+      "${aws_dynamodb_table.applications_table.arn}/*",
+      aws_dynamodb_table.deployments_table.arn,
+      "${aws_dynamodb_table.deployments_table.arn}/*"
     ]
 
   }
@@ -181,7 +183,7 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
   }
 
   statement {
-    sid    = "AppDeployServiceLambdaEC2Permissions"
+    sid    = "AppDeployStatusLambdaEC2Permissions"
     effect = "Allow"
     actions = [
       "ec2:CreateNetworkInterface",
@@ -189,6 +191,37 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
       "ec2:DeleteNetworkInterface",
       "ec2:AssignPrivateIpAddresses",
       "ec2:UnassignPrivateIpAddresses"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "StatusLambdaAccessToDynamoDB"
+    effect = "Allow"
+
+    actions = [
+      "dynamodb:BatchGetItem",
+      "dynamodb:GetItem",
+      "dynamodb:Query",
+      "dynamodb:BatchWriteItem",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem"
+    ]
+
+    resources = [
+      aws_dynamodb_table.applications_table.arn,
+      "${aws_dynamodb_table.applications_table.arn}/*",
+      aws_dynamodb_table.deployments_table.arn,
+      "${aws_dynamodb_table.deployments_table.arn}/*"
+    ]
+
+  }
+
+  statement {
+    sid    = "AppDeployStatusLambdaECSPermissions"
+    effect = "Allow"
+    actions = [
+      "ecs:DescribeTasks",
     ]
     resources = ["*"]
   }
@@ -309,6 +342,7 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
       "ecs:DescribeTasks",
       "ecs:RunTask",
       "ecs:ListTasks",
+      "ecs:TagResource",
       "iam:PassRole",
       "iam:PutRolePolicy",
       "iam:GetRolePolicy",

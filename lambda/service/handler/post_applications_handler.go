@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"github.com/pennsieve/app-deploy-service/service/mappers"
+	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 	"log"
 	"net/http"
 	"os"
@@ -11,11 +13,11 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
@@ -47,8 +49,19 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	SecurityGroup := os.Getenv("SECURITY_GROUP")
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
 	DeployerTaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
+	// Maybe we should check for role.Writer instead here, but I'm not
+	// sure if there is a difference for org roles.
+	// So just making sure the user is not a guest
+	if !authorizer.HasOrgRole(claims, role.Viewer) {
+		log.Printf("user not permitted to create application with claims: %+v", claims)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusUnauthorized,
+			Body:       handlerError(handlerName, ErrNotPermitted),
+		}, nil
+	}
 	organizationId := claims.OrgClaim.NodeId
 	userId := claims.UserClaim.NodeId
 
@@ -183,10 +196,36 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	}
 	err = applicationsStore.Insert(ctx, store_applications)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Println("error inserting application: ", err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrStoringApplication),
+		}, nil
 	}
 
 	applicationIdKey := "APPLICATION_UUID"
+	deploymentId := uuid.NewString()
+
+	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
+		DeploymentKey: store_dynamodb.DeploymentKey{
+			DeploymentId:  deploymentId,
+			ApplicationId: applicationId,
+		},
+		InitiatedAt:     time.Now().UTC(),
+		WorkspaceNodeId: organizationId,
+		UserNodeId:      userId,
+		Action:          actionValue,
+		LastStatus:      "NOT_STARTED",
+	}); err != nil {
+		log.Println("error inserting deployment: ", err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrStoringDeployment),
+		}, nil
+	}
+
+	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, applicationId, deploymentId)
 
 	environment := []types.KeyValuePair{
 		{
@@ -289,6 +328,14 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 			Name:  &memoryKey,
 			Value: &memoryValueStr,
 		},
+		{
+			Name:  aws.String(deploymentIdKey),
+			Value: aws.String(deploymentId),
+		},
+		{
+			Name:  aws.String(deploymentsTableNameKey),
+			Value: aws.String(deploymentsTable),
+		},
 	}
 
 	runTaskIn := &ecs.RunTaskInput{
@@ -312,23 +359,42 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		LaunchType: types.LaunchTypeFargate,
 	}
 
-	runner := runner.NewECSTaskRunner(client, runTaskIn)
-	if err := runner.Run(ctx); err != nil {
+	taskRunner := runner.NewECSTaskRunner(client, runTaskIn)
+	runTaskOut, err := taskRunner.Run(ctx)
+	if err != nil {
 		log.Println(err)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
 		}, nil
 	}
+	if err := runner.GetRunFailures(runTaskOut); err != nil {
+		log.Println(err)
+		// assuming here that if there were failures, then no tasks started.
+		// seems safe since for now we are only starting one task
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: 500,
+			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
+		}, nil
+	}
+	// we expect one task
+	if len(runTaskOut.Tasks) > 0 {
+		log.Printf("started provisioning and deployment %s of application %s from %s in task %s",
+			deploymentId,
+			applicationId,
+			sourceUrlValue,
+			aws.ToString(runTaskOut.Tasks[0].TaskArn))
+	}
 
-	m, err := json.Marshal(models.ApplicationResponse{
-		Message: "Application creation initiated",
+	m, err := json.Marshal(models.RegisterApplicationResponse{
+		Application:  mappers.StoreToModel(store_applications),
+		DeploymentId: deploymentId,
 	})
 	if err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrMarshaling),
+			Body:       handlerError(handlerName, ErrRunningFargateTask),
 		}, nil
 	}
 

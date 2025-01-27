@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go/aws"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
@@ -148,15 +148,31 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 		LaunchType: types.LaunchTypeFargate,
 	}
 
-	runner := runner.NewECSTaskRunner(client, runTaskIn)
-	if err := runner.Run(ctx); err != nil {
+	taskRunner := runner.NewECSTaskRunner(client, runTaskIn)
+	runTaskOut, err := taskRunner.Run(ctx)
+	if err != nil {
 		log.Println(err)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
 			Body:       handlerError(handlerName, ErrRunningFargateTask),
 		}, nil
 	}
-
+	if err := runner.GetRunFailures(runTaskOut); err != nil {
+		log.Println(err)
+		// assuming here that if there were failures, then no tasks started.
+		// seems safe since for now we are only starting one task
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: 500,
+			Body:       handlerError(handlerName, ErrRunningFargateTask),
+		}, nil
+	}
+	// we expect one task
+	if len(runTaskOut.Tasks) > 0 {
+		log.Printf("started deletion of application %s from %s in task %s",
+			application.ApplicationId,
+			sourceUrlValue,
+			aws.ToString(runTaskOut.Tasks[0].TaskArn))
+	}
 	m, err := json.Marshal(models.ApplicationResponse{
 		Message: "Application deletion initiated",
 	})

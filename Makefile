@@ -100,9 +100,11 @@ publish: package
 tidy:
 	cd ${WORKING_DIR}/lambda/service; go mod tidy
 	cd ${WORKING_DIR}/lambda/status; go mod tidy
+	cd ${WORKING_DIR}/fargate/app-provisioner; go mod tidy
 
 # Run go vet on modules
 vet:
 	cd ${WORKING_DIR}/lambda/service; go vet ./...
 	cd ${WORKING_DIR}/lambda/status; go vet ./...
+	cd ${WORKING_DIR}/fargate/app-provisioner; go vet ./...
 
