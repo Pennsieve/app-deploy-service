@@ -8,7 +8,7 @@ import (
 // These *Field const must match the field names in the Applications table
 
 const ApplicationKeyField = "uuid"
-const ApplicationStatusField = "status"
+const ApplicationStatusField = "registrationStatus"
 
 func ApplicationKey(applicationId string) map[string]types.AttributeValue {
 	return map[string]types.AttributeValue{ApplicationKeyField: dydbutils.StringAttributeValue(applicationId)}
