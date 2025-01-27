@@ -123,6 +123,7 @@ func TestDeploymentsStore_GetHistory(t *testing.T) {
 				appIdNameKey = k
 			}
 		}
+		assert.NotEmpty(t, appIdNameKey)
 
 		//Values
 		var appIdValueKey string
@@ -131,6 +132,7 @@ func TestDeploymentsStore_GetHistory(t *testing.T) {
 				appIdValueKey = k
 			}
 		}
+		assert.NotEmpty(t, appIdValueKey)
 
 		assert.Equal(t, fmt.Sprintf("%s = %s", appIdNameKey, appIdValueKey), aws.ToString(input.KeyConditionExpression))
 
