@@ -27,13 +27,13 @@ func NewDeploymentsStore(api DeploymentsTableAPI, tableName string) *Deployments
 	}
 }
 
-func (s *DeploymentsStore) SetErrored(ctx context.Context, applicationId string, deploymentId string) error {
+func (s *DeploymentsStore) SetErroredFlag(ctx context.Context, applicationId string, deploymentId string) error {
 	key, err := attributevalue.MarshalMap(DeploymentKey{
 		ApplicationId: applicationId,
 		DeploymentId:  deploymentId,
 	})
 	if err != nil {
-		return fmt.Errorf("error marshaling key for deployment errored update: %w", err)
+		return fmt.Errorf("error marshaling key for deployment %s 'errored' flag update: %w", deploymentId, err)
 	}
 
 	_, err = s.api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
@@ -45,7 +45,7 @@ func (s *DeploymentsStore) SetErrored(ctx context.Context, applicationId string,
 		UpdateExpression: aws.String("set errored = :e"),
 	})
 	if err != nil {
-		return fmt.Errorf("error updating deployment errored: %w", err)
+		return fmt.Errorf("error updating 'errored' flag on deployment %s: %w", deploymentId, err)
 	}
 
 	return nil

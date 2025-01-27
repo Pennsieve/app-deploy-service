@@ -54,7 +54,7 @@ func main() {
 	case "CREATE":
 		ecsClient := ecs.NewFromConfig(cfg)
 		if err := Create(ctx, applicationUuid, deploymentId, sourceUrl, appProvisioner, applicationsStore, ecsClient); err != nil {
-			if statusErr := StoreError(ctx, err, applicationUuid, deploymentId, applicationsStore, deploymentsStore); statusErr != nil {
+			if statusErr := SetErrorStatus(ctx, err, applicationUuid, deploymentId, applicationsStore, deploymentsStore); statusErr != nil {
 				log.Println("warning: unable to update states with create error: ", statusErr.Error())
 			}
 			log.Fatal(err)
@@ -70,7 +70,7 @@ func main() {
 		// Build and deploy
 		ecsClient := ecs.NewFromConfig(cfg)
 		if err := Redeploy(ctx, applicationUuid, deploymentId, sourceUrl, destinationUrl, appProvisioner, applicationsStore, ecsClient); err != nil {
-			if statusErr := StoreError(ctx, err, applicationUuid, deploymentId, applicationsStore, deploymentsStore); statusErr != nil {
+			if statusErr := SetErrorStatus(ctx, err, applicationUuid, deploymentId, applicationsStore, deploymentsStore); statusErr != nil {
 				log.Println("warning: unable to update applications with re-deploy error: ", statusErr.Error())
 			}
 			log.Fatal(err)
@@ -212,7 +212,7 @@ func Delete(ctx context.Context, applicationUuid string, appProvisioner provisio
 	return nil
 }
 
-func StoreError(ctx context.Context, err error, applicationUuid string, deploymentId string, applicationsStore store_dynamodb.DynamoDBStore, deploymentsStore *store_dynamodb.DeploymentsStore) error {
+func SetErrorStatus(ctx context.Context, err error, applicationUuid string, deploymentId string, applicationsStore store_dynamodb.DynamoDBStore, deploymentsStore *store_dynamodb.DeploymentsStore) error {
 	var statusErr error
 	if statusErr = applicationsStore.UpdateStatus(ctx, err.Error(), applicationUuid); statusErr != nil {
 		return fmt.Errorf("error while updating application %s with error %s: %w",
@@ -220,7 +220,7 @@ func StoreError(ctx context.Context, err error, applicationUuid string, deployme
 			err.Error(),
 			statusErr)
 	}
-	if statusErr = deploymentsStore.SetErrored(ctx, applicationUuid, deploymentId); statusErr != nil {
+	if statusErr = deploymentsStore.SetErroredFlag(ctx, applicationUuid, deploymentId); statusErr != nil {
 		return fmt.Errorf("error while setting 'errored' on deployment %s: %w",
 			deploymentId,
 			statusErr)
