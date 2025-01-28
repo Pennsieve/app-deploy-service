@@ -203,7 +203,6 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		}, nil
 	}
 
-	applicationIdKey := "APPLICATION_UUID"
 	deploymentId := uuid.NewString()
 
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
@@ -229,7 +228,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	environment := []types.KeyValuePair{
 		{
-			Name:  &applicationIdKey,
+			Name:  aws.String(applicationIdKey),
 			Value: &applicationId,
 		},
 		{
