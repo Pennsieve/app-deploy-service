@@ -113,7 +113,7 @@ func (s *DeploymentsStore) GetHistory(ctx context.Context, applicationId string)
 
 	var deployments []Deployment
 
-	for doQuery, page := true, 1; doQuery; doQuery = len(queryIn.ExclusiveStartKey) > 0 {
+	for doQuery, page := true, 1; doQuery; doQuery, page = len(queryIn.ExclusiveStartKey) > 0, page+1 {
 		queryOut, err := s.api.Query(ctx, queryIn)
 		if err != nil {
 			return nil, fmt.Errorf("error getting page %d of deployments for application %s: %w", page, applicationId, err)
