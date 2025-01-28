@@ -169,9 +169,9 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	}
 
 	id := uuid.New()
-	applicationId := id.String()
+	applicationUuid := id.String()
 	store_applications := store_dynamodb.Application{
-		Uuid:             applicationId,
+		Uuid:             applicationUuid,
 		Name:             nameValue,
 		Description:      descriptionValue,
 		ApplicationType:  applicationTypeValue,
@@ -209,7 +209,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
 		DeploymentKey: store_dynamodb.DeploymentKey{
 			DeploymentId:  deploymentId,
-			ApplicationId: applicationId,
+			ApplicationId: applicationUuid,
 		},
 		InitiatedAt:     time.Now().UTC(),
 		WorkspaceNodeId: organizationId,
@@ -224,12 +224,12 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		}, nil
 	}
 
-	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, applicationId, deploymentId)
+	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, applicationUuid, deploymentId)
 
 	environment := []types.KeyValuePair{
 		{
-			Name:  aws.String(applicationIdKey),
-			Value: &applicationId,
+			Name:  aws.String(applicationUuidKey),
+			Value: &applicationUuid,
 		},
 		{
 			Name:  &envKey,
@@ -380,7 +380,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	if len(runTaskOut.Tasks) > 0 {
 		log.Printf("started provisioning and deployment %s of application %s from %s in task %s",
 			deploymentId,
-			applicationId,
+			applicationUuid,
 			sourceUrlValue,
 			aws.ToString(runTaskOut.Tasks[0].TaskArn))
 	}

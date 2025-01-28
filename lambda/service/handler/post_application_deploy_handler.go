@@ -167,7 +167,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 							Value: &envValue,
 						},
 						{
-							Name:  aws.String(applicationIdKey),
+							Name:  aws.String(applicationUuidKey),
 							Value: aws.String(applicationUuid),
 						},
 						{
