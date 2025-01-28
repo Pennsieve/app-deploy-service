@@ -146,6 +146,9 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	}
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, tableValue)
 	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, applicationUuid, deploymentId)
+	if err := applicationsStore.UpdateStatus(ctx, "pending", applicationUuid); err != nil {
+		log.Printf("warning: error updating status of application %s to 'pending': %s\n", applicationUuid, err.Error())
+	}
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
