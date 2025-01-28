@@ -14,6 +14,7 @@ import (
 	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 	"net/http"
 	"os"
+	"slices"
 )
 
 func GetDeploymentsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -75,10 +76,8 @@ func GetDeploymentsHandler(ctx context.Context, request events.APIGatewayV2HTTPR
 	}
 
 	var deployments models.Deployments
-
 	deployments.Deployments = mappers.DeploymentItemsToModels(deploymentItems)
-
-	//TODO sort
+	slices.SortFunc(deployments.Deployments, models.DeploymentsByInitiatedAtAsc)
 
 	response, err := json.Marshal(deployments)
 	if err != nil {

@@ -34,3 +34,7 @@ type Deployment struct {
 type Deployments struct {
 	Deployments []Deployment `json:"deployments"`
 }
+
+func DeploymentsByInitiatedAtAsc(d1, d2 Deployment) int {
+	return d1.InitiatedAt.Compare(d2.InitiatedAt)
+}
