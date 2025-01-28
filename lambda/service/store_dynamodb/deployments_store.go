@@ -110,31 +110,25 @@ func (s *DeploymentsStore) GetHistory(ctx context.Context, applicationId string)
 		ExpressionAttributeValues: expressions.Values(),
 		KeyConditionExpression:    expressions.KeyCondition(),
 	}
-	queryOut, err := s.api.Query(ctx, queryIn)
-	if err != nil {
-		return nil, fmt.Errorf("error getting deployments for application %s: %w", applicationId, err)
-	}
+
 	var deployments []Deployment
-	deployments, err = fromItems(queryOut.Items, deployments)
-	if err != nil {
-		return nil, err
-	}
-	for lastEvaluatedKey, page := queryOut.LastEvaluatedKey, 2; len(lastEvaluatedKey) > 0; page++ {
-		queryIn.ExclusiveStartKey = lastEvaluatedKey
+
+	for doQuery, page := true, 1; doQuery; doQuery = len(queryIn.ExclusiveStartKey) > 0 {
 		queryOut, err := s.api.Query(ctx, queryIn)
 		if err != nil {
 			return nil, fmt.Errorf("error getting page %d of deployments for application %s: %w", page, applicationId, err)
 		}
-		deployments, err = fromItems(queryOut.Items, deployments)
+		deployments, err = appendItems(deployments, queryOut.Items)
 		if err != nil {
 			return nil, err
 		}
-		lastEvaluatedKey = queryOut.LastEvaluatedKey
+		queryIn.ExclusiveStartKey = queryOut.LastEvaluatedKey
 	}
+
 	return deployments, nil
 }
 
-func fromItems(items []map[string]types.AttributeValue, deployments []Deployment) ([]Deployment, error) {
+func appendItems(deployments []Deployment, items []map[string]types.AttributeValue) ([]Deployment, error) {
 	for _, item := range items {
 		var deployment Deployment
 		if err := attributevalue.UnmarshalMap(item, &deployment); err != nil {

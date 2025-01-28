@@ -103,7 +103,7 @@ func TestDeploymentsStore_GetHistory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, deployments, len(expectedDeploymentItems))
 	var expectedDeployments []Deployment
-	expectedDeployments, err = fromItems(expectedDeploymentItems, expectedDeployments)
+	expectedDeployments, err = appendItems(expectedDeployments, expectedDeploymentItems)
 	require.NoError(t, err)
 	assert.Equal(t, expectedDeployments, deployments)
 
