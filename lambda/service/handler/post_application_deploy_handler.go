@@ -38,6 +38,8 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 		envValue = application.Env
 	}
 
+	applicationUuid := application.Uuid
+
 	TaskDefinitionArn := os.Getenv("TASK_DEF_ARN")
 	DeployerTaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
 	subIdStr := os.Getenv("SUBNET_IDS")
@@ -128,7 +130,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
 		DeploymentKey: store_dynamodb.DeploymentKey{
 			DeploymentId:  deploymentId,
-			ApplicationId: application.Uuid,
+			ApplicationId: applicationUuid,
 		},
 		InitiatedAt:     time.Now().UTC(),
 		WorkspaceNodeId: organizationId,
@@ -143,7 +145,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 		}, nil
 	}
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, tableValue)
-	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, application.Uuid, deploymentId)
+	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, applicationUuid, deploymentId)
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -163,6 +165,10 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 						{
 							Name:  &envKey,
 							Value: &envValue,
+						},
+						{
+							Name:  aws.String(applicationUuidKey),
+							Value: aws.String(applicationUuid),
 						},
 						{
 							Name:  &applicationNameKey,
@@ -285,7 +291,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	if len(runTaskOut.Tasks) > 0 {
 		log.Printf("started re-deployment %s of application %s from %s in task %s",
 			deploymentId,
-			application.ApplicationId,
+			applicationUuid,
 			sourceUrlValue,
 			aws.ToString(runTaskOut.Tasks[0].TaskArn))
 	}
