@@ -15,7 +15,6 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
-	pennsievePusher "github.com/pennsieve/pennsieve-go-core/pkg/models/pusher"
 	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 	"github.com/pusher/pusher-http-go/v5"
 	"log"
@@ -137,26 +136,16 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 
 	// add pusher to statusManager if possible
 	ssmClient := ssm.NewFromConfig(cfg)
-	getParameterOutput, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String("/ops/pusher-config"),
-		WithDecryption: aws.Bool(true),
-	})
-	if err != nil {
-		log.Printf("warning: error getting Pusher config from SSM: %v\n", err)
+	if pusherConfig, err := GetPusherConfig(ctx, ssmClient); err != nil {
+		log.Printf("warning: %v\n", err)
 	} else {
-		configValue := *getParameterOutput.Parameter.Value
-		var pusherConfig *pennsievePusher.Config
-		if err := json.Unmarshal([]byte(configValue), &pusherConfig); err != nil {
-			log.Printf("warning: error unmarshalling pusher config: %v\n", err)
-		} else {
-			statusManager = statusManager.WithPusher(&pusher.Client{
-				AppID:   pusherConfig.AppId,
-				Key:     pusherConfig.Key,
-				Secret:  pusherConfig.Secret,
-				Cluster: pusherConfig.Cluster,
-				Secure:  true,
-			})
-		}
+		statusManager = statusManager.WithPusher(&pusher.Client{
+			AppID:   pusherConfig.AppId,
+			Key:     pusherConfig.Key,
+			Secret:  pusherConfig.Secret,
+			Cluster: pusherConfig.Cluster,
+			Secure:  true,
+		})
 	}
 
 	if err := statusManager.NewDeployment(ctx, store_dynamodb.Deployment{
