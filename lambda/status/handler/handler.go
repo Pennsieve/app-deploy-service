@@ -7,18 +7,25 @@ import (
 	"github.com/pennsieve/app-deploy-service/status/external"
 	"github.com/pennsieve/app-deploy-service/status/logging"
 	"github.com/pennsieve/app-deploy-service/status/models"
+	"github.com/pusher/pusher-http-go/v5"
 	"log/slog"
 )
 
 type DeployTaskStateChangeHandler struct {
 	ECSApi            external.ECSApi
 	DynamoDBApi       external.DynamoDBApi
+	PusherClient      *pusher.Client
 	ApplicationsTable string
 	DeploymentsTable  string
 }
 
 func NewDeployTaskStateChangeHandler(ecsApi external.ECSApi, dynamoDBApi external.DynamoDBApi, applicationsTable string, deploymentsTable string) *DeployTaskStateChangeHandler {
 	return &DeployTaskStateChangeHandler{ECSApi: ecsApi, DynamoDBApi: dynamoDBApi, ApplicationsTable: applicationsTable, DeploymentsTable: deploymentsTable}
+}
+
+func (h *DeployTaskStateChangeHandler) WithPusher(pusherClient *pusher.Client) *DeployTaskStateChangeHandler {
+	h.PusherClient = pusherClient
+	return h
 }
 
 func (h *DeployTaskStateChangeHandler) Handle(ctx context.Context, event models.TaskStateChangeEvent) error {
