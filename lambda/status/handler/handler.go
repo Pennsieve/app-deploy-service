@@ -62,6 +62,7 @@ func (h *DeployTaskStateChangeHandler) Handle(ctx context.Context, event models.
 	}
 
 	if final := IsFinalState(event); final != nil {
+		h.SendApplicationStatusEvent(applicationId, deploymentId, final, event.Detail.UpdatedAt, logger)
 		if err := h.UpdateApplicationsTable(ctx, applicationId, final); err != nil {
 			return err
 		}

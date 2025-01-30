@@ -8,12 +8,12 @@ import (
 const ApplicationStatusEventName = "application_status_event"
 
 type ApplicationStatusEvent struct {
-	ApplicationId string    `json:"application_id"`
-	DeploymentId  string    `json:"deployment_id"`
-	Status        string    `json:"status"`
-	Time          time.Time `json:"time"`
-	IsErrorStatus bool      `json:"is_error"`
-	Source        string    `json:"source"`
+	ApplicationId string     `json:"application_id"`
+	DeploymentId  string     `json:"deployment_id"`
+	Status        string     `json:"status"`
+	Time          *time.Time `json:"time,omitempty"`
+	IsErrorStatus bool       `json:"is_error"`
+	Source        string     `json:"source"`
 }
 
 func ApplicationStatusChannel(applicationUuid string) string {

@@ -2,28 +2,29 @@ package handler
 
 import (
 	"github.com/pennsieve/app-deploy-service/status/events"
-	"github.com/pennsieve/app-deploy-service/status/logging"
 	"log"
 	"log/slog"
 	"time"
 )
 
-func (h *DeployTaskStateChangeHandler) SendApplicationStatusEvent(applicationId, deploymentId string, status string, isErrorStatus bool) {
+func (h *DeployTaskStateChangeHandler) SendApplicationStatusEvent(applicationId, deploymentId string, final *FinalState, updateTime *time.Time, logger *slog.Logger) {
 	if h.PusherClient == nil {
 		log.Printf("warning: no Pusher client configured")
 		return
 	}
 	channel := events.ApplicationStatusChannel(applicationId)
+	status := final.Status()
+	isErrorStatus := final.Errored
 	event := events.ApplicationStatusEvent{
 		ApplicationId: applicationId,
 		DeploymentId:  deploymentId,
 		Status:        status,
-		Time:          time.Now().UTC(),
+		Time:          updateTime,
 		IsErrorStatus: isErrorStatus,
 		Source:        "DeployTaskStateChangeHandler",
 	}
 	if err := h.PusherClient.Trigger(channel, events.ApplicationStatusEventName, event); err != nil {
-		logging.Default.Warn("error updating pusher application channel",
+		logger.Warn("error updating pusher application channel",
 			slog.String("channel", channel),
 			slog.String("status", status),
 			slog.Any("error", err))
