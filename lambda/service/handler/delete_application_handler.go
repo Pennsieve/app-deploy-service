@@ -51,6 +51,7 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 	applicationIdKey := "APPLICATION_UUID"
 
 	dynamo_store := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
+	statusManager := NewStatusManager(handlerName, dynamo_store, uuid)
 	application, err := dynamo_store.GetById(ctx, uuid)
 	if err != nil {
 		log.Println(err.Error())
@@ -59,6 +60,7 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 			Body:       handlerError(handlerName, ErrNoRecordsFound),
 		}, nil
 	}
+	statusManager.UpdateApplicationStatus(ctx, "deleting", uuid)
 
 	client := ecs.NewFromConfig(cfg)
 	log.Println("Initiating new Provisioning Fargate Task.")
@@ -154,7 +156,7 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 		log.Println(err)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	if err := runner.GetRunFailures(runTaskOut); err != nil {
@@ -163,7 +165,7 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 		// seems safe since for now we are only starting one task
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	// we expect one task

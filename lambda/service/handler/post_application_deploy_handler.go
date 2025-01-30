@@ -9,12 +9,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
+	pennsievePusher "github.com/pennsieve/pennsieve-go-core/pkg/models/pusher"
 	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
+	"github.com/pusher/pusher-http-go/v5"
 	"log"
 	"net/http"
 	"os"
@@ -126,8 +129,37 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
+	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, tableValue)
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
-	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
+
+	statusManager := NewStatusManager(handlerName, applicationsStore, applicationUuid).
+		WithDeployment(deploymentsStore, deploymentId)
+
+	// add pusher to statusManager if possible
+	ssmClient := ssm.NewFromConfig(cfg)
+	getParameterOutput, err := ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           aws.String("/ops/pusher-config"),
+		WithDecryption: aws.Bool(true),
+	})
+	if err != nil {
+		log.Printf("warning: error getting Pusher config from SSM: %v\n", err)
+	} else {
+		configValue := *getParameterOutput.Parameter.Value
+		var pusherConfig *pennsievePusher.Config
+		if err := json.Unmarshal([]byte(configValue), &pusherConfig); err != nil {
+			log.Printf("warning: error unmarshalling pusher config: %v\n", err)
+		} else {
+			statusManager = statusManager.WithPusher(&pusher.Client{
+				AppID:   pusherConfig.AppId,
+				Key:     pusherConfig.Key,
+				Secret:  pusherConfig.Secret,
+				Cluster: pusherConfig.Cluster,
+				Secure:  true,
+			})
+		}
+	}
+
+	if err := statusManager.NewDeployment(ctx, store_dynamodb.Deployment{
 		DeploymentKey: store_dynamodb.DeploymentKey{
 			DeploymentId:  deploymentId,
 			ApplicationId: applicationUuid,
@@ -144,11 +176,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 			Body:       handlerError(handlerName, ErrStoringDeployment),
 		}, nil
 	}
-	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, tableValue)
-	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, applicationUuid, deploymentId)
-	if err := applicationsStore.UpdateStatus(ctx, "pending", applicationUuid); err != nil {
-		log.Printf("warning: error updating status of application %s to 'pending': %s\n", applicationUuid, err.Error())
-	}
+	statusManager.UpdateApplicationStatus(ctx, "pending", applicationUuid)
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -278,7 +306,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 		log.Println("error running task: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	if err := runner.GetRunFailures(runTaskOut); err != nil {
@@ -287,7 +315,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 		// seems safe since for now we are only starting one task
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	// we expect one task
