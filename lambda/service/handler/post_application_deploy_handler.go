@@ -165,7 +165,7 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 			Body:       handlerError(handlerName, ErrStoringDeployment),
 		}, nil
 	}
-	statusManager.UpdateApplicationStatus(ctx, "pending", applicationUuid)
+	statusManager.UpdateApplicationStatus(ctx, applicationUuid, "pending")
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),

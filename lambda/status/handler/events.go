@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (h *DeployTaskStateChangeHandler) SendApplicationStatusEvent(applicationId, deploymentId string, final *FinalState, updateTime *time.Time, logger *slog.Logger) {
+func (h *DeployTaskStateChangeHandler) SendApplicationStatusEvent(applicationId, deploymentId string, final *FinalState, updateTime *time.Time) {
 	if h.PusherClient == nil {
 		log.Printf("warning: no Pusher client configured")
 		return
@@ -24,7 +24,7 @@ func (h *DeployTaskStateChangeHandler) SendApplicationStatusEvent(applicationId,
 		Source:        "DeployTaskStateChangeHandler",
 	}
 	if err := h.PusherClient.Trigger(channel, events.ApplicationStatusEventName, event); err != nil {
-		logger.Warn("error updating pusher application channel",
+		h.logger.Warn("error updating pusher application channel",
 			slog.String("channel", channel),
 			slog.String("status", status),
 			slog.Any("error", err))

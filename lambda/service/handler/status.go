@@ -51,7 +51,7 @@ func (m *StatusManager) SetErrorStatus(ctx context.Context, err error) string {
 	return handlerError(m.HandlerName, err)
 }
 
-func (m *StatusManager) UpdateApplicationStatus(ctx context.Context, newStatus string, applicationUuid string) {
+func (m *StatusManager) UpdateApplicationStatus(ctx context.Context, applicationUuid string, newStatus string) {
 	if err := m.ApplicationsStore.UpdateStatus(ctx, newStatus, applicationUuid); err != nil {
 		log.Printf("warning: error updating status of application %s to %q: %s\n", applicationUuid, newStatus, err.Error())
 	}

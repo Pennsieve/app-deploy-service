@@ -60,7 +60,7 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 			Body:       handlerError(handlerName, ErrNoRecordsFound),
 		}, nil
 	}
-	statusManager.UpdateApplicationStatus(ctx, "deleting", uuid)
+	statusManager.UpdateApplicationStatus(ctx, uuid, "deleting")
 
 	client := ecs.NewFromConfig(cfg)
 	log.Println("Initiating new Provisioning Fargate Task.")
