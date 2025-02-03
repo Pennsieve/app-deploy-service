@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner"
+	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/pusher_config"
+	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/status"
 	"log"
 	"os"
 	"strings"
@@ -34,8 +37,6 @@ func main() {
 	computeNodeUuid := os.Getenv("COMPUTE_NODE_UUID")
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
-	deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
-	deploymentId := os.Getenv(provisioner.DeploymentIdKey)
 
 	// Initializing environment
 	cfg, err := config.LoadDefaultConfig(context.Background())
@@ -47,46 +48,55 @@ func main() {
 		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid))
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
-	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+	statusManager := status.NewManager(applicationsStore, applicationUuid)
+
+	// deploymentId will only be present if this is not a DELETE. DELETE does not
+	// generate a Deployment record that needs to be updated.
+	var deploymentId string
+	if action == "CREATE" || action == "DEPLOY" {
+		deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
+		deploymentId = os.Getenv(provisioner.DeploymentIdKey)
+		deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+		statusManager = statusManager.WithDeployment(deploymentsStore, deploymentId)
+	}
+
+	// use pusher if we can get the config
+	if pusherConfig, err := pusher_config.Get(ctx, ssm.NewFromConfig(cfg)); err != nil {
+		log.Printf("warning: unable to configure Pusher: %s\n", err.Error())
+	} else {
+		statusManager = statusManager.WithPusher(pusherConfig)
+	}
 
 	// POST provisioning actions
 	switch action {
 	case "CREATE":
 		ecsClient := ecs.NewFromConfig(cfg)
-		if err := Create(ctx, applicationUuid, deploymentId, sourceUrl, appProvisioner, applicationsStore, ecsClient); err != nil {
-			if statusErr := SetErrorStatus(ctx, err, applicationUuid, deploymentId, applicationsStore, deploymentsStore); statusErr != nil {
-				log.Println("warning: unable to update states with create error: ", statusErr.Error())
-			}
+		if err := Create(ctx, applicationUuid, deploymentId, sourceUrl, appProvisioner, ecsClient, statusManager); err != nil {
+			statusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
 		}
 	case "DELETE":
 		if err := Delete(ctx, applicationUuid, appProvisioner, applicationsStore); err != nil {
-			if statusErr := applicationsStore.UpdateStatus(ctx, err.Error(), applicationUuid); statusErr != nil {
-				log.Println("warning: unable to update applications with delete error: ", statusErr.Error())
-			}
+			statusManager.UpdateApplicationStatus(ctx, err.Error(), true)
 			log.Fatal(err)
 		}
 	case "DEPLOY":
 		// Build and deploy
 		ecsClient := ecs.NewFromConfig(cfg)
-		if err := Redeploy(ctx, applicationUuid, deploymentId, sourceUrl, destinationUrl, appProvisioner, applicationsStore, ecsClient); err != nil {
-			if statusErr := SetErrorStatus(ctx, err, applicationUuid, deploymentId, applicationsStore, deploymentsStore); statusErr != nil {
-				log.Println("warning: unable to update applications with re-deploy error: ", statusErr.Error())
-			}
+		if err := Redeploy(ctx, applicationUuid, deploymentId, sourceUrl, destinationUrl, appProvisioner, ecsClient, statusManager); err != nil {
+			statusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
 		}
 	default:
-		status := fmt.Sprintf("error: unknown provision action: %s", action)
-		if statusErr := applicationsStore.UpdateStatus(ctx, status, applicationUuid); statusErr != nil {
-			log.Println("warning: unable to update applications with unknown action error: ", statusErr.Error())
-		}
+		unknownActionStatus := fmt.Sprintf("error: unknown provision action: %s", action)
+		statusManager.UpdateApplicationStatus(ctx, unknownActionStatus, true)
 		log.Fatalf("action not supported: %s", action)
 	}
 
 	log.Println("provisioning complete")
 }
 
-func Create(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, appProvisioner provisioner.Provisioner, applicationsStore store_dynamodb.DynamoDBStore, ecsClient *ecs.Client) error {
+func Create(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager) error {
 	if err := appProvisioner.Create(ctx); err != nil {
 		return fmt.Errorf("error creating infrastructure: %w", err)
 	}
@@ -104,7 +114,7 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 		DestinationUrl:           outputs.AppEcrUrl.Value,
 		Status:                   "deploying",
 	}
-	err = applicationsStore.Update(ctx, store_application, applicationUuid)
+	err = statusManager.ApplicationCreateUpdate(ctx, store_application)
 	if err != nil {
 		return fmt.Errorf("error updating application record: %w", err)
 	}
@@ -118,11 +128,9 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-func Redeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, destinationUrl string, appProvisioner provisioner.Provisioner, applicationsStore store_dynamodb.DynamoDBStore, ecsClient *ecs.Client) error {
+func Redeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager) error {
 	log.Println("Initiating new Deployment Fargate Task: DEPLOY")
-	if err := applicationsStore.UpdateStatus(ctx, "re-deploying", applicationUuid); err != nil {
-		return fmt.Errorf("error updating status of application %s to `re-deploying`: %w", applicationUuid, err)
-	}
+	statusManager.UpdateApplicationStatus(ctx, "re-deploying", false)
 	if err := Deploy(ctx, applicationUuid, deploymentId, sourceUrl, destinationUrl, appProvisioner, ecsClient); err != nil {
 		return err
 	}
@@ -208,22 +216,6 @@ func Delete(ctx context.Context, applicationUuid string, appProvisioner provisio
 
 	if err := applicationsStore.Delete(ctx, applicationUuid); err != nil {
 		return fmt.Errorf("error deleting application from store: %w", err)
-	}
-	return nil
-}
-
-func SetErrorStatus(ctx context.Context, err error, applicationUuid string, deploymentId string, applicationsStore store_dynamodb.DynamoDBStore, deploymentsStore *store_dynamodb.DeploymentsStore) error {
-	var statusErr error
-	if statusErr = applicationsStore.UpdateStatus(ctx, err.Error(), applicationUuid); statusErr != nil {
-		return fmt.Errorf("error while updating application %s with error %s: %w",
-			applicationUuid,
-			err.Error(),
-			statusErr)
-	}
-	if statusErr = deploymentsStore.SetErroredFlag(ctx, applicationUuid, deploymentId); statusErr != nil {
-		return fmt.Errorf("error while setting 'errored' on deployment %s: %w",
-			deploymentId,
-			statusErr)
 	}
 	return nil
 }

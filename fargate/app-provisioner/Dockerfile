@@ -10,14 +10,14 @@ RUN wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/shar
   apt-get update && apt-get -y install terraform
 
 # install Go
-RUN wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz
+RUN wget https://go.dev/dl/go1.22.11.linux-amd64.tar.gz
 
-RUN  rm -rf /usr/local/go && tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz
+RUN  rm -rf /usr/local/go && tar -C /usr/local -xzf go1.22.11.linux-amd64.tar.gz
 
 ENV PATH="${PATH}:/usr/local/go/bin"
 
 # cleanup
-RUN rm -f go1.21.0.linux-amd64.tar.gz
+RUN rm -f go1.22.11.linux-amd64.tar.gz
  
 COPY . ./
 RUN go mod tidy
