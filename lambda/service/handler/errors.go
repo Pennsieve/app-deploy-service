@@ -1,11 +1,8 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"log"
 
 	"github.com/pennsieve/app-deploy-service/service/models"
@@ -35,27 +32,4 @@ func handlerError(handlerName string, errorMessage error) string {
 	}
 
 	return string(m)
-}
-
-type ErrorHandler struct {
-	HandlerName       string
-	ApplicationsStore store_dynamodb.DynamoDBStore
-	DeploymentsStore  *store_dynamodb.DeploymentsStore
-	ApplicationId     string
-	DeploymentId      string
-}
-
-func NewErrorHandler(handlerName string, applicationsStore store_dynamodb.DynamoDBStore, deploymentsStore *store_dynamodb.DeploymentsStore, applicationId string, deploymentId string) *ErrorHandler {
-	return &ErrorHandler{HandlerName: handlerName, ApplicationsStore: applicationsStore, DeploymentsStore: deploymentsStore, ApplicationId: applicationId, DeploymentId: deploymentId}
-}
-
-func (h *ErrorHandler) handleError(ctx context.Context, err error) string {
-	msg := fmt.Sprintf("error: %s", err.Error())
-	if appStoreErr := h.ApplicationsStore.UpdateStatus(ctx, msg, h.ApplicationId); appStoreErr != nil {
-		log.Printf("warning: error updating applications table with error: %s: %s\n", msg, appStoreErr.Error())
-	}
-	if deployStoreErr := h.DeploymentsStore.SetErrored(ctx, h.ApplicationId, h.DeploymentId); deployStoreErr != nil {
-		log.Printf("warning: error setting errored on deployments table: %s\n", deployStoreErr.Error())
-	}
-	return handlerError(h.HandlerName, err)
 }

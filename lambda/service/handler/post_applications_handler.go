@@ -3,8 +3,10 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/pennsieve/app-deploy-service/service/mappers"
 	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
+	"github.com/pusher/pusher-http-go/v5"
 	"log"
 	"net/http"
 	"os"
@@ -89,8 +91,8 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	userIdValue := userId
 	actionKey := "ACTION"
 	actionValue := "CREATE"
-	tableKey := "APPLICATIONS_TABLE"
-	tableValue := os.Getenv("APPLICATIONS_TABLE")
+	applicationsTableKey := "APPLICATIONS_TABLE"
+	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 	applicationNameKey := "APPLICATION_NAME"
 	applicationDescriptionKey := "APPLICATION_DESCRIPTION"
 	nameValue := application.Name
@@ -143,10 +145,31 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	cpuValueStr := strconv.Itoa(cpuValue)
 	memoryValueStr := strconv.Itoa(memoryValue)
 
+	applicationUuid := uuid.NewString()
+	deploymentId := uuid.NewString()
+
 	// persist to dynamodb
-	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
+	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+
+	statusManager := NewStatusManager(handlerName, applicationsStore, applicationUuid).
+		WithDeployment(deploymentsStore, deploymentId)
+
+	// add pusher to statusManager if possible
+	ssmClient := ssm.NewFromConfig(cfg)
+	if pusherConfig, err := GetPusherConfig(ctx, ssmClient); err != nil {
+		log.Printf("warning: %v\n", err)
+	} else {
+		statusManager = statusManager.WithPusher(&pusher.Client{
+			AppID:   pusherConfig.AppId,
+			Key:     pusherConfig.Key,
+			Secret:  pusherConfig.Secret,
+			Cluster: pusherConfig.Cluster,
+			Secure:  true,
+		})
+	}
+
 	params := map[string]string{
 		"computeNodeUuid": computeNodeUuidValue,
 		"sourceUrl":       sourceUrlValue,
@@ -168,8 +191,6 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		}, nil
 	}
 
-	id := uuid.New()
-	applicationUuid := id.String()
 	store_applications := store_dynamodb.Application{
 		Uuid:             applicationUuid,
 		Name:             nameValue,
@@ -194,7 +215,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		CommandArguments: application.CommandArguments,
 		Status:           "registering",
 	}
-	err = applicationsStore.Insert(ctx, store_applications)
+	err = statusManager.NewApplication(ctx, store_applications)
 	if err != nil {
 		log.Println("error inserting application: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
@@ -203,10 +224,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		}, nil
 	}
 
-	deploymentId := uuid.NewString()
-
-	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
-	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
+	if err := statusManager.NewDeployment(ctx, store_dynamodb.Deployment{
 		DeploymentKey: store_dynamodb.DeploymentKey{
 			DeploymentId:  deploymentId,
 			ApplicationId: applicationUuid,
@@ -223,8 +241,6 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 			Body:       handlerError(handlerName, ErrStoringDeployment),
 		}, nil
 	}
-
-	errorHandler := NewErrorHandler(handlerName, applicationsStore, deploymentsStore, applicationUuid, deploymentId)
 
 	environment := []types.KeyValuePair{
 		{
@@ -260,8 +276,8 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 			Value: &actionValue,
 		},
 		{
-			Name:  &tableKey,
-			Value: &tableValue,
+			Name:  &applicationsTableKey,
+			Value: &applicationsTable,
 		},
 		{
 			Name:  &organizationIdKey,
@@ -364,7 +380,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		log.Println(err)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	if err := runner.GetRunFailures(runTaskOut); err != nil {
@@ -373,7 +389,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		// seems safe since for now we are only starting one task
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       errorHandler.handleError(ctx, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	// we expect one task
