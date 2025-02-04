@@ -6,7 +6,6 @@ type Deployment struct {
 	DeploymentId  string    `json:"deploymentId"`
 	ApplicationId string    `json:"applicationId"`
 	InitiatedAt   time.Time `json:"initiatedAt"`
-	Version       int       `json:"version"`
 	LastStatus    string    `json:"lastStatus"`
 	DesiredStatus string    `json:"desiredStatus"`
 	TaskArn       string    `json:"taskArn"`

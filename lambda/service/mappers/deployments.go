@@ -10,7 +10,6 @@ func DeploymentItemToModel(item store_dynamodb.Deployment) models.Deployment {
 		DeploymentId:  item.DeploymentId,
 		ApplicationId: item.ApplicationId,
 		InitiatedAt:   item.InitiatedAt,
-		Version:       item.Version,
 		LastStatus:    item.LastStatus,
 		DesiredStatus: item.DesiredStatus,
 		TaskArn:       item.TaskArn,
