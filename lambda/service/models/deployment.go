@@ -34,6 +34,7 @@ type Deployments struct {
 	Deployments []Deployment `json:"deployments"`
 }
 
+// DeploymentsByInitiatedAtAsc compares two Deployment objects based on their InitiatedAt field in ascending order.
 func DeploymentsByInitiatedAtAsc(d1, d2 Deployment) int {
 	return d1.InitiatedAt.Compare(d2.InitiatedAt)
 }
