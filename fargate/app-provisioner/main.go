@@ -50,13 +50,14 @@ func main() {
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	statusManager := status.NewManager(applicationsStore, applicationUuid)
 
+	deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
+	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+
 	// deploymentId will only be present if this is not a DELETE. DELETE does not
 	// generate a Deployment record that needs to be updated.
 	var deploymentId string
 	if action == "CREATE" || action == "DEPLOY" {
-		deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
 		deploymentId = os.Getenv(provisioner.DeploymentIdKey)
-		deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 		statusManager = statusManager.WithDeployment(deploymentsStore, deploymentId)
 	}
 
@@ -76,7 +77,7 @@ func main() {
 			log.Fatal(err)
 		}
 	case "DELETE":
-		if err := Delete(ctx, applicationUuid, appProvisioner, applicationsStore); err != nil {
+		if err := Delete(ctx, applicationUuid, appProvisioner, applicationsStore, deploymentsStore); err != nil {
 			statusManager.UpdateApplicationStatus(ctx, err.Error(), true)
 			log.Fatal(err)
 		}
@@ -207,7 +208,7 @@ func Deploy(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-func Delete(ctx context.Context, applicationUuid string, appProvisioner provisioner.Provisioner, applicationsStore store_dynamodb.DynamoDBStore) error {
+func Delete(ctx context.Context, applicationUuid string, appProvisioner provisioner.Provisioner, applicationsStore store_dynamodb.DynamoDBStore, deploymentsStore *store_dynamodb.DeploymentsStore) error {
 	log.Println("Deleting", applicationUuid)
 
 	if err := appProvisioner.Delete(ctx); err != nil {
@@ -216,6 +217,9 @@ func Delete(ctx context.Context, applicationUuid string, appProvisioner provisio
 
 	if err := applicationsStore.Delete(ctx, applicationUuid); err != nil {
 		return fmt.Errorf("error deleting application from store: %w", err)
+	}
+	if err := deploymentsStore.DeleteApplicationDeployments(ctx, applicationUuid); err != nil {
+		log.Printf("warning: error deleting deployment records for deleted application %s: %v\n", applicationUuid, err)
 	}
 	return nil
 }
