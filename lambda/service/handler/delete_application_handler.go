@@ -47,6 +47,7 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 
 	applicationIdKey := "APPLICATION_UUID"
 
@@ -142,6 +143,10 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 						{
 							Name:  &sourceUrlKey,
 							Value: &sourceUrlValue,
+						},
+						{
+							Name:  aws.String(deploymentsTableNameKey),
+							Value: aws.String(deploymentsTable),
 						},
 					},
 				},

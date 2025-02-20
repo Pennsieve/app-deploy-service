@@ -37,6 +37,7 @@ func main() {
 	computeNodeUuid := os.Getenv("COMPUTE_NODE_UUID")
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
 
 	// Initializing environment
 	cfg, err := config.LoadDefaultConfig(context.Background())
@@ -48,17 +49,16 @@ func main() {
 		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid))
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
-	statusManager := status.NewManager(applicationsStore, applicationUuid)
-
-	deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+	statusManager := status.NewManager(applicationsStore, applicationUuid, deploymentsStore)
 
 	// deploymentId will only be present if this is not a DELETE. DELETE does not
-	// generate a Deployment record that needs to be updated.
+	// generate a Deployment record that needs to be updated. Instead, we must delete all
+	// deployment records for the application along with the application
 	var deploymentId string
 	if action == "CREATE" || action == "DEPLOY" {
 		deploymentId = os.Getenv(provisioner.DeploymentIdKey)
-		statusManager = statusManager.WithDeployment(deploymentsStore, deploymentId)
+		statusManager = statusManager.WithDeploymentId(deploymentId)
 	}
 
 	// use pusher if we can get the config
@@ -77,7 +77,7 @@ func main() {
 			log.Fatal(err)
 		}
 	case "DELETE":
-		if err := Delete(ctx, applicationUuid, appProvisioner, applicationsStore, deploymentsStore); err != nil {
+		if err := Delete(ctx, applicationUuid, appProvisioner, statusManager); err != nil {
 			statusManager.UpdateApplicationStatus(ctx, err.Error(), true)
 			log.Fatal(err)
 		}
@@ -208,18 +208,15 @@ func Deploy(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-func Delete(ctx context.Context, applicationUuid string, appProvisioner provisioner.Provisioner, applicationsStore store_dynamodb.DynamoDBStore, deploymentsStore *store_dynamodb.DeploymentsStore) error {
+func Delete(ctx context.Context, applicationUuid string, appProvisioner provisioner.Provisioner, statusManager *status.Manager) error {
 	log.Println("Deleting", applicationUuid)
 
 	if err := appProvisioner.Delete(ctx); err != nil {
 		return fmt.Errorf("error deleting infrastructure: :%w", err)
 	}
 
-	if err := applicationsStore.Delete(ctx, applicationUuid); err != nil {
-		return fmt.Errorf("error deleting application from store: %w", err)
-	}
-	if err := deploymentsStore.DeleteApplicationDeployments(ctx, applicationUuid); err != nil {
-		log.Printf("warning: error deleting deployment records for deleted application %s: %v\n", applicationUuid, err)
+	if err := statusManager.ApplicationDelete(ctx); err != nil {
+		return err
 	}
 	return nil
 }

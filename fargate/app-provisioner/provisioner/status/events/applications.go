@@ -16,6 +16,14 @@ type ApplicationStatusEvent struct {
 	Source        string    `json:"source"`
 }
 
+const ApplicationDeletionEventName = "application_deletion_event"
+
+type ApplicationDeletionEvent struct {
+	ApplicationId string    `json:"application_id"`
+	Time          time.Time `json:"time"`
+	Source        string    `json:"source"`
+}
+
 func ApplicationStatusChannel(applicationUuid string) string {
 	return fmt.Sprintf("application-%s", applicationUuid)
 }
