@@ -89,7 +89,6 @@ func main() {
 			log.Fatal(err)
 		}
 	case "ADD_TO_APPSTORE":
-		// Build and deploy
 		ecsClient := ecs.NewFromConfig(cfg)
 		if err := AddToAppstore(ctx, applicationUuid, deploymentId, sourceUrl, destinationUrl, appProvisioner, ecsClient, statusManager); err != nil {
 			statusManager.SetErrorStatus(ctx, err)
