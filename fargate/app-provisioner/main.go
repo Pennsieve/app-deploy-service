@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
+	"strings"
+
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/pusher_config"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/status"
-	"log"
-	"os"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -87,6 +88,13 @@ func main() {
 			statusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
 		}
+	case "ADD_TO_APPSTORE":
+		// Build and deploy
+		ecsClient := ecs.NewFromConfig(cfg)
+		if err := AddToAppstore(ctx, applicationUuid, deploymentId, sourceUrl, destinationUrl, appProvisioner, ecsClient, statusManager); err != nil {
+			statusManager.SetErrorStatus(ctx, err)
+			log.Fatal(err)
+		}
 	default:
 		unknownActionStatus := fmt.Sprintf("error: unknown provision action: %s", action)
 		statusManager.UpdateApplicationStatus(ctx, unknownActionStatus, true)
@@ -124,6 +132,25 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	if err := Deploy(ctx, applicationUuid, deploymentId, sourceUrl, store_application.DestinationUrl, appProvisioner, ecsClient); err != nil {
 		return err
 	}
+
+	return nil
+}
+
+func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager) error {
+	if destinationUrl == "" {
+		if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
+			return fmt.Errorf("error creating infrastructure: %w", err)
+		}
+	}
+
+	// parse output file created after infrastructure creation
+	parser := parser.NewOutputParser("/usr/src/app/terraform/pennsieve/public-repository/outputs.json")
+	outputs, err := parser.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("error running output parser: %w", err)
+	}
+
+	log.Println(outputs)
 
 	return nil
 }

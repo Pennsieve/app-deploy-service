@@ -397,4 +397,21 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
     ]
   }
 
+  statement {
+    sid    = "PublicECRRepo"
+    effect = "Allow"
+    actions = [
+      "ecr-public:CreateRepository",
+      "ecr-public:PutRepositoryPolicy",
+      "ecr-public:SetRepositoryPolicy",
+      "ecr-public:GetRepositoryPolicy",
+      "ecr-public:DescribeRepositories",
+      "ecr-public:TagResource",
+      "ecr-public:UntagResource",
+      "ecr-public:DeleteRepository",
+      "sts:GetServiceBearerToken"
+    ]
+    resources = ["*"]
+  }
+
 }

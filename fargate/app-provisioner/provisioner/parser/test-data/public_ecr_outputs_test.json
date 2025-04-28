@@ -1,0 +1,7 @@
+{
+  "app_public_ecr_repository": {
+    "sensitive": false,
+    "type": "string",
+    "value": "some-public-url/app"
+  }
+}
