@@ -9,9 +9,15 @@ import (
 )
 
 func TestOutputParser(t *testing.T) {
-	parser := parser.NewOutputParser("./test-data/outputs_test.json")
+	parser := parser.NewOutputParser("./test-data/infrastructure_outputs_test.json")
 	outputs, _ := parser.Run(context.Background())
 	assert.Equal(t, "some-account-url/app", outputs.AppEcrUrl.Value)
 	assert.Equal(t, "some-task-defn-arn", outputs.AppTaskDefn.Value)
 	assert.Equal(t, "some-container_name", outputs.AppContainerName.Value)
+}
+
+func TestPublicRepoOutputParser(t *testing.T) {
+	parser := parser.NewOutputParser("./test-data/public_ecr_outputs_test.json")
+	outputs, _ := parser.Run(context.Background())
+	assert.Equal(t, "some-public-url/app", outputs.AppPublicEcrUrl.Value)
 }

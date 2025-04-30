@@ -35,6 +35,7 @@ type ComputeNode struct {
 type Source struct {
 	SourceType string `json:"type"`
 	Url        string `json:"url"`
+	Tag        string `json:"tag"`
 }
 
 type Destination struct {
@@ -58,4 +59,8 @@ type RegisterApplicationResponse struct {
 
 type DeployApplicationResponse struct {
 	DeploymentId string `json:"deploymentId"`
+}
+
+type AppStoreRegistrationResponse struct {
+	RegistrationId string `json:"registrationId"`
 }

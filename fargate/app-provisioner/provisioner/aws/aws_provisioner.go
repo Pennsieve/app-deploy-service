@@ -186,3 +186,19 @@ func (p *AWSProvisioner) Delete(ctx context.Context) error {
 
 	return nil
 }
+
+func (p *AWSProvisioner) CreatePublicRepository(ctx context.Context) error {
+	log.Println("creating public repository ...")
+
+	// TODO: validate if repository already exists
+	// create public repository
+	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/pennsieve/public-repository.sh",
+		p.GitUrl, p.AppSlug)
+	out, err := cmd.Output()
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(out))
+
+	return nil
+}

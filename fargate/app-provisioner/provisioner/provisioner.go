@@ -12,4 +12,5 @@ type Provisioner interface {
 	AssumeRole(context.Context) (aws.Credentials, error)
 	CreatePolicy(context.Context) error
 	GetPolicy(context.Context) (*string, error)
+	CreatePublicRepository(ctx context.Context) error
 }
