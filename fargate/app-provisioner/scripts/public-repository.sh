@@ -20,7 +20,7 @@ EOL
 echo "Running init and plan ..."
 export TF_LOG_PATH="error.log"
 export TF_LOG=TRACE
-terraform init -force-copy -backend-config=$BACKEND_FILE
+terraform init
 terraform plan -out=tfplan -var-file=$VAR_FILE
 
 echo "Running apply ..."
