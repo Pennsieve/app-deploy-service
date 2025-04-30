@@ -37,7 +37,7 @@ func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTT
 	router.DELETE("/applications/{id}", DeleteApplicationHandler)
 	router.PUT("/applications/{id}", PutApplicationsHandler)
 	router.POST("/applications/deploy", PostApplicationDeployHandler)
-	router.POST("/applications/appstore", PostAppStoreHandler)
+	router.POST("/applications/store", PostAppStoreHandler)
 
 	return router.Start(ctx, request)
 }

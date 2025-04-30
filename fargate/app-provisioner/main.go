@@ -136,10 +136,8 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 }
 
 func AddToAppstore(ctx context.Context, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
-	if destinationUrl == "" {
-		if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
-			return fmt.Errorf("error creating infrastructure: %w", err)
-		}
+	if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
+		return fmt.Errorf("error creating infrastructure: %w", err)
 	}
 
 	// parse output file created after infrastructure creation
