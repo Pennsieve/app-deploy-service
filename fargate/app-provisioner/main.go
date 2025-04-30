@@ -90,9 +90,9 @@ func main() {
 		}
 	case "ADD_TO_APPSTORE":
 		ecsClient := ecs.NewFromConfig(cfg)
-		if err := AddToAppstore(ctx, destinationUrl, appProvisioner, ecsClient); err != nil {
-			statusManager.SetErrorStatus(ctx, err)
-			log.Fatal(err)
+		err := AddToAppstore(ctx, destinationUrl, appProvisioner, ecsClient)
+		if err != nil {
+			log.Println(err)
 		}
 	default:
 		unknownActionStatus := fmt.Sprintf("error: unknown provision action: %s", action)
@@ -137,7 +137,7 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 
 func AddToAppstore(ctx context.Context, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
 	if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
-		return fmt.Errorf("error creating infrastructure: %w", err)
+		return fmt.Errorf("error creating public repository: %w", err)
 	}
 
 	// parse output file created after infrastructure creation
