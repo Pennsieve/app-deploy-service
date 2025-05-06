@@ -20,4 +20,5 @@ func TestPublicRepoOutputParser(t *testing.T) {
 	parser := parser.NewOutputParser("./test-data/public_ecr_outputs_test.json")
 	outputs, _ := parser.Run(context.Background())
 	assert.Equal(t, "some-public-url/app", outputs.AppPublicEcrUrl.Value)
+	assert.Equal(t, "some-public-url-arn", outputs.AppPublicEcrArn.Value)
 }

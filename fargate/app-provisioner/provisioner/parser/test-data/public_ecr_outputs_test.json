@@ -3,5 +3,10 @@
     "sensitive": false,
     "type": "string",
     "value": "some-public-url/app"
+  },
+  "app_public_ecr_repository_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "some-public-url-arn"
   }
 }

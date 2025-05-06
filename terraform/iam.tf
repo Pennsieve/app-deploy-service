@@ -409,7 +409,8 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
       "ecr-public:TagResource",
       "ecr-public:UntagResource",
       "ecr-public:DeleteRepository",
-      "sts:GetServiceBearerToken"
+      "sts:GetServiceBearerToken",
+      "ecr-public:GetRepositoryCatalogData"
     ]
     resources = ["*"]
   }
