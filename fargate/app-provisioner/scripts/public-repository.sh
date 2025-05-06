@@ -13,8 +13,7 @@ echo "Creating tfvars config"
   /bin/cat > $VAR_FILE <<EOL
 region = "$AWS_DEFAULT_REGION"
 env = "$ENV"
-app_slug = "$1"
-source_url = "$2"
+source_url = "$1"
 EOL
 
 echo "Running init and plan ..."
