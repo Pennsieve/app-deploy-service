@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner"
+	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/utils"
 )
 
 type AWSProvisioner struct {
@@ -192,8 +194,9 @@ func (p *AWSProvisioner) CreatePublicRepository(ctx context.Context) error {
 
 	// TODO: validate if repository already exists
 	// create public repository
+	sourceUrlHash := utils.GenerateHash(p.GitUrl)
 	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/public-repository.sh",
-		p.GitUrl)
+		p.GitUrl, strconv.Itoa(int(sourceUrlHash)))
 	out, err := cmd.Output()
 	if err != nil {
 		return err

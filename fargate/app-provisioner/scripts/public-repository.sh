@@ -14,6 +14,7 @@ echo "Creating tfvars config"
 region = "$AWS_DEFAULT_REGION"
 env = "$ENV"
 source_url = "$1"
+source_url_hash = "$2"
 EOL
 
 echo "Running init and plan ..."

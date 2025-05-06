@@ -7,3 +7,6 @@ variable "env" {
 variable "source_url" {
     type = string
 }
+variable "source_url_hash" {
+    type = string
+}
