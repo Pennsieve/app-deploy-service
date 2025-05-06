@@ -193,7 +193,7 @@ func (p *AWSProvisioner) CreatePublicRepository(ctx context.Context) error {
 	// TODO: validate if repository already exists
 	// create public repository
 	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/public-repository.sh",
-		p.GitUrl, p.AppSlug)
+		p.GitUrl)
 	out, err := cmd.Output()
 	if err != nil {
 		return err
