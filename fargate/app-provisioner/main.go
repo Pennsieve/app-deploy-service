@@ -39,6 +39,12 @@ func main() {
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 
+	var tag string
+	tag = os.Getenv("TAG")
+	if tag == "" {
+		tag = "latest"
+	}
+
 	// Initializing environment
 	cfg, err := config.LoadDefaultConfig(context.Background())
 	if err != nil {
@@ -90,7 +96,7 @@ func main() {
 		}
 	case "ADD_TO_APPSTORE":
 		ecsClient := ecs.NewFromConfig(cfg)
-		err := AddToAppstore(ctx, destinationUrl, appProvisioner, ecsClient)
+		err := AddToAppstore(ctx, sourceUrl, tag, appProvisioner, ecsClient)
 		if err != nil {
 			log.Println(err)
 		}
@@ -135,7 +141,8 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-func AddToAppstore(ctx context.Context, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+func AddToAppstore(ctx context.Context, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+	// CreatePublicRepository
 	if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
 		return fmt.Errorf("error creating public repository: %w", err)
 	}
@@ -148,6 +155,13 @@ func AddToAppstore(ctx context.Context, destinationUrl string, appProvisioner pr
 	}
 
 	log.Println(outputs)
+	destinationUrl := outputs.AppPublicEcrUrl.Value
+
+	// Build and push
+	log.Println("Initiating new Deployment Fargate Task: CREATE")
+	if err := PublicDeploy(ctx, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -240,6 +254,48 @@ func Delete(ctx context.Context, applicationUuid string, appProvisioner provisio
 
 	if err := applicationsStore.Delete(ctx, applicationUuid); err != nil {
 		return fmt.Errorf("error deleting application from store: %w", err)
+	}
+	return nil
+}
+
+func PublicDeploy(ctx context.Context, sourceUrl string, tag string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+	TaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
+	subIdStr := os.Getenv("SUBNET_IDS")
+	SubNetIds := strings.Split(subIdStr, ",")
+	cluster := os.Getenv("CLUSTER_ARN")
+	SecurityGroup := os.Getenv("SECURITY_GROUP")
+	TaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+
+	runTaskIn := &ecs.RunTaskInput{
+		TaskDefinition: aws.String(TaskDefinitionArn),
+		Cluster:        aws.String(cluster),
+		NetworkConfiguration: &types.NetworkConfiguration{
+			AwsvpcConfiguration: &types.AwsVpcConfiguration{
+				Subnets:        SubNetIds,
+				SecurityGroups: []string{SecurityGroup},
+				AssignPublicIp: types.AssignPublicIpEnabled,
+			},
+		},
+		Overrides: &types.TaskOverride{
+			ContainerOverrides: []types.ContainerOverride{
+				{
+					Name:        &TaskDefContainerName,
+					Command:     []string{"--context", sourceUrl, "--destination", destinationUrl, "--force"},
+					Environment: []types.KeyValuePair{},
+				},
+			},
+		},
+		LaunchType: types.LaunchTypeFargate,
+		Tags:       []types.Tag{},
+	}
+
+	taskRunner := runner.NewECSTaskRunner(ecsClient, runTaskIn)
+	runTaskOut, err := taskRunner.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("error running deployment task: %w", err)
+	}
+	if err := runner.GetRunFailures(runTaskOut); err != nil {
+		return fmt.Errorf("error: run failures: %w", err)
 	}
 	return nil
 }
