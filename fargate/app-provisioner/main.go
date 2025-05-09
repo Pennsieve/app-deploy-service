@@ -158,7 +158,7 @@ func AddToAppstore(ctx context.Context, sourceUrl string, tag string, appProvisi
 	destinationUrl := outputs.AppPublicEcrUrl.Value
 
 	// Build and push
-	log.Println("Initiating new Deployment Fargate Task: CREATE")
+	log.Println("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE")
 	if err := PublicDeploy(ctx, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
 		return err
 	}
