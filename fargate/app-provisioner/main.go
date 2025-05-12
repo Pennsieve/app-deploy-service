@@ -259,6 +259,18 @@ func Delete(ctx context.Context, applicationUuid string, appProvisioner provisio
 }
 
 func PublicDeploy(ctx context.Context, sourceUrl string, tag string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+	creds, err := appProvisioner.GetProvisionerCreds(ctx)
+	if err != nil {
+		return fmt.Errorf("error retrieving credentials: %w", err)
+	}
+
+	accessKeyId := "AWS_ACCESS_KEY_ID"
+	accessKeyIdValue := creds.AccessKeyID
+	secretAccessKey := "AWS_SECRET_ACCESS_KEY"
+	secretAccessKeyValue := creds.SecretAccessKey
+	sessionToken := "AWS_SESSION_TOKEN"
+	sessionTokenValue := creds.SessionToken
+
 	TaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
 	subIdStr := os.Getenv("SUBNET_IDS")
 	SubNetIds := strings.Split(subIdStr, ",")
@@ -279,9 +291,22 @@ func PublicDeploy(ctx context.Context, sourceUrl string, tag string, destination
 		Overrides: &types.TaskOverride{
 			ContainerOverrides: []types.ContainerOverride{
 				{
-					Name:        &TaskDefContainerName,
-					Command:     []string{"--context", sourceUrl, "--destination", destinationUrl, "--force"},
-					Environment: []types.KeyValuePair{},
+					Name:    &TaskDefContainerName,
+					Command: []string{"--context", sourceUrl, "--destination", destinationUrl, "--force"},
+					Environment: []types.KeyValuePair{
+						{
+							Name:  &accessKeyId,
+							Value: &accessKeyIdValue,
+						},
+						{
+							Name:  &sessionToken,
+							Value: &sessionTokenValue,
+						},
+						{
+							Name:  &secretAccessKey,
+							Value: &secretAccessKeyValue,
+						},
+					},
 				},
 			},
 		},

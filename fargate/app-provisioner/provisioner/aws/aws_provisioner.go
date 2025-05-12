@@ -56,6 +56,17 @@ func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error
 	return credentials, nil
 }
 
+func (p *AWSProvisioner) GetProvisionerCreds(ctx context.Context) (aws.Credentials, error) {
+	log.Println("getting provisioner credentials ...")
+
+	credentials, err := p.Config.Credentials.Retrieve(ctx)
+	if err != nil {
+		return aws.Credentials{}, err
+	}
+
+	return credentials, nil
+}
+
 func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 	log.Println("creating an inline policy ...")
 	stsClient := sts.NewFromConfig(p.Config)
