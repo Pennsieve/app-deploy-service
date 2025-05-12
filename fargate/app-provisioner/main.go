@@ -40,7 +40,7 @@ func main() {
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 
 	var tag string
-	tag = os.Getenv("TAG")
+	tag = os.Getenv("SOURCE_TAG")
 	if tag == "" {
 		tag = "latest"
 	}
