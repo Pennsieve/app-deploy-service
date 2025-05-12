@@ -292,7 +292,7 @@ func PublicDeploy(ctx context.Context, sourceUrl string, tag string, destination
 			ContainerOverrides: []types.ContainerOverride{
 				{
 					Name:    &TaskDefContainerName,
-					Command: []string{"--context", sourceUrl, "--destination", destinationUrl, "--force"},
+					Command: []string{"--context", sourceUrl, "--destination", fmt.Sprintf("%s:%s", destinationUrl, tag), "--force"},
 					Environment: []types.KeyValuePair{
 						{
 							Name:  &accessKeyId,
