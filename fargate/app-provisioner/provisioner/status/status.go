@@ -23,12 +23,11 @@ type Manager struct {
 	DeploymentId      string
 }
 
-func NewManager(applicationsStore store_dynamodb.DynamoDBStore, applicationId string) *Manager {
-	return &Manager{HandlerName: "AppProvisioner", ApplicationsStore: applicationsStore, ApplicationId: applicationId}
+func NewManager(applicationsStore store_dynamodb.DynamoDBStore, applicationId string, deploymentsStore *store_dynamodb.DeploymentsStore) *Manager {
+	return &Manager{HandlerName: "AppProvisioner", ApplicationsStore: applicationsStore, ApplicationId: applicationId, DeploymentsStore: deploymentsStore}
 }
 
-func (m *Manager) WithDeployment(deploymentsStore *store_dynamodb.DeploymentsStore, deploymentId string) *Manager {
-	m.DeploymentsStore = deploymentsStore
+func (m *Manager) WithDeploymentId(deploymentId string) *Manager {
 	m.DeploymentId = deploymentId
 	return m
 }
@@ -49,7 +48,7 @@ func (m *Manager) SetErrorStatus(ctx context.Context, err error) {
 	if appStoreErr := m.ApplicationsStore.UpdateStatus(ctx, msg, m.ApplicationId); appStoreErr != nil {
 		log.Printf("warning: error updating applications table with error: %s: %s\n", msg, appStoreErr.Error())
 	}
-	if m.DeploymentsStore != nil {
+	if len(m.DeploymentId) > 0 {
 		if deployStoreErr := m.DeploymentsStore.SetErroredFlag(ctx, m.ApplicationId, m.DeploymentId); deployStoreErr != nil {
 			log.Printf("warning: error setting errored on deployments table: %s\n", deployStoreErr.Error())
 		}
@@ -70,6 +69,17 @@ func (m *Manager) ApplicationCreateUpdate(ctx context.Context, application store
 	return m.ApplicationsStore.Update(ctx, application, m.ApplicationId)
 }
 
+func (m *Manager) ApplicationDelete(ctx context.Context) error {
+	if err := m.ApplicationsStore.Delete(ctx, m.ApplicationId); err != nil {
+		return fmt.Errorf("error deleting application %s from store: %w", m.ApplicationId, err)
+	}
+	if err := m.DeploymentsStore.DeleteApplicationDeployments(ctx, m.ApplicationId); err != nil {
+		log.Printf("warning: error deleting deployments for application %s: %s\n", m.ApplicationId, err.Error())
+	}
+	m.sendApplicationDeletionEvent()
+	return nil
+}
+
 func (m *Manager) sendApplicationStatusEvent(status string, isErrorStatus bool) {
 	if m.Pusher == nil {
 		log.Printf("warning: no Pusher client configured")
@@ -86,5 +96,21 @@ func (m *Manager) sendApplicationStatusEvent(status string, isErrorStatus bool) 
 	}
 	if err := m.Pusher.Trigger(channel, events.ApplicationStatusEventName, event); err != nil {
 		log.Printf("warning: error updating pusher application channel %s with status: %s: %s\n", channel, status, err.Error())
+	}
+}
+
+func (m *Manager) sendApplicationDeletionEvent() {
+	if m.Pusher == nil {
+		log.Printf("warning: no Pusher client configured")
+		return
+	}
+	channel := events.ApplicationStatusChannel(m.ApplicationId)
+	event := events.ApplicationDeletionEvent{
+		ApplicationId: m.ApplicationId,
+		Time:          time.Now().UTC(),
+		Source:        m.HandlerName,
+	}
+	if err := m.Pusher.Trigger(channel, events.ApplicationDeletionEventName, event); err != nil {
+		log.Printf("warning: error sending deletion event to pusher application channel %s: %s\n", channel, err.Error())
 	}
 }
