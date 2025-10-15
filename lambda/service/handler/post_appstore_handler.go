@@ -16,8 +16,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
-	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
-	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 )
 
 func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -54,19 +52,20 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}, nil
 	}
 
-	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	// Maybe we should check for role.Writer instead here, but I'm not
-	// sure if there is a difference for org roles.
-	// So just making sure the user is not a guest
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		log.Printf("user not permitted to deploy application with claims: %+v", claims)
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, ErrNotPermitted),
-		}, nil
-	}
-	organizationId := claims.OrgClaim.NodeId
-	userId := claims.UserClaim.NodeId
+	// TODO: add authorization and authentication
+	// claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
+	// // Maybe we should check for role.Writer instead here, but I'm not
+	// // sure if there is a difference for org roles.
+	// // So just making sure the user is not a guest
+	// if !authorizer.HasOrgRole(claims, role.Viewer) {
+	// 	log.Printf("user not permitted to deploy application with claims: %+v", claims)
+	// 	return events.APIGatewayV2HTTPResponse{
+	// 		StatusCode: http.StatusUnauthorized,
+	// 		Body:       handlerError(handlerName, ErrNotPermitted),
+	// 	}, nil
+	// }
+	// organizationId := claims.OrgClaim.NodeId
+	// userId := claims.UserClaim.NodeId
 
 	client := ecs.NewFromConfig(cfg)
 	log.Println("Initiating new AppStore Fargate Task.")
@@ -77,10 +76,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	accountTypeValue := application.Account.AccountType
 	accountUuidKey := "ACCOUNT_UUID"
 	accountUuidValue := application.Account.Uuid
-	organizationIdKey := "ORG_ID"
-	organizationIdValue := organizationId
-	userIdKey := "USER_ID"
-	userIdValue := userId
 	actionKey := "ACTION"
 	actionValue := "ADD_TO_APPSTORE"
 
@@ -142,14 +137,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 						{
 							Name:  &actionKey,
 							Value: &actionValue,
-						},
-						{
-							Name:  &organizationIdKey,
-							Value: &organizationIdValue,
-						},
-						{
-							Name:  &userIdKey,
-							Value: &userIdValue,
 						},
 						{
 							Name:  &sourceTypeKey,
