@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
+	"github.com/pennsieve/app-deploy-service/service/utils"
 )
 
 func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -82,7 +83,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	sourceTypeKey := "SOURCE_TYPE"
 	sourceTypeValue := application.Source.SourceType
 	sourceUrlKey := "SOURCE_URL"
-	sourceUrlValue := application.Source.Url
+	sourceUrlValue := utils.DetermineSourceURL(application.Source.Url, application.Source.Tag)
 	sourceTagKey := "SOURCE_TAG"
 	sourceTagValue := application.Source.Tag
 
