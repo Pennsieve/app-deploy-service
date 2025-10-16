@@ -12,7 +12,6 @@ func ExtractRoute(requestRouteKey string) string {
 }
 
 func DetermineSourceURL(sourceURL string, tag string) string {
-	// if the sourceURL starts with http or https, return it as is
 	if matched, _ := regexp.MatchString(`^https?://`, sourceURL); matched {
 		return fmt.Sprintf("%s#%s", sourceURL, tag)
 	}
