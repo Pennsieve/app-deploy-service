@@ -46,8 +46,8 @@ variable "deployer_image_url" {
 }
 
 variable "deployer_image_tag" {
-  default = "latest"
-}
+  default = "debug"
+} 
 
 variable "deployer_tier" {
   default = "app-deployer"
