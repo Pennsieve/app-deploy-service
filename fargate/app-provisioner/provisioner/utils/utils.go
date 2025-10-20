@@ -23,6 +23,6 @@ func GenerateHash(s string) uint32 {
 }
 
 func AppSlug(s string, t string) string {
-	sourceUrlComputeNodeSlug := fmt.Sprintf("%s-%v", ExtractRepoName(s), t)
+	sourceUrlComputeNodeSlug := fmt.Sprintf("%s-%v", s, t)
 	return fmt.Sprint(GenerateHash(sourceUrlComputeNodeSlug))
 }
