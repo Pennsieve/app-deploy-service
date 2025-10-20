@@ -36,5 +36,15 @@ func TestAppSlug(t *testing.T) {
 	s := "git://github.com/edmore/cytof-PIPELINE"
 	s2 := "f03bea87-c766-4ec3-96b9-519fa31c1de9"
 	result := utils.AppSlug(s, s2)
-	assert.Equal(t, "36637889", fmt.Sprint(result))
+	assert.Equal(t, "3672999531", fmt.Sprint(result))
+}
+
+func TestUniqueAppIdentifierPerOrg(t *testing.T) {
+	sourceUrl1 := "git://github.com/test/test-PIPELINE"
+	sourceUrl2 := "git://github.com/test2/test-PIPELINE"
+	uuid := "f03bea87-c766-4ec3-96b9-519fa31c1de9"
+
+	result := utils.AppSlug(sourceUrl1, uuid)
+	result2 := utils.AppSlug(sourceUrl2, uuid)
+	assert.NotEqual(t, result, result2)
 }
