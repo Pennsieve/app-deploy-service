@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 func ExtractRoute(requestRouteKey string) string {
@@ -19,7 +20,8 @@ func DetermineSourceURL(sourceURL string, tag string) (string, error) {
 		if tag == "" {
 			return "", errors.New("tag is required for https source URLs")
 		}
-		return fmt.Sprintf("%s/archive/refs/tags/%s.tar.gz", sourceURL, tag), nil
+		newSourceURL := strings.Replace(sourceURL, "https://", "git://", 1)
+		return fmt.Sprintf("%s#refs/tags/%s", newSourceURL, tag), nil
 	}
 	return sourceURL, nil
 }
