@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 )
@@ -11,9 +12,14 @@ func ExtractRoute(requestRouteKey string) string {
 	return routeKeyParts[r.SubexpIndex("pathKey")]
 }
 
-func DetermineSourceURL(sourceURL string, tag string) string {
+var ErrTagRequired = errors.New("tag is required for https source URLs")
+
+func DetermineSourceURL(sourceURL string, tag string) (string, error) {
 	if matched, _ := regexp.MatchString(`^https?://`, sourceURL); matched {
-		return fmt.Sprintf("%s/archive/refs/tags/%s.tar.gz", sourceURL, tag)
+		if tag == "" {
+			return "", errors.New("tag is required for https source URLs")
+		}
+		return fmt.Sprintf("%s/archive/refs/tags/%s.tar.gz", sourceURL, tag), nil
 	}
-	return sourceURL
+	return sourceURL, nil
 }
