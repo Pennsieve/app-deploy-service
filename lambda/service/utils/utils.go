@@ -13,7 +13,7 @@ func ExtractRoute(requestRouteKey string) string {
 
 func DetermineSourceURL(sourceURL string, tag string) string {
 	if matched, _ := regexp.MatchString(`^https?://`, sourceURL); matched {
-		return fmt.Sprintf("%s#%s", sourceURL, tag)
+		return fmt.Sprintf("%s/archive/refs/tags/%s.tar.gz", sourceURL, tag)
 	}
 	return sourceURL
 }
