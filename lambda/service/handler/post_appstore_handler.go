@@ -82,10 +82,17 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 
 	sourceTypeKey := "SOURCE_TYPE"
 	sourceTypeValue := application.Source.SourceType
-	sourceUrlKey := "SOURCE_URL"
-	sourceUrlValue := utils.DetermineSourceURL(application.Source.Url, application.Source.Tag)
 	sourceTagKey := "SOURCE_TAG"
 	sourceTagValue := application.Source.Tag
+	sourceUrlKey := "SOURCE_URL"
+	sourceUrlValue, err := utils.DetermineSourceURL(application.Source.Url, sourceTagValue)
+	if err != nil {
+		log.Println("error determining sourceUrlValue: ", err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusBadRequest,
+			Body:       handlerError(handlerName, ErrSourceURL),
+		}, nil
+	}
 
 	destinationTypeKey := "DESTINATION_TYPE"
 	destinationTypeValue := application.Destination.DestinationType

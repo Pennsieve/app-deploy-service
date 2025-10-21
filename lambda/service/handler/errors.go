@@ -20,6 +20,7 @@ var ErrDynamoDB = errors.New("error performing action on DynamoDB table")
 var ErrNotPermitted = errors.New("not permitted")
 var ErrStoringApplication = errors.New("error storing application")
 var ErrStoringDeployment = errors.New("error storing deployment")
+var ErrSourceURL = errors.New("error determining source URL")
 
 func handlerError(handlerName string, errorMessage error) string {
 	log.Printf("%s: %s", handlerName, errorMessage.Error())
