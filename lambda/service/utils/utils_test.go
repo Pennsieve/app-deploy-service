@@ -21,7 +21,7 @@ func TestExtractRouteKey(t *testing.T) {
 func TestDetermineSourceURL(t *testing.T) {
 	sourceURL := "https://github.com/owner/repo"
 	tag := "v1.0.0"
-	expected := "https://github.com/owner/repo/archive/refs/tags/v1.0.0.tar.gz"
+	expected := "git://github.com/owner/repo#refs/tags/v1.0.0"
 	got, _ := utils.DetermineSourceURL(sourceURL, tag)
 	if got != expected {
 		t.Errorf("expected %s, got %s", expected, got)
