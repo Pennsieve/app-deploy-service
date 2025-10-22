@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -51,16 +52,29 @@ func (r *ApplicationDatabaseStore) Get(ctx context.Context, organizationId strin
 	applications := []Application{}
 
 	var c expression.ConditionBuilder
-	c = expression.Name("organizationId").Equal((expression.Value(organizationId)))
+	c = expression.Name("organizationId").Equal(expression.Value(organizationId))
 
 	if applicationType, found := params["applicationType"]; found {
-		c = c.And(expression.Name("applicationType").Equal((expression.Value(applicationType))))
+		c = c.And(expression.Name("applicationType").Equal(expression.Value(applicationType)))
 	}
 	if computeNodeUuid, found := params["computeNodeUuid"]; found {
-		c = c.And(expression.Name("computeNodeUuid").Equal((expression.Value(computeNodeUuid))))
+		c = c.And(expression.Name("computeNodeUuid").Equal(expression.Value(computeNodeUuid)))
 	}
 	if sourceUrl, found := params["sourceUrl"]; found {
-		c = c.And(expression.Name("sourceUrl").Equal((expression.Value(sourceUrl))))
+		c = c.And(expression.Name("sourceUrl").Equal(expression.Value(sourceUrl)))
+	}
+	if deletedStrValue, found := params["deleted"]; found {
+		if deleted, err := strconv.ParseBool(deletedStrValue); err != nil {
+			return nil, fmt.Errorf("error converting 'deleted' value %s to bool: %w", deletedStrValue, err)
+		} else if deleted {
+			c = c.And(expression.Name("deleted").Equal(expression.Value(deleted)))
+		} else {
+			// deleted == false also requires checking for non-existent deleted property
+			c = c.And(
+				expression.Name("deleted").AttributeNotExists().
+					Or(expression.Name("deleted").Equal(expression.Value(deleted))),
+			)
+		}
 	}
 
 	expr, err := expression.NewBuilder().WithFilter(c).Build()
