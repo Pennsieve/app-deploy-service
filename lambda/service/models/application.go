@@ -19,6 +19,7 @@ type Application struct {
 	Params                   interface{}          `json:"params,omitempty"`
 	CommandArguments         interface{}          `json:"commandArguments,omitempty"`
 	Status                   string               `json:"status"`
+	Release                  Release              `json:"release,omitempty"`
 }
 
 type Account struct {
@@ -36,6 +37,7 @@ type Source struct {
 	SourceType string `json:"type"`
 	Url        string `json:"url"`
 	Tag        string `json:"tag"`
+	IsPrivate  bool   `json:"isPrivate,omitempty"`
 }
 
 type Destination struct {
@@ -43,6 +45,9 @@ type Destination struct {
 	Url             string `json:"url"`
 }
 
+type Release struct {
+	ID string `json:"id"`
+}
 type ApplicationResources struct {
 	CPU    int `json:"cpu"`
 	Memory int `json:"memory"`
