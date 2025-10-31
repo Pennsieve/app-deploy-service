@@ -10,11 +10,11 @@ const DeploymentApplicationIdField = "applicationId"
 type DeploymentKey struct {
 	ApplicationId string `dynamodbav:"applicationId"`
 	DeploymentId  string `dynamodbav:"deploymentId"`
-	ReleaseId     string `dynamodbav:"releaseId"`
 }
 
 type Deployment struct {
 	DeploymentKey
+	ReleaseId       string    `dynamodbav:"releaseId"`
 	InitiatedAt     time.Time `dynamodbav:"initiatedAt"`
 	WorkspaceNodeId string    `dynamodbav:"workspaceNodeId"`
 	UserNodeId      string    `dynamodbav:"userNodeId"`
