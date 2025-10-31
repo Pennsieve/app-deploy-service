@@ -10,6 +10,7 @@ const DeploymentApplicationIdField = "applicationId"
 type DeploymentKey struct {
 	ApplicationId string `dynamodbav:"applicationId"`
 	DeploymentId  string `dynamodbav:"deploymentId"`
+	ReleaseId     string `dynamodbav:"releaseId"`
 }
 
 type Deployment struct {

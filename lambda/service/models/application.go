@@ -48,6 +48,7 @@ type Destination struct {
 type Release struct {
 	ID string `json:"id"`
 }
+
 type ApplicationResources struct {
 	CPU    int `json:"cpu"`
 	Memory int `json:"memory"`
