@@ -15,11 +15,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/app-deploy-service/service/utils"
+	"github.com/pusher/pusher-http-go/v5"
 )
 
 func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -80,15 +82,31 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	// Use source URL as the application identifier for appstore deployments
 	applicationId := application.Source.Url
 
+	statusManager := NewDeploymentStatusManager(handlerName, deploymentsStore, applicationId, deploymentId)
+
+	// Add pusher to statusManager if possible for real-time updates
+	ssmClient := ssm.NewFromConfig(cfg)
+	if pusherConfig, err := GetPusherConfig(ctx, ssmClient); err != nil {
+		log.Printf("warning: %v\n", err)
+	} else {
+		statusManager = statusManager.WithPusher(&pusher.Client{
+			AppID:   pusherConfig.AppId,
+			Key:     pusherConfig.Key,
+			Secret:  pusherConfig.Secret,
+			Cluster: pusherConfig.Cluster,
+			Secure:  true,
+		})
+	}
+
 	// Create deployment record before launching task
-	if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
+	if err := statusManager.NewDeployment(ctx, store_dynamodb.Deployment{
 		DeploymentKey: store_dynamodb.DeploymentKey{
 			DeploymentId:  deploymentId,
 			ApplicationId: applicationId,
 		},
 		ReleaseId:       application.Release.ID,
 		InitiatedAt:     time.Now().UTC(),
-		WorkspaceNodeId: "APPSTORE",
+		WorkspaceNodeId: appstoreWorkspaceId,
 		UserNodeId:      application.Source.SourceType,
 		Action:          "ADD_TO_APPSTORE",
 		LastStatus:      "NOT_STARTED",
@@ -231,24 +249,18 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	runTaskOut, err := taskRunner.Run(ctx)
 	if err != nil {
 		log.Println("error running task: ", err.Error())
-		if deployErr := deploymentsStore.SetErrored(ctx, applicationId, deploymentId); deployErr != nil {
-			log.Printf("warning: error setting errored on deployments table: %s\n", deployErr.Error())
-		}
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	if err := runner.GetRunFailures(runTaskOut); err != nil {
 		log.Println("run failures from task: ", err.Error())
 		// assuming here that if there were failures, then no tasks started.
 		// seems safe since for now we are only starting one task
-		if deployErr := deploymentsStore.SetErrored(ctx, applicationId, deploymentId); deployErr != nil {
-			log.Printf("warning: error setting errored on deployments table: %s\n", deployErr.Error())
-		}
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	// we expect one task

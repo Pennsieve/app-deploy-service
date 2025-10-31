@@ -7,3 +7,6 @@ const applicationUuidKey = "APPLICATION_UUID"
 // ECS Task tags for deployment tracking
 const deploymentIdTag = "DeploymentId"
 const applicationIdTag = "ApplicationId"
+
+// Special workspace identifier for appstore deployments
+const appstoreWorkspaceId = "APPSTORE"
