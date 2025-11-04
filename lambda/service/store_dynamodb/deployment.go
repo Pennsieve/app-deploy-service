@@ -14,6 +14,7 @@ type DeploymentKey struct {
 
 type Deployment struct {
 	DeploymentKey
+	ReleaseId       string    `dynamodbav:"releaseId"`
 	InitiatedAt     time.Time `dynamodbav:"initiatedAt"`
 	WorkspaceNodeId string    `dynamodbav:"workspaceNodeId"`
 	UserNodeId      string    `dynamodbav:"userNodeId"`

@@ -7,16 +7,21 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
+	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/app-deploy-service/service/utils"
+	"github.com/pusher/pusher-http-go/v5"
 )
 
 func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -43,6 +48,8 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	SecurityGroup := os.Getenv("SECURITY_GROUP")
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
 	DeployerTaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+	deploymentsTable := os.Getenv(deploymentsTableNameKey)
+	deploymentId := uuid.NewString()
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -69,6 +76,48 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	// userId := claims.UserClaim.NodeId
 
 	client := ecs.NewFromConfig(cfg)
+	dynamoDBClient := dynamodb.NewFromConfig(cfg)
+	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+
+	// Use source URL as the application identifier for appstore deployments
+	applicationId := application.Source.Url
+
+	statusManager := NewDeploymentStatusManager(handlerName, deploymentsStore, applicationId, deploymentId)
+
+	// Add pusher to statusManager if possible for real-time updates
+	ssmClient := ssm.NewFromConfig(cfg)
+	if pusherConfig, err := GetPusherConfig(ctx, ssmClient); err != nil {
+		log.Printf("warning: %v\n", err)
+	} else {
+		statusManager = statusManager.WithPusher(&pusher.Client{
+			AppID:   pusherConfig.AppId,
+			Key:     pusherConfig.Key,
+			Secret:  pusherConfig.Secret,
+			Cluster: pusherConfig.Cluster,
+			Secure:  true,
+		})
+	}
+
+	// Create deployment record before launching task
+	if err := statusManager.NewDeployment(ctx, store_dynamodb.Deployment{
+		DeploymentKey: store_dynamodb.DeploymentKey{
+			DeploymentId:  deploymentId,
+			ApplicationId: applicationId,
+		},
+		ReleaseId:       application.Release.ID,
+		InitiatedAt:     time.Now().UTC(),
+		WorkspaceNodeId: appstoreWorkspaceId,
+		UserNodeId:      application.Source.SourceType,
+		Action:          "ADD_TO_APPSTORE",
+		LastStatus:      "NOT_STARTED",
+	}); err != nil {
+		log.Println("error creating deployment record: ", err.Error())
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrStoringDeployment),
+		}, nil
+	}
+
 	log.Println("Initiating new AppStore Fargate Task.")
 	envKey := "ENV"
 	accountIdKey := "ACCOUNT_ID"
@@ -109,7 +158,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	securityGroupValue := SecurityGroup
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
-	registrationId := uuid.NewString()
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -191,6 +239,10 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			},
 		},
 		LaunchType: types.LaunchTypeFargate,
+		Tags: []types.Tag{
+			{Key: aws.String(deploymentIdTag), Value: aws.String(deploymentId)},
+			{Key: aws.String(applicationIdTag), Value: aws.String(applicationId)},
+		},
 	}
 
 	taskRunner := runner.NewECSTaskRunner(client, runTaskIn)
@@ -199,7 +251,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		log.Println("error running task: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	if err := runner.GetRunFailures(runTaskOut); err != nil {
@@ -208,18 +260,18 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		// seems safe since for now we are only starting one task
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrRunningFargateTask),
+			Body:       statusManager.SetErrorStatus(ctx, ErrRunningFargateTask),
 		}, nil
 	}
 	// we expect one task
 	if len(runTaskOut.Tasks) > 0 {
-		log.Printf("started Add to AppStore for ID %s from %s in task %s",
-			registrationId,
+		log.Printf("started Add to AppStore deployment %s from %s in task %s",
+			deploymentId,
 			sourceUrlValue,
 			aws.ToString(runTaskOut.Tasks[0].TaskArn))
 	}
 
-	m, err := json.Marshal(models.AppStoreRegistrationResponse{RegistrationId: registrationId})
+	m, err := json.Marshal(models.DeployApplicationResponse{DeploymentId: deploymentId})
 	if err != nil {
 		log.Println("error marshalling response: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
