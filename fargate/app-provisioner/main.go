@@ -96,9 +96,10 @@ func main() {
 		}
 	case "ADD_TO_APPSTORE":
 		ecsClient := ecs.NewFromConfig(cfg)
-		err := AddToAppstore(ctx, sourceUrl, tag, appProvisioner, ecsClient)
+		err := AddToAppstore(ctx, applicationUuid, sourceUrl, tag, appProvisioner, ecsClient, applicationsStore, statusManager)
 		if err != nil {
-			log.Println(err)
+			statusManager.SetErrorStatus(ctx, err)
+			log.Fatal(err)
 		}
 	default:
 		unknownActionStatus := fmt.Sprintf("error: unknown provision action: %s", action)
@@ -141,21 +142,45 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-func AddToAppstore(ctx context.Context, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
-	// CreatePublicRepository
-	if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
-		return fmt.Errorf("error creating public repository: %w", err)
-	}
+const appstoreIdentifier = "APP_STORE"
 
-	// parse output file created after infrastructure creation
-	parser := parser.NewOutputParser("/usr/src/app/terraform/pennsieve/public-repository/outputs.json")
-	outputs, err := parser.Run(ctx)
+func AddToAppstore(ctx context.Context, applicationUuid string, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, applicationsStore store_dynamodb.DynamoDBStore, statusManager *status.Manager) error {
+	var destinationUrl string
+
+	// Check if an application with this source URL already exists in the appstore
+	applications, err := applicationsStore.Get(ctx, appstoreIdentifier, sourceUrl)
 	if err != nil {
-		return fmt.Errorf("error running output parser: %w", err)
+		return fmt.Errorf("error checking for existing application: %w", err)
 	}
 
-	log.Println(outputs)
-	destinationUrl := outputs.AppPublicEcrUrl.Value
+	if len(applications) > 0 {
+		log.Printf("Application with source URL %s already exists (found %d), skipping repository creation", sourceUrl, len(applications))
+		destinationUrl = applications[0].DestinationUrl
+	} else {
+		log.Println("No existing application found, creating public repository")
+		// CreatePublicRepository
+		if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
+			return fmt.Errorf("error creating public repository: %w", err)
+		}
+
+		// parse output file created after infrastructure creation
+		parser := parser.NewOutputParser("/usr/src/app/terraform/pennsieve/public-repository/outputs.json")
+		outputs, err := parser.Run(ctx)
+		if err != nil {
+			return fmt.Errorf("error running output parser: %w", err)
+		}
+
+		log.Println(outputs)
+		destinationUrl = outputs.AppPublicEcrUrl.Value
+
+		// Update application record with destination URL
+		store_application := store_dynamodb.Application{
+			DestinationUrl: destinationUrl,
+		}
+		if err := statusManager.ApplicationCreateUpdate(ctx, store_application); err != nil {
+			return fmt.Errorf("error updating application with destination URL: %w", err)
+		}
+	}
 
 	// Build and push
 	log.Println("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE")
