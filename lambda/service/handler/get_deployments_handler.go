@@ -95,12 +95,12 @@ func GetDeploymentsHandler(ctx context.Context, request events.APIGatewayV2HTTPR
 }
 
 // IsAuthorized just checks that all the deployments in deploymentItems have the currentWorkspaceId (the one from the claims).
-// Special case: appstoreWorkspaceId deployments are treated as publicly viewable since they represent apps being added to the public appstore.
+// Special case: appstoreIdentifier deployments are treated as publicly viewable since they represent apps being added to the public appstore.
 // Maybe later we'll do something with the user?
 func IsAuthorized(currentWorkspaceId string, deploymentItems ...store_dynamodb.Deployment) bool {
 	for _, deploymentItem := range deploymentItems {
 		// Allow appstore deployments to be viewed by any authenticated user
-		if deploymentItem.WorkspaceNodeId == appstoreWorkspaceId {
+		if deploymentItem.WorkspaceNodeId == appstoreIdentifier {
 			continue
 		}
 		// For regular deployments, check workspace ownership

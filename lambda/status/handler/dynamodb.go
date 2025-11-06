@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -117,14 +116,6 @@ func (h *DeployTaskStateChangeHandler) UpdateApplicationsTable(ctx context.Conte
 		UpdateExpression:          expressions.Update(),
 	}
 	if _, err := h.DynamoDBApi.UpdateItem(ctx, updateIn); err != nil {
-		// Gracefully handle missing application records (e.g., for appstore deployments)
-		var conditionFailedError *types.ConditionalCheckFailedException
-		if errors.As(err, &conditionFailedError) {
-			h.logger.Info("application record does not exist, skipping application status update",
-				slog.String("applicationId", applicationId),
-				slog.String("status", status))
-			return nil
-		}
 		return fmt.Errorf("error updating application %s in table %s to status: %s: %w",
 			applicationId,
 			h.ApplicationsTable,

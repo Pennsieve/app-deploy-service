@@ -8,5 +8,5 @@ const applicationUuidKey = "APPLICATION_UUID"
 const deploymentIdTag = "DeploymentId"
 const applicationIdTag = "ApplicationId"
 
-// Special workspace identifier for appstore deployments
-const appstoreWorkspaceId = "APPSTORE"
+// Special identifier for appstore deployments (used for workspace and compute node)
+const appstoreIdentifier = "APP_STORE"
