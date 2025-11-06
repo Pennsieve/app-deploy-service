@@ -52,6 +52,8 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 	applicationUuid := uuid.NewString()
 	deploymentId := uuid.NewString()
+	actionKey := "ACTION"
+	actionValue := "ADD_TO_APPSTORE"
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -130,8 +132,10 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		InitiatedAt:     time.Now().UTC(),
 		WorkspaceNodeId: appstoreIdentifier,
 		UserNodeId:      application.Source.SourceType,
-		Action:          "ADD_TO_APPSTORE",
+		Action:          actionValue,
 		LastStatus:      "NOT_STARTED",
+		SourceUrl:       application.Source.Url,
+		Tag:             application.Source.Tag,
 	}); err != nil {
 		log.Println("error creating deployment record: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
@@ -148,8 +152,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	accountTypeValue := application.Account.AccountType
 	accountUuidKey := "ACCOUNT_UUID"
 	accountUuidValue := application.Account.Uuid
-	actionKey := "ACTION"
-	actionValue := "ADD_TO_APPSTORE"
 
 	sourceTypeKey := "SOURCE_TYPE"
 	sourceTypeValue := application.Source.SourceType

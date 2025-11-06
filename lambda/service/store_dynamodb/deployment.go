@@ -23,6 +23,8 @@ type Deployment struct {
 	LastStatus      string    `dynamodbav:"lastStatus"`
 	DesiredStatus   string    `dynamodbav:"desiredStatus"`
 	TaskArn         string    `dynamodbav:"taskArn"`
+	SourceUrl       string    `dynamodbav:"sourceUrl,omitempty"`
+	Tag             string    `dynamodbav:"tag,omitempty"`
 
 	// UpdatedAt is not in the reference. Assume it is the time this state change happened.
 	UpdatedAt *time.Time `dynamodbav:"updatedAt,omitempty"`
