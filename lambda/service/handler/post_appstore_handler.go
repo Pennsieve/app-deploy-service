@@ -101,9 +101,8 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		})
 	}
 
-	sourceUrlValue := application.Source.Url
 	params := map[string]string{
-		"sourceUrl": sourceUrlValue,
+		"sourceUrl": application.Source.Url,
 	}
 	applications, err := applicationsStore.Get(ctx, appstoreIdentifier, params)
 	if err != nil {
@@ -114,14 +113,14 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}, nil
 	}
 	if len(applications) > 0 {
-		log.Printf("application with sourceUrl %s already exists in AppStore", sourceUrlValue)
+		log.Printf("application with sourceUrl %s already exists in AppStore", application.Source.Url)
 	} else {
 		log.Println("Creating new application record for AppStore deployment.")
 		// Persist minimal application record for appstore deployment
 		store_application := store_dynamodb.Application{
 			Uuid:            applicationUuid,
 			SourceType:      application.Source.SourceType,
-			SourceUrl:       sourceUrlValue,
+			SourceUrl:       application.Source.Url,
 			ApplicationType: "processor",
 			ComputeNodeUuid: appstoreIdentifier,
 			OrganizationId:  appstoreIdentifier,
