@@ -258,6 +258,14 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 							Name:  &deployertaskDefnContainerKey,
 							Value: &deployertaskDefnContainerValue,
 						},
+						{
+							Name:  aws.String(deploymentsTableNameKey),
+							Value: aws.String(deploymentsTable),
+						},
+						{
+							Name:  aws.String(applicationsTableNameKey),
+							Value: aws.String(applicationsTable),
+						},
 					},
 				},
 			},
