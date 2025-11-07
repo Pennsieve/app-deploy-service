@@ -228,6 +228,10 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 							Value: aws.String(applicationUuid),
 						},
 						{
+							Name:  aws.String(deploymentIdKey),
+							Value: aws.String(deploymentId),
+						},
+						{
 							Name:  &envKey,
 							Value: &envValue,
 						},
