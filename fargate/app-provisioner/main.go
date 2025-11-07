@@ -184,7 +184,7 @@ func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId str
 		log.Println(outputs)
 		destinationUrl = outputs.AppPublicEcrUrl.Value
 		if destinationUrl == "" {
-			return fmt.Errorf("destination URL is empty")
+			return fmt.Errorf("error creating public repository, destination URL is empty")
 		}
 		// Update or create application record with destination URL
 		store_application := store_dynamodb.Application{
