@@ -101,25 +101,41 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		})
 	}
 
-	// Persist minimal application record for appstore deployment
-	store_application := store_dynamodb.Application{
-		Uuid:            applicationUuid,
-		SourceType:      application.Source.SourceType,
-		SourceUrl:       application.Source.Url,
-		ApplicationType: "processor",
-		ComputeNodeUuid: appstoreIdentifier,
-		OrganizationId:  appstoreIdentifier,
-		UserId:          application.Source.SourceType,
-		CreatedAt:       time.Now().UTC().String(),
-		Status:          "registering",
+	params := map[string]string{
+		"sourceUrl": application.Source.Url,
 	}
-	err = statusManager.NewApplication(ctx, store_application)
+	applications, err := applicationsStore.Get(ctx, appstoreIdentifier, params)
 	if err != nil {
-		log.Println("error inserting application: ", err.Error())
+		log.Println(err)
 		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrStoringApplication),
+			StatusCode: 500,
+			Body:       handlerError(handlerName, ErrDynamoDB),
 		}, nil
+	}
+	if len(applications) > 0 {
+		log.Printf("application with sourceUrl %s already exists in AppStore", application.Source.Url)
+	} else {
+		log.Println("Creating new application record for AppStore deployment.")
+		// Persist minimal application record for appstore deployment
+		store_application := store_dynamodb.Application{
+			Uuid:            applicationUuid,
+			SourceType:      application.Source.SourceType,
+			SourceUrl:       application.Source.Url,
+			ApplicationType: "processor",
+			ComputeNodeUuid: appstoreIdentifier,
+			OrganizationId:  appstoreIdentifier,
+			UserId:          application.Source.SourceType,
+			CreatedAt:       time.Now().UTC().String(),
+			Status:          "registering",
+		}
+		err = statusManager.NewApplication(ctx, store_application)
+		if err != nil {
+			log.Println("error inserting application: ", err.Error())
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       handlerError(handlerName, ErrStoringApplication),
+			}, nil
+		}
 	}
 
 	// Create deployment record before launching task
