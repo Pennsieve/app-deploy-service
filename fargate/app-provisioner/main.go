@@ -163,7 +163,7 @@ func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId str
 		if len(applications) > 0 {
 			log.Printf("Application with source URL %s exists but has no destination URL, creating public repository", sourceUrl)
 		} else {
-			log.Println("No existing application found, creating public repository and application record")
+			log.Println("No existing application found, creating public repository and updating application record")
 		}
 	}
 
