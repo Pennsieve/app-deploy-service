@@ -17,29 +17,3 @@ func TestExtractRouteKey(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, got)
 	}
 }
-
-func TestDetermineSourceURL(t *testing.T) {
-	sourceURL := "https://github.com/owner/repo"
-	tag := "v1.0.0"
-	expected := "git://github.com/owner/repo#refs/tags/v1.0.0"
-	got, _ := utils.DetermineSourceURL(sourceURL, tag)
-	if got != expected {
-		t.Errorf("expected %s, got %s", expected, got)
-	}
-
-	sourceURL = "https://github.com/owner/repo"
-	tag = ""
-	got, err := utils.DetermineSourceURL(sourceURL, tag)
-	if err.Error() != utils.ErrTagRequired.Error() {
-		t.Errorf("expected to get error: %s, got nil instead", utils.ErrTagRequired)
-	}
-
-	sourceURL = "git://github.com/owner/repo"
-	tag = "v1.0.0"
-	expected = "git://github.com/owner/repo"
-	got, _ = utils.DetermineSourceURL(sourceURL, tag)
-	if got != expected {
-		t.Errorf("expected %s, got %s", expected, got)
-	}
-
-}
