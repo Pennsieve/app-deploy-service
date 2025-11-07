@@ -304,6 +304,11 @@ func PublicDeploy(ctx context.Context, applicationUuid string, deploymentId stri
 		return fmt.Errorf("error retrieving credentials: %w", err)
 	}
 
+	deploymentSourceUrl, err := utils.DetermineSourceURL(sourceUrl, tag)
+	if err != nil {
+		return fmt.Errorf("error determining sourceUrl variable for deployment: %w", err)
+	}
+
 	accessKeyId := "AWS_ACCESS_KEY_ID"
 	accessKeyIdValue := creds.AccessKeyID
 	secretAccessKey := "AWS_SECRET_ACCESS_KEY"
@@ -332,7 +337,7 @@ func PublicDeploy(ctx context.Context, applicationUuid string, deploymentId stri
 			ContainerOverrides: []types.ContainerOverride{
 				{
 					Name:    &TaskDefContainerName,
-					Command: []string{"--context", sourceUrl, "--destination", fmt.Sprintf("%s:%s", destinationUrl, tag), "--force"},
+					Command: []string{"--context", deploymentSourceUrl, "--destination", fmt.Sprintf("%s:%s", destinationUrl, tag), "--force"},
 					Environment: []types.KeyValuePair{
 						{
 							Name:  &accessKeyId,

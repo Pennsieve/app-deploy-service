@@ -20,7 +20,6 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
-	"github.com/pennsieve/app-deploy-service/service/utils"
 	"github.com/pusher/pusher-http-go/v5"
 )
 
@@ -183,14 +182,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	sourceTagKey := "SOURCE_TAG"
 	sourceTagValue := application.Source.Tag
 	sourceUrlKey := "SOURCE_URL"
-	sourceUrlValue, err := utils.DetermineSourceURL(application.Source.Url, sourceTagValue)
-	if err != nil {
-		log.Println("error determining sourceUrlValue: ", err.Error())
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusBadRequest,
-			Body:       handlerError(handlerName, ErrSourceURL),
-		}, nil
-	}
+	sourceUrlValue := application.Source.Url
 
 	destinationTypeKey := "DESTINATION_TYPE"
 	destinationTypeValue := application.Destination.DestinationType
