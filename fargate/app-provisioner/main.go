@@ -60,7 +60,7 @@ func main() {
 	// deploymentId will only be present if this is not a DELETE. DELETE does not
 	// generate a Deployment record that needs to be updated.
 	var deploymentId string
-	if action == "CREATE" || action == "DEPLOY" {
+	if action == "CREATE" || action == "DEPLOY" || action == "ADD_TO_APPSTORE" {
 		deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
 		deploymentId = os.Getenv(provisioner.DeploymentIdKey)
 		deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
@@ -96,7 +96,7 @@ func main() {
 		}
 	case "ADD_TO_APPSTORE":
 		ecsClient := ecs.NewFromConfig(cfg)
-		err := AddToAppstore(ctx, applicationUuid, sourceUrl, tag, appProvisioner, ecsClient, applicationsStore, statusManager)
+		err := AddToAppstore(ctx, applicationUuid, deploymentId, sourceUrl, tag, appProvisioner, ecsClient, applicationsStore, statusManager)
 		if err != nil {
 			statusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
@@ -144,7 +144,7 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 
 const appstoreIdentifier = "APP_STORE"
 
-func AddToAppstore(ctx context.Context, applicationUuid string, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, applicationsStore store_dynamodb.DynamoDBStore, statusManager *status.Manager) error {
+func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, applicationsStore store_dynamodb.DynamoDBStore, statusManager *status.Manager) error {
 	var destinationUrl string
 	var needsRepositoryCreation bool
 
@@ -186,8 +186,9 @@ func AddToAppstore(ctx context.Context, applicationUuid string, sourceUrl string
 
 		// Update or create application record with destination URL
 		store_application := store_dynamodb.Application{
-			DestinationUrl: destinationUrl,
-			Status:         "deploying",
+			DestinationUrl:  destinationUrl,
+			DestinationType: "ecr",
+			Status:          "deploying",
 		}
 		if err := statusManager.ApplicationCreateUpdate(ctx, store_application); err != nil {
 			return fmt.Errorf("error updating application with destination URL: %w", err)
@@ -196,7 +197,7 @@ func AddToAppstore(ctx context.Context, applicationUuid string, sourceUrl string
 
 	// Build and push
 	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", sourceUrl, tag, destinationUrl)
-	if err := PublicDeploy(ctx, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
+	if err := PublicDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
 		return err
 	}
 
@@ -295,7 +296,7 @@ func Delete(ctx context.Context, applicationUuid string, appProvisioner provisio
 	return nil
 }
 
-func PublicDeploy(ctx context.Context, sourceUrl string, tag string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+func PublicDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
 	creds, err := appProvisioner.GetProvisionerCreds(ctx)
 	if err != nil {
 		return fmt.Errorf("error retrieving credentials: %w", err)
@@ -348,7 +349,10 @@ func PublicDeploy(ctx context.Context, sourceUrl string, tag string, destination
 			},
 		},
 		LaunchType: types.LaunchTypeFargate,
-		Tags:       []types.Tag{},
+		Tags: []types.Tag{
+			{Key: aws.String(provisioner.DeploymentIdTag), Value: aws.String(deploymentId)},
+			{Key: aws.String(provisioner.ApplicationIdTag), Value: aws.String(applicationUuid)},
+		},
 	}
 
 	taskRunner := runner.NewECSTaskRunner(ecsClient, runTaskIn)
