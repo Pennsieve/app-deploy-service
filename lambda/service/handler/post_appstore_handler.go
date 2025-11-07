@@ -50,7 +50,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	DeployerTaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
 	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
-	applicationUuid := uuid.NewString()
+	var applicationUuid string
 	deploymentId := uuid.NewString()
 	actionKey := "ACTION"
 	actionValue := "ADD_TO_APPSTORE"
@@ -84,8 +84,53 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 
-	statusManager := NewStatusManager(handlerName, applicationsStore, applicationUuid).
-		WithDeployment(deploymentsStore, deploymentId)
+	params := map[string]string{
+		"sourceUrl": application.Source.Url,
+	}
+	applications, err := applicationsStore.Get(ctx, appstoreIdentifier, params)
+	if err != nil {
+		log.Println(err)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: 500,
+			Body:       handlerError(handlerName, ErrDynamoDB),
+		}, nil
+	}
+
+	var statusManager *StatusManager
+	if len(applications) > 0 {
+		log.Printf("application with sourceUrl %s already exists in AppStore", application.Source.Url)
+		applicationUuid = applications[0].Uuid
+
+		statusManager = NewStatusManager(handlerName, applicationsStore, applicationUuid).
+			WithDeployment(deploymentsStore, deploymentId)
+
+	} else {
+		log.Println("Creating new application record for AppStore deployment.")
+		// Persist minimal application record for appstore deployment
+		applicationUuid := uuid.NewString()
+		store_application := store_dynamodb.Application{
+			Uuid:            applicationUuid,
+			SourceType:      application.Source.SourceType,
+			SourceUrl:       application.Source.Url,
+			ApplicationType: "processor",
+			ComputeNodeUuid: appstoreIdentifier,
+			OrganizationId:  appstoreIdentifier,
+			UserId:          application.Source.SourceType,
+			CreatedAt:       time.Now().UTC().String(),
+			Status:          "registering",
+		}
+		statusManager := NewStatusManager(handlerName, applicationsStore, applicationUuid).
+			WithDeployment(deploymentsStore, deploymentId)
+
+		err = statusManager.NewApplication(ctx, store_application)
+		if err != nil {
+			log.Println("error inserting application: ", err.Error())
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       handlerError(handlerName, ErrStoringApplication),
+			}, nil
+		}
+	}
 
 	// Add pusher to statusManager if possible for real-time updates
 	ssmClient := ssm.NewFromConfig(cfg)
@@ -99,43 +144,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			Cluster: pusherConfig.Cluster,
 			Secure:  true,
 		})
-	}
-
-	params := map[string]string{
-		"sourceUrl": application.Source.Url,
-	}
-	applications, err := applicationsStore.Get(ctx, appstoreIdentifier, params)
-	if err != nil {
-		log.Println(err)
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: 500,
-			Body:       handlerError(handlerName, ErrDynamoDB),
-		}, nil
-	}
-	if len(applications) > 0 {
-		log.Printf("application with sourceUrl %s already exists in AppStore", application.Source.Url)
-	} else {
-		log.Println("Creating new application record for AppStore deployment.")
-		// Persist minimal application record for appstore deployment
-		store_application := store_dynamodb.Application{
-			Uuid:            applicationUuid,
-			SourceType:      application.Source.SourceType,
-			SourceUrl:       application.Source.Url,
-			ApplicationType: "processor",
-			ComputeNodeUuid: appstoreIdentifier,
-			OrganizationId:  appstoreIdentifier,
-			UserId:          application.Source.SourceType,
-			CreatedAt:       time.Now().UTC().String(),
-			Status:          "registering",
-		}
-		err = statusManager.NewApplication(ctx, store_application)
-		if err != nil {
-			log.Println("error inserting application: ", err.Error())
-			return events.APIGatewayV2HTTPResponse{
-				StatusCode: http.StatusInternalServerError,
-				Body:       handlerError(handlerName, ErrStoringApplication),
-			}, nil
-		}
 	}
 
 	// Create deployment record before launching task
@@ -214,6 +222,10 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 				{
 					Name: &TaskDefContainerName,
 					Environment: []types.KeyValuePair{
+						{
+							Name:  aws.String(applicationUuidKey),
+							Value: aws.String(applicationUuid),
+						},
 						{
 							Name:  &envKey,
 							Value: &envValue,
