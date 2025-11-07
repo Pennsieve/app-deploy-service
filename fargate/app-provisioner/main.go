@@ -146,6 +146,7 @@ const appstoreIdentifier = "APP_STORE"
 
 func AddToAppstore(ctx context.Context, applicationUuid string, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, applicationsStore store_dynamodb.DynamoDBStore, statusManager *status.Manager) error {
 	var destinationUrl string
+	var needsRepositoryCreation bool
 
 	// Check if an application with this source URL already exists in the appstore
 	applications, err := applicationsStore.Get(ctx, appstoreIdentifier, sourceUrl)
@@ -153,11 +154,21 @@ func AddToAppstore(ctx context.Context, applicationUuid string, sourceUrl string
 		return fmt.Errorf("error checking for existing application: %w", err)
 	}
 
-	if len(applications) > 0 {
-		log.Printf("Application with source URL %s already exists (found %d), skipping repository creation", sourceUrl, len(applications))
+	if len(applications) > 0 && applications[0].DestinationUrl != "" {
+		log.Printf("Application with source URL %s already exists with destination URL (found %d), skipping repository creation", sourceUrl, len(applications))
 		destinationUrl = applications[0].DestinationUrl
+		needsRepositoryCreation = false
 	} else {
-		log.Println("No existing application found, creating public repository")
+		needsRepositoryCreation = true
+		if len(applications) > 0 {
+			log.Printf("Application with source URL %s exists but has no destination URL, creating public repository", sourceUrl)
+		} else {
+			log.Println("No existing application found, creating public repository and application record")
+		}
+	}
+
+	// Create repository if needed
+	if needsRepositoryCreation {
 		// CreatePublicRepository
 		if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
 			return fmt.Errorf("error creating public repository: %w", err)
@@ -173,9 +184,10 @@ func AddToAppstore(ctx context.Context, applicationUuid string, sourceUrl string
 		log.Println(outputs)
 		destinationUrl = outputs.AppPublicEcrUrl.Value
 
-		// Update application record with destination URL
+		// Update or create application record with destination URL
 		store_application := store_dynamodb.Application{
 			DestinationUrl: destinationUrl,
+			Status:         "deploying",
 		}
 		if err := statusManager.ApplicationCreateUpdate(ctx, store_application); err != nil {
 			return fmt.Errorf("error updating application with destination URL: %w", err)
@@ -183,7 +195,7 @@ func AddToAppstore(ctx context.Context, applicationUuid string, sourceUrl string
 	}
 
 	// Build and push
-	log.Println("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE")
+	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", sourceUrl, tag, destinationUrl)
 	if err := PublicDeploy(ctx, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
 		return err
 	}

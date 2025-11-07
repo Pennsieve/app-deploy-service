@@ -107,7 +107,8 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	} else {
 		log.Println("Creating new application record for AppStore deployment.")
 		// Persist minimal application record for appstore deployment
-		applicationUuid := uuid.NewString()
+		// Note: DestinationUrl will be set by the AddToAppstore function after repository creation
+		applicationUuid = uuid.NewString()
 		store_application := store_dynamodb.Application{
 			Uuid:            applicationUuid,
 			SourceType:      application.Source.SourceType,
@@ -119,7 +120,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			CreatedAt:       time.Now().UTC().String(),
 			Status:          "registering",
 		}
-		statusManager := NewStatusManager(handlerName, applicationsStore, applicationUuid).
+		statusManager = NewStatusManager(handlerName, applicationsStore, applicationUuid).
 			WithDeployment(deploymentsStore, deploymentId)
 
 		err = statusManager.NewApplication(ctx, store_application)
