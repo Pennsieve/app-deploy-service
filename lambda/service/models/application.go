@@ -22,6 +22,11 @@ type Application struct {
 	Release                  Release              `json:"release,omitempty"`
 }
 
+type AppStoreApplication struct {
+	Source  Source  `json:"source"`
+	Release Release `json:"release,omitempty"`
+}
+
 type Account struct {
 	Uuid        string `json:"uuid"`
 	AccountId   string `json:"accountId"`
