@@ -29,8 +29,10 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 	}
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 
 	dynamo_store := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
+	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 
 	dynamoApplications, err := dynamo_store.Get(ctx, "APP_STORE", queryParams)
 	if err != nil {
@@ -41,7 +43,20 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 		}, nil
 	}
 
-	m, err := json.Marshal(mappers.DynamoDBApplicationToJsonApplication(dynamoApplications))
+	applications := mappers.DynamoDBApplicationToJsonApplication(dynamoApplications)
+
+	// Fetch and populate deployments for each application
+	for i := range applications {
+		deployments, err := deploymentsStore.GetHistory(ctx, applications[i].ApplicationId)
+		if err != nil {
+			log.Printf("error fetching deployments for application %s: %v", applications[i].ApplicationId, err)
+			// Continue processing other applications instead of failing completely
+			continue
+		}
+		applications[i].Deployments = mappers.DeploymentItemsToModels(deployments)
+	}
+
+	m, err := json.Marshal(applications)
 	if err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
