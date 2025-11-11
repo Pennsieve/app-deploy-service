@@ -18,8 +18,13 @@ type Application struct {
 	CreatedAt                string               `json:"createdAt"`
 	Params                   interface{}          `json:"params,omitempty"`
 	CommandArguments         interface{}          `json:"commandArguments,omitempty"`
+	Deployments              []Deployment         `json:"deployments"`
 	Status                   string               `json:"status"`
-	Release                  Release              `json:"release,omitempty"`
+}
+
+type AppStoreDeployment struct {
+	Source  DeploymentSource `json:"source"`
+	Release Release          `json:"release"`
 }
 
 type Account struct {
@@ -33,11 +38,16 @@ type ComputeNode struct {
 	EfsId string `json:"efsId"`
 }
 
-type Source struct {
+type DeploymentSource struct {
 	SourceType string `json:"type"`
 	Url        string `json:"url"`
 	Tag        string `json:"tag"`
 	IsPrivate  bool   `json:"isPrivate,omitempty"`
+}
+
+type Source struct {
+	SourceType string `json:"type"`
+	Url        string `json:"url"`
 }
 
 type Destination struct {

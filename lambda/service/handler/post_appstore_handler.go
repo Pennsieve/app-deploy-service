@@ -25,7 +25,7 @@ import (
 
 func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "PostAppStoreHandler"
-	var application models.Application
+	var application models.AppStoreDeployment
 	if err := json.Unmarshal([]byte(request.Body), &application); err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
@@ -35,9 +35,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	}
 
 	envValue := os.Getenv("ENV")
-	if application.Env != "" {
-		envValue = application.Env
-	}
 
 	TaskDefinitionArn := os.Getenv("TASK_DEF_ARN")
 	DeployerTaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
@@ -170,12 +167,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 
 	log.Println("Initiating new AppStore Fargate Task.")
 	envKey := "ENV"
-	accountIdKey := "ACCOUNT_ID"
-	accountIdValue := application.Account.AccountId
-	accountTypeKey := "ACCOUNT_TYPE"
-	accountTypeValue := application.Account.AccountType
-	accountUuidKey := "ACCOUNT_UUID"
-	accountUuidValue := application.Account.Uuid
 
 	sourceTypeKey := "SOURCE_TYPE"
 	sourceTypeValue := application.Source.SourceType
@@ -183,11 +174,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	sourceTagValue := application.Source.Tag
 	sourceUrlKey := "SOURCE_URL"
 	sourceUrlValue := application.Source.Url
-
-	destinationTypeKey := "DESTINATION_TYPE"
-	destinationTypeValue := application.Destination.DestinationType
-	destinationUrlKey := "DESTINATION_URL"
-	destinationUrlValue := application.Destination.Url
 
 	deployerTaskDefnKey := "DEPLOYER_TASK_DEF_ARN"
 	deployerTaskDefnValue := DeployerTaskDefinitionArn
@@ -228,18 +214,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 							Value: &envValue,
 						},
 						{
-							Name:  &accountIdKey,
-							Value: &accountIdValue,
-						},
-						{
-							Name:  &accountUuidKey,
-							Value: &accountUuidValue,
-						},
-						{
-							Name:  &accountTypeKey,
-							Value: &accountTypeValue,
-						},
-						{
 							Name:  &actionKey,
 							Value: &actionValue,
 						},
@@ -254,14 +228,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 						{
 							Name:  &sourceTagKey,
 							Value: &sourceTagValue,
-						},
-						{
-							Name:  &destinationTypeKey,
-							Value: &destinationTypeValue,
-						},
-						{
-							Name:  &destinationUrlKey,
-							Value: &destinationUrlValue,
 						},
 						{
 							Name:  &deployerTaskDefnKey,
