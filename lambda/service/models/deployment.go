@@ -5,10 +5,13 @@ import "time"
 type Deployment struct {
 	DeploymentId  string    `json:"deploymentId"`
 	ApplicationId string    `json:"applicationId"`
+	ReleaseId     int       `json:"releaseId,omitempty"`
 	InitiatedAt   time.Time `json:"initiatedAt"`
 	LastStatus    string    `json:"lastStatus"`
 	DesiredStatus string    `json:"desiredStatus"`
 	TaskArn       string    `json:"taskArn"`
+	SourceUrl     string    `dynamodbav:"sourceUrl,omitempty"`
+	Tag           string    `dynamodbav:"tag,omitempty"`
 
 	// UpdatedAt is not in the reference. Assume it is the time this state change happened.
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`

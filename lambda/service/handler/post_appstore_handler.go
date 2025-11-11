@@ -25,7 +25,7 @@ import (
 
 func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "PostAppStoreHandler"
-	var application models.AppStoreApplication
+	var application models.AppStoreDeployment
 	if err := json.Unmarshal([]byte(request.Body), &application); err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
