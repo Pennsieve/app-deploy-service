@@ -18,7 +18,7 @@ type Application struct {
 	CreatedAt                string               `json:"createdAt"`
 	Params                   interface{}          `json:"params,omitempty"`
 	CommandArguments         interface{}          `json:"commandArguments,omitempty"`
-	Deployments              []Deployment         `json:"deployments,omitempty"`
+	Deployments              []Deployment         `json:"deployments"`
 	Status                   string               `json:"status"`
 }
 
