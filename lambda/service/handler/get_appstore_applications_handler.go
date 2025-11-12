@@ -47,7 +47,7 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 
 	// Fetch and populate deployments for each application
 	for i := range applications {
-		deployments, err := deploymentsStore.GetHistory(ctx, applications[i].ApplicationId)
+		deployments, err := deploymentsStore.GetHistory(ctx, applications[i].Uuid)
 		if err != nil {
 			log.Printf("error fetching deployments for application %s: %v", applications[i].ApplicationId, err)
 			// Continue processing other applications instead of failing completely

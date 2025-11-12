@@ -24,7 +24,7 @@ func DeploymentItemToModel(item store_dynamodb.Deployment) models.Deployment {
 }
 
 func DeploymentItemsToModels(items []store_dynamodb.Deployment) []models.Deployment {
-	var ms []models.Deployment
+	ms := []models.Deployment{}
 	for _, item := range items {
 		ms = append(ms, DeploymentItemToModel(item))
 	}
