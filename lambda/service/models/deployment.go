@@ -10,8 +10,8 @@ type Deployment struct {
 	LastStatus    string    `json:"lastStatus"`
 	DesiredStatus string    `json:"desiredStatus"`
 	TaskArn       string    `json:"taskArn"`
-	SourceUrl     string    `dynamodbav:"sourceUrl,omitempty"`
-	Tag           string    `dynamodbav:"tag,omitempty"`
+	SourceUrl     string    `json:"sourceUrl,omitempty"`
+	Tag           string    `json:"tag,omitempty"`
 
 	// UpdatedAt is not in the reference. Assume it is the time this state change happened.
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
