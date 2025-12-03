@@ -3,16 +3,17 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/pennsieve/app-deploy-service/service/mappers"
-	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
-	"github.com/pusher/pusher-http-go/v5"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/pennsieve/app-deploy-service/service/mappers"
+	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
+	"github.com/pusher/pusher-http-go/v5"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -207,6 +208,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		DestinationUrl:   destinationUrlValue,
 		CPU:              cpuValue,
 		Memory:           memoryValue,
+		RunOnGPU:         application.RunOnGPU,
 		Env:              envValue,
 		OrganizationId:   organizationId,
 		UserId:           userId,

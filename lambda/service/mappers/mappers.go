@@ -16,6 +16,7 @@ func StoreToModel(a store_dynamodb.Application) models.Application {
 			CPU:    a.CPU,
 			Memory: a.Memory,
 		},
+		RunOnGPU:        a.RunOnGPU,
 		ApplicationType: a.ApplicationType,
 		Account: models.Account{
 			Uuid:        a.AccountUuid,
