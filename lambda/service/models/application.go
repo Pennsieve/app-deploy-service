@@ -6,7 +6,8 @@ type Application struct {
 	ApplicationContainerName string               `json:"applicationContainerName"`
 	Name                     string               `json:"name"`
 	Description              string               `json:"description"`
-	Resources                ApplicationResources `json:"resources"`
+	Resources                ApplicationResources `json:"resources"` // task level resources
+	RunOnGPU                 bool                 `json:"runOnGpu"`  // container level requirement
 	Account                  Account              `json:"account"`
 	ComputeNode              ComputeNode          `json:"computeNode"`
 	Source                   Source               `json:"source"`
