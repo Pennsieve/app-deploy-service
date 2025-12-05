@@ -146,6 +146,9 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	cpuValueStr := strconv.Itoa(cpuValue)
 	memoryValueStr := strconv.Itoa(memoryValue)
 
+	runOnGPUKey := "RUN_ON_GPU"
+	runOnGPUValue := strconv.FormatBool(application.RunOnGPU)
+
 	applicationUuid := uuid.NewString()
 	deploymentId := uuid.NewString()
 
@@ -352,6 +355,10 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		{
 			Name:  aws.String(deploymentsTableNameKey),
 			Value: aws.String(deploymentsTable),
+		},
+		{
+			Name:  &runOnGPUKey,
+			Value: &runOnGPUValue,
 		},
 	}
 
