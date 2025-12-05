@@ -22,3 +22,7 @@ variable "app_slug" {
 variable "source_url" {
     type = string
 }
+variable "run_on_gpu" {
+    type = bool
+    default = false
+}

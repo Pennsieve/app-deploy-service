@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -83,6 +84,8 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 	computeNodeUuidValue := application.ComputeNodeUuid
 	sourceUrlKey := "SOURCE_URL"
 	sourceUrlValue := application.SourceUrl
+	runOnGPUKey := "RUN_ON_GPU"
+	runOnGPUValue := strconv.FormatBool(application.RunOnGPU)
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -142,6 +145,10 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 						{
 							Name:  &sourceUrlKey,
 							Value: &sourceUrlValue,
+						},
+						{
+							Name:  &runOnGPUKey,
+							Value: &runOnGPUValue,
 						},
 					},
 				},

@@ -29,10 +29,11 @@ type AWSProvisioner struct {
 	GitUrl           string
 	ComputeNodeEfsId string
 	AppSlug          string
+	RunOnGPU         bool
 }
 
-func NewAWSProvisioner(cfg aws.Config, accountId string, action string, env string, gitUrl string, computeNodeEfsId string, app_slug string) provisioner.Provisioner {
-	return &AWSProvisioner{Config: cfg, AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, AppSlug: app_slug}
+func NewAWSProvisioner(cfg aws.Config, accountId string, action string, env string, gitUrl string, computeNodeEfsId string, app_slug string, runOnGPU bool) provisioner.Provisioner {
+	return &AWSProvisioner{Config: cfg, AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, AppSlug: app_slug, RunOnGPU: runOnGPU}
 }
 
 func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error) {
@@ -171,8 +172,9 @@ func (p *AWSProvisioner) Create(ctx context.Context) error {
 	}
 
 	// create infrastructure
+	runOnGPUStr := strconv.FormatBool(p.RunOnGPU)
 	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/infrastructure.sh",
-		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl, p.ComputeNodeEfsId, p.AppSlug)
+		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl, p.ComputeNodeEfsId, p.AppSlug, runOnGPUStr)
 	out, err := cmd.Output()
 	if err != nil {
 		return err
@@ -189,8 +191,9 @@ func (p *AWSProvisioner) Delete(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	runOnGPUStr := strconv.FormatBool(p.RunOnGPU)
 	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/destroy-infrastructure.sh",
-		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl, p.ComputeNodeEfsId, p.AppSlug)
+		p.AccountId, creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken, p.GitUrl, p.ComputeNodeEfsId, p.AppSlug, runOnGPUStr)
 	out, err := cmd.Output()
 	if err != nil {
 		return err

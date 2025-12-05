@@ -3,6 +3,13 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -17,11 +24,6 @@ import (
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 	"github.com/pusher/pusher-http-go/v5"
-	"log"
-	"net/http"
-	"os"
-	"strings"
-	"time"
 )
 
 func PostApplicationDeployHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -126,6 +128,9 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	securityGroupValue := SecurityGroup
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
+
+	runOnGPUKey := "RUN_ON_GPU"
+	runOnGPUValue := strconv.FormatBool(application.RunOnGPU)
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, tableValue)
@@ -281,6 +286,10 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 						{
 							Name:  aws.String(deploymentsTableNameKey),
 							Value: aws.String(deploymentsTable),
+						},
+						{
+							Name:  &runOnGPUKey,
+							Value: &runOnGPUValue,
 						},
 					},
 				},

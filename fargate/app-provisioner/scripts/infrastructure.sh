@@ -30,6 +30,7 @@ app_memory = "${APP_MEMORY:-4096}"
 compute_node_efs_id = "$6"
 app_slug = "$7"
 source_url = "$5"
+run_on_gpu = $8
 EOL
 
 echo "Running init and plan ..."

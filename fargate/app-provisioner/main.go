@@ -36,6 +36,7 @@ func main() {
 	destinationUrl := os.Getenv("DESTINATION_URL")
 	storageId := os.Getenv("COMPUTE_NODE_EFS_ID")
 	computeNodeUuid := os.Getenv("COMPUTE_NODE_UUID")
+	runOnGPU := os.Getenv("RUN_ON_GPU") == "true"
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 
@@ -52,7 +53,7 @@ func main() {
 	}
 
 	appProvisioner := awsProvisioner.NewAWSProvisioner(cfg,
-		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid))
+		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU)
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	statusManager := status.NewManager(applicationsStore, applicationUuid)
