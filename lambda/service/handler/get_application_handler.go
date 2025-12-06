@@ -55,6 +55,7 @@ func GetApplicationHandler(ctx context.Context, request events.APIGatewayV2HTTPR
 			CPU:    application.CPU,
 			Memory: application.Memory,
 		},
+		RunOnGPU:        application.RunOnGPU,
 		ApplicationType: application.ApplicationType,
 		Account: models.Account{
 			Uuid:        application.AccountUuid,
