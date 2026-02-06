@@ -220,17 +220,3 @@ func (p *AWSProvisioner) CreatePublicRepository(ctx context.Context) error {
 	return nil
 }
 
-func (p *AWSProvisioner) CreatePrivateRepository(ctx context.Context) error {
-	log.Println("fetching private repository URL from platform-infrastructure ...")
-
-	// No arguments needed - the script uses environment variables (AWS_ACCOUNT, VPC_NAME, ENV)
-	// to fetch the pre-existing ECR repository URL from platform-infrastructure remote state
-	cmd := exec.Command("/bin/sh", "/usr/src/app/scripts/private-repository.sh")
-	out, err := cmd.Output()
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(out))
-
-	return nil
-}
