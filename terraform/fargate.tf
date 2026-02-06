@@ -3,6 +3,7 @@ data "template_file" "app_provisioner_ecs_task_definition" {
   template = file("${path.module}/task_definition.json.tpl")
 
   vars = {
+    appstore_private_ecr_url  = data.terraform_remote_state.platform_infrastructure.outputs.appstore_private_ecr_repository_url
     aws_region                = data.aws_region.current_region.name
     aws_region_shortname      = data.terraform_remote_state.region.outputs.aws_region_shortname
     container_cpu             = var.container_cpu

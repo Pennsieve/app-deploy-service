@@ -97,7 +97,7 @@ func main() {
 		}
 	case "ADD_TO_APPSTORE":
 		ecsClient := ecs.NewFromConfig(cfg)
-		err := AddToAppstore(ctx, applicationUuid, deploymentId, sourceUrl, tag, appProvisioner, ecsClient, applicationsStore, statusManager)
+		err := AddToAppstore(ctx, applicationUuid, deploymentId, sourceUrl, tag, appProvisioner, ecsClient, statusManager)
 		if err != nil {
 			statusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
@@ -143,64 +143,35 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-const appstoreIdentifier = "APP_STORE"
-
-func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, applicationsStore store_dynamodb.DynamoDBStore, statusManager *status.Manager) error {
-	var destinationUrl string
-	var needsRepositoryCreation bool
-
-	// Check if an application with this source URL already exists in the appstore
-	applications, err := applicationsStore.Get(ctx, appstoreIdentifier, sourceUrl)
-	if err != nil {
-		return fmt.Errorf("error checking for existing application: %w", err)
+func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager) error {
+	// Get the pre-existing private ECR URL from environment variable
+	ecrRepoUrl := os.Getenv("APPSTORE_PRIVATE_ECR_URL")
+	if ecrRepoUrl == "" {
+		return fmt.Errorf("APPSTORE_PRIVATE_ECR_URL environment variable is not set")
 	}
 
-	if len(applications) > 0 && applications[0].DestinationUrl != "" {
-		log.Printf("Application with source URL %s already exists with destination URL (found %d), skipping repository creation", sourceUrl, len(applications))
-		destinationUrl = applications[0].DestinationUrl
-		needsRepositoryCreation = false
-	} else {
-		needsRepositoryCreation = true
-		if len(applications) > 0 {
-			log.Printf("Application with source URL %s exists but has no destination URL, creating public repository", sourceUrl)
-		} else {
-			log.Println("No existing application found, creating public repository and updating application record")
-		}
+	// Generate unique tag using source URL hash: {hash}-{source_tag}
+	// This ensures each source gets unique tags in the shared ECR repo
+	sourceUrlHash := utils.GenerateHash(sourceUrl)
+	uniqueTag := fmt.Sprintf("%d-%s", sourceUrlHash, tag)
+	destinationUrl := fmt.Sprintf("%s:%s", ecrRepoUrl, uniqueTag)
+
+	log.Printf("Using private ECR repository with unique tag: %s", destinationUrl)
+
+	// Update or create application record with full destination URL (including tag)
+	// This allows tracing back from any image to its source URL
+	store_application := store_dynamodb.Application{
+		DestinationUrl:  destinationUrl,
+		DestinationType: "ecr-private",
+		Status:          "deploying",
 	}
-
-	// Create repository if needed
-	if needsRepositoryCreation {
-		// CreatePublicRepository
-		if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
-			return fmt.Errorf("error creating public repository: %w", err)
-		}
-
-		// parse output file created after infrastructure creation
-		parser := parser.NewOutputParser("/usr/src/app/terraform/pennsieve/public-repository/outputs.json")
-		outputs, err := parser.Run(ctx)
-		if err != nil {
-			return fmt.Errorf("error running output parser: %w", err)
-		}
-
-		log.Println(outputs)
-		destinationUrl = outputs.AppPublicEcrUrl.Value
-		if destinationUrl == "" {
-			return fmt.Errorf("error creating public repository, destination URL is empty")
-		}
-		// Update or create application record with destination URL
-		store_application := store_dynamodb.Application{
-			DestinationUrl:  destinationUrl,
-			DestinationType: "ecr",
-			Status:          "deploying",
-		}
-		if err := statusManager.ApplicationCreateUpdate(ctx, store_application); err != nil {
-			return fmt.Errorf("error updating application with destination URL: %w", err)
-		}
+	if err := statusManager.ApplicationCreateUpdate(ctx, store_application); err != nil {
+		return fmt.Errorf("error updating application with destination URL: %w", err)
 	}
 
 	// Build and push
 	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", sourceUrl, tag, destinationUrl)
-	if err := PublicDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
+	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
 		return err
 	}
 
@@ -339,6 +310,84 @@ func PublicDeploy(ctx context.Context, applicationUuid string, deploymentId stri
 				{
 					Name:    &TaskDefContainerName,
 					Command: []string{"--context", deploymentSourceUrl, "--destination", fmt.Sprintf("%s:%s", destinationUrl, tag), "--force"},
+					Environment: []types.KeyValuePair{
+						{
+							Name:  &accessKeyId,
+							Value: &accessKeyIdValue,
+						},
+						{
+							Name:  &sessionToken,
+							Value: &sessionTokenValue,
+						},
+						{
+							Name:  &secretAccessKey,
+							Value: &secretAccessKeyValue,
+						},
+					},
+				},
+			},
+		},
+		LaunchType: types.LaunchTypeFargate,
+		Tags: []types.Tag{
+			{Key: aws.String(provisioner.DeploymentIdTag), Value: aws.String(deploymentId)},
+			{Key: aws.String(provisioner.ApplicationIdTag), Value: aws.String(applicationUuid)},
+		},
+	}
+
+	taskRunner := runner.NewECSTaskRunner(ecsClient, runTaskIn)
+	runTaskOut, err := taskRunner.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("error running deployment task: %w", err)
+	}
+	if err := runner.GetRunFailures(runTaskOut); err != nil {
+		return fmt.Errorf("error: run failures: %w", err)
+	}
+	return nil
+}
+
+func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+	creds, err := appProvisioner.GetProvisionerCreds(ctx)
+	if err != nil {
+		return fmt.Errorf("error retrieving credentials: %w", err)
+	}
+
+	deploymentSourceUrl, err := utils.DetermineSourceURL(sourceUrl, tag)
+	if err != nil {
+		return fmt.Errorf("error determining sourceUrl variable for deployment: %w", err)
+	}
+
+	// destinationUrl already contains the full image reference with unique tag
+	// Format: {ecr_repo}:{source_hash}-{source_tag}
+
+	accessKeyId := "AWS_ACCESS_KEY_ID"
+	accessKeyIdValue := creds.AccessKeyID
+	secretAccessKey := "AWS_SECRET_ACCESS_KEY"
+	secretAccessKeyValue := creds.SecretAccessKey
+	sessionToken := "AWS_SESSION_TOKEN"
+	sessionTokenValue := creds.SessionToken
+
+	TaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
+	subIdStr := os.Getenv("SUBNET_IDS")
+	SubNetIds := strings.Split(subIdStr, ",")
+	cluster := os.Getenv("CLUSTER_ARN")
+	SecurityGroup := os.Getenv("SECURITY_GROUP")
+	TaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+
+	runTaskIn := &ecs.RunTaskInput{
+		TaskDefinition: aws.String(TaskDefinitionArn),
+		Cluster:        aws.String(cluster),
+		NetworkConfiguration: &types.NetworkConfiguration{
+			AwsvpcConfiguration: &types.AwsVpcConfiguration{
+				Subnets:        SubNetIds,
+				SecurityGroups: []string{SecurityGroup},
+				AssignPublicIp: types.AssignPublicIpEnabled,
+			},
+		},
+		Overrides: &types.TaskOverride{
+			ContainerOverrides: []types.ContainerOverride{
+				{
+					Name:    &TaskDefContainerName,
+					Command: []string{"--context", deploymentSourceUrl, "--destination", destinationUrl, "--force"},
 					Environment: []types.KeyValuePair{
 						{
 							Name:  &accessKeyId,
