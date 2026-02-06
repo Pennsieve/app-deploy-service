@@ -162,30 +162,30 @@ func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId str
 	} else {
 		needsRepositoryCreation = true
 		if len(applications) > 0 {
-			log.Printf("Application with source URL %s exists but has no destination URL, creating public repository", sourceUrl)
+			log.Printf("Application with source URL %s exists but has no destination URL, fetching private repository URL", sourceUrl)
 		} else {
-			log.Println("No existing application found, creating public repository and updating application record")
+			log.Println("No existing application found, fetching private repository URL and updating application record")
 		}
 	}
 
-	// Create repository if needed
+	// Fetch repository URL if needed
 	if needsRepositoryCreation {
-		// CreatePublicRepository
-		if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
-			return fmt.Errorf("error creating public repository: %w", err)
+		// CreatePrivateRepository fetches the pre-existing ECR repo URL from platform-infrastructure
+		if err := appProvisioner.CreatePrivateRepository(ctx); err != nil {
+			return fmt.Errorf("error fetching private repository URL: %w", err)
 		}
 
 		// parse output file created after infrastructure creation
-		parser := parser.NewOutputParser("/usr/src/app/terraform/pennsieve/public-repository/outputs.json")
+		parser := parser.NewOutputParser("/usr/src/app/terraform/pennsieve/private-repository/outputs.json")
 		outputs, err := parser.Run(ctx)
 		if err != nil {
 			return fmt.Errorf("error running output parser: %w", err)
 		}
 
 		log.Println(outputs)
-		destinationUrl = outputs.AppPublicEcrUrl.Value
+		destinationUrl = outputs.AppPrivateEcrUrl.Value
 		if destinationUrl == "" {
-			return fmt.Errorf("error creating public repository, destination URL is empty")
+			return fmt.Errorf("error fetching private repository, destination URL is empty")
 		}
 		// Update or create application record with destination URL
 		store_application := store_dynamodb.Application{
@@ -200,7 +200,7 @@ func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId str
 
 	// Build and push
 	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", sourceUrl, tag, destinationUrl)
-	if err := PublicDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
+	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
 		return err
 	}
 
@@ -300,6 +300,81 @@ func Delete(ctx context.Context, applicationUuid string, appProvisioner provisio
 }
 
 func PublicDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+	creds, err := appProvisioner.GetProvisionerCreds(ctx)
+	if err != nil {
+		return fmt.Errorf("error retrieving credentials: %w", err)
+	}
+
+	deploymentSourceUrl, err := utils.DetermineSourceURL(sourceUrl, tag)
+	if err != nil {
+		return fmt.Errorf("error determining sourceUrl variable for deployment: %w", err)
+	}
+
+	accessKeyId := "AWS_ACCESS_KEY_ID"
+	accessKeyIdValue := creds.AccessKeyID
+	secretAccessKey := "AWS_SECRET_ACCESS_KEY"
+	secretAccessKeyValue := creds.SecretAccessKey
+	sessionToken := "AWS_SESSION_TOKEN"
+	sessionTokenValue := creds.SessionToken
+
+	TaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
+	subIdStr := os.Getenv("SUBNET_IDS")
+	SubNetIds := strings.Split(subIdStr, ",")
+	cluster := os.Getenv("CLUSTER_ARN")
+	SecurityGroup := os.Getenv("SECURITY_GROUP")
+	TaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+
+	runTaskIn := &ecs.RunTaskInput{
+		TaskDefinition: aws.String(TaskDefinitionArn),
+		Cluster:        aws.String(cluster),
+		NetworkConfiguration: &types.NetworkConfiguration{
+			AwsvpcConfiguration: &types.AwsVpcConfiguration{
+				Subnets:        SubNetIds,
+				SecurityGroups: []string{SecurityGroup},
+				AssignPublicIp: types.AssignPublicIpEnabled,
+			},
+		},
+		Overrides: &types.TaskOverride{
+			ContainerOverrides: []types.ContainerOverride{
+				{
+					Name:    &TaskDefContainerName,
+					Command: []string{"--context", deploymentSourceUrl, "--destination", fmt.Sprintf("%s:%s", destinationUrl, tag), "--force"},
+					Environment: []types.KeyValuePair{
+						{
+							Name:  &accessKeyId,
+							Value: &accessKeyIdValue,
+						},
+						{
+							Name:  &sessionToken,
+							Value: &sessionTokenValue,
+						},
+						{
+							Name:  &secretAccessKey,
+							Value: &secretAccessKeyValue,
+						},
+					},
+				},
+			},
+		},
+		LaunchType: types.LaunchTypeFargate,
+		Tags: []types.Tag{
+			{Key: aws.String(provisioner.DeploymentIdTag), Value: aws.String(deploymentId)},
+			{Key: aws.String(provisioner.ApplicationIdTag), Value: aws.String(applicationUuid)},
+		},
+	}
+
+	taskRunner := runner.NewECSTaskRunner(ecsClient, runTaskIn)
+	runTaskOut, err := taskRunner.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("error running deployment task: %w", err)
+	}
+	if err := runner.GetRunFailures(runTaskOut); err != nil {
+		return fmt.Errorf("error: run failures: %w", err)
+	}
+	return nil
+}
+
+func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
 	creds, err := appProvisioner.GetProvisionerCreds(ctx)
 	if err != nil {
 		return fmt.Errorf("error retrieving credentials: %w", err)

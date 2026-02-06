@@ -13,5 +13,6 @@ type Provisioner interface {
 	CreatePolicy(context.Context) error
 	GetPolicy(context.Context) (*string, error)
 	CreatePublicRepository(ctx context.Context) error
+	CreatePrivateRepository(ctx context.Context) error
 	GetProvisionerCreds(context.Context) (aws.Credentials, error)
 }

@@ -9,9 +9,11 @@
       }
     },
     "environment": [
+      { "name" : "AWS_ACCOUNT", "value": "${aws_account}" },
       { "name" : "ENVIRONMENT", "value": "${environment_name}" },
       { "name" : "ENV", "value": "${environment_name}" },
-      { "name" : "REGION", "value": "${aws_region}" }
+      { "name" : "REGION", "value": "${aws_region}" },
+      { "name" : "VPC_NAME", "value": "${vpc_name}" }
     ],
     "name": "${tier}",
     "image": "${image_url}:${image_tag}",
