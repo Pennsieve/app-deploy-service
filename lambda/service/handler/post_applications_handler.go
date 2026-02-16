@@ -218,6 +218,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		CreatedAt:        time.Now().UTC().String(),
 		Params:           application.Params,
 		CommandArguments: application.CommandArguments,
+		ComputeTypes:    application.ComputeTypes,
 		Status:           "registering",
 	}
 	err = statusManager.NewApplication(ctx, store_applications)

@@ -38,7 +38,7 @@ func GetApplicationHandler(ctx context.Context, request events.APIGatewayV2HTTPR
 			Body:       handlerError(handlerName, ErrDynamoDB),
 		}, nil
 	}
-	if (store_dynamodb.Application{}) == application {
+	if application.Uuid == "" {
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusNotFound,
 			Body:       handlerError(handlerName, ErrNoRecordsFound),
