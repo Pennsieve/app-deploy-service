@@ -16,7 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.53.1
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.56.9
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.6
-	github.com/pennsieve/pennsieve-go-core v1.13.0
+	github.com/pennsieve/pennsieve-go-core v1.13.7
 	github.com/pusher/pusher-http-go/v5 v5.1.1
 	github.com/stretchr/testify v1.9.0
 )
