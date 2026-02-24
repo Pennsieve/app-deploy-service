@@ -97,7 +97,8 @@ func main() {
 		}
 	case "ADD_TO_APPSTORE":
 		ecsClient := ecs.NewFromConfig(cfg)
-		err := AddToAppstore(ctx, applicationUuid, deploymentId, sourceUrl, tag, appProvisioner, ecsClient, statusManager)
+		authToken := os.Getenv("AUTH_TOKEN")
+		err := AddToAppstore(ctx, applicationUuid, deploymentId, sourceUrl, tag, authToken, appProvisioner, ecsClient, statusManager)
 		if err != nil {
 			statusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
@@ -143,7 +144,7 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager) error {
+func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, authToken string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager) error {
 	// Get the pre-existing private ECR URL from environment variable
 	ecrRepoUrl := os.Getenv("APPSTORE_PRIVATE_ECR_URL")
 	if ecrRepoUrl == "" {
@@ -171,7 +172,7 @@ func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId str
 
 	// Build and push
 	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", sourceUrl, tag, destinationUrl)
-	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
+	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, authToken, appProvisioner, ecsClient); err != nil {
 		return err
 	}
 
@@ -345,7 +346,7 @@ func PublicDeploy(ctx context.Context, applicationUuid string, deploymentId stri
 	return nil
 }
 
-func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, authToken string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
 	creds, err := appProvisioner.GetProvisionerCreds(ctx)
 	if err != nil {
 		return fmt.Errorf("error retrieving credentials: %w", err)
@@ -373,6 +374,29 @@ func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId str
 	SecurityGroup := os.Getenv("SECURITY_GROUP")
 	TaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
 
+	envVars := []types.KeyValuePair{
+		{
+			Name:  &accessKeyId,
+			Value: &accessKeyIdValue,
+		},
+		{
+			Name:  &sessionToken,
+			Value: &sessionTokenValue,
+		},
+		{
+			Name:  &secretAccessKey,
+			Value: &secretAccessKeyValue,
+		},
+	}
+
+	// Add GIT_TOKEN for kaniko to authenticate with private GitHub repos
+	if authToken != "" {
+		envVars = append(envVars, types.KeyValuePair{
+			Name:  aws.String("GIT_TOKEN"),
+			Value: aws.String(authToken),
+		})
+	}
+
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
 		Cluster:        aws.String(cluster),
@@ -386,22 +410,9 @@ func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId str
 		Overrides: &types.TaskOverride{
 			ContainerOverrides: []types.ContainerOverride{
 				{
-					Name:    &TaskDefContainerName,
-					Command: []string{"--context", deploymentSourceUrl, "--destination", destinationUrl, "--force"},
-					Environment: []types.KeyValuePair{
-						{
-							Name:  &accessKeyId,
-							Value: &accessKeyIdValue,
-						},
-						{
-							Name:  &sessionToken,
-							Value: &sessionTokenValue,
-						},
-						{
-							Name:  &secretAccessKey,
-							Value: &secretAccessKeyValue,
-						},
-					},
+					Name:        &TaskDefContainerName,
+					Command:     []string{"--context", deploymentSourceUrl, "--destination", destinationUrl, "--force"},
+					Environment: envVars,
 				},
 			},
 		},

@@ -186,6 +186,9 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
 
+	authTokenKey := "AUTH_TOKEN"
+	authTokenValue := application.Source.AuthToken
+
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
 		Cluster:        aws.String(cluster),
@@ -256,6 +259,10 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 						{
 							Name:  aws.String(applicationsTableNameKey),
 							Value: aws.String(applicationsTable),
+						},
+						{
+							Name:  &authTokenKey,
+							Value: &authTokenValue,
 						},
 					},
 				},
