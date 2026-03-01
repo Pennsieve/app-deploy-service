@@ -86,6 +86,8 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 	sourceUrlValue := application.SourceUrl
 	runOnGPUKey := "RUN_ON_GPU"
 	runOnGPUValue := strconv.FormatBool(application.RunOnGPU)
+	roleNameKey := "ROLE_NAME"
+	roleNameValue := application.RoleName
 
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
@@ -149,6 +151,10 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 						{
 							Name:  &runOnGPUKey,
 							Value: &runOnGPUValue,
+						},
+						{
+							Name:  &roleNameKey,
+							Value: &roleNameValue,
 						},
 					},
 				},
