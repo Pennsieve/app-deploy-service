@@ -31,6 +31,7 @@ func main() {
 	applicationUuid := os.Getenv("APPLICATION_UUID")
 	action := os.Getenv("ACTION")
 	accountId := os.Getenv("ACCOUNT_ID")
+	roleName := os.Getenv("ROLE_NAME")
 	env := os.Getenv("ENV")
 	sourceUrl := os.Getenv("SOURCE_URL")
 	destinationUrl := os.Getenv("DESTINATION_URL")
@@ -53,7 +54,7 @@ func main() {
 	}
 
 	appProvisioner := awsProvisioner.NewAWSProvisioner(cfg,
-		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU)
+		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU, roleName)
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	statusManager := status.NewManager(applicationsStore, applicationUuid)
