@@ -31,7 +31,8 @@ resource "aws_lambda_function" "service_lambda" {
       TASK_DEF_CONTAINER_NAME          = var.tier,
       DEPLOYER_TASK_DEF_CONTAINER_NAME = var.deployer_tier,
       APPLICATIONS_TABLE               = aws_dynamodb_table.applications_table.name,
-      DEPLOYMENTS_TABLE                = aws_dynamodb_table.deployments_table.name
+      DEPLOYMENTS_TABLE                = aws_dynamodb_table.deployments_table.name,
+      ACCOUNTS_TABLE                   = data.terraform_remote_state.account_service.outputs.accounts_table_name
     }
   }
 }

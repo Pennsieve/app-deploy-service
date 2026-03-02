@@ -86,8 +86,8 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	accountTypeValue := application.Account.AccountType
 	accountUuidKey := "ACCOUNT_UUID"
 	accountUuidValue := application.Account.Uuid
-	roleNameKey := "ROLE_NAME"
-	roleNameValue := application.Account.RoleName
+	accountsTableKey := "ACCOUNTS_TABLE"
+	accountsTableValue := os.Getenv("ACCOUNTS_TABLE")
 	organizationIdKey := "ORG_ID"
 	organizationIdValue := organizationId
 	userIdKey := "USER_ID"
@@ -205,7 +205,6 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		AccountUuid:      accountUuidValue,
 		AccountId:        accountIdValue,
 		AccountType:      accountTypeValue,
-		RoleName:         roleNameValue,
 		ComputeNodeUuid:  computeNodeUuidValue,
 		ComputeNodeEfsId: computeNodeEfsIdValue,
 		SourceType:       sourceTypeValue,
@@ -365,8 +364,8 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 			Value: &runOnGPUValue,
 		},
 		{
-			Name:  &roleNameKey,
-			Value: &roleNameValue,
+			Name:  &accountsTableKey,
+			Value: &accountsTableValue,
 		},
 	}
 

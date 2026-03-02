@@ -16,7 +16,6 @@ type Application struct {
 	AccountUuid string `dynamodbav:"accountUuid"`
 	AccountId   string `dynamodbav:"accountId"`
 	AccountType string `dynamodbav:"accountType"`
-	RoleName    string `dynamodbav:"roleName"`
 
 	ComputeNodeUuid  string `dynamodbav:"computeNodeUuid"`
 	ComputeNodeEfsId string `dynamodbav:"computeNodeEfsId"`
