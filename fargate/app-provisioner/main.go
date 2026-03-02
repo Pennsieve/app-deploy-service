@@ -31,7 +31,7 @@ func main() {
 	applicationUuid := os.Getenv("APPLICATION_UUID")
 	action := os.Getenv("ACTION")
 	accountId := os.Getenv("ACCOUNT_ID")
-	roleName := os.Getenv("ROLE_NAME")
+	accountUuid := os.Getenv("ACCOUNT_UUID")
 	env := os.Getenv("ENV")
 	sourceUrl := os.Getenv("SOURCE_URL")
 	destinationUrl := os.Getenv("DESTINATION_URL")
@@ -40,6 +40,7 @@ func main() {
 	runOnGPU := os.Getenv("RUN_ON_GPU") == "true"
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	accountsTable := os.Getenv("ACCOUNTS_TABLE")
 
 	var tag string
 	tag = os.Getenv("SOURCE_TAG")
@@ -53,9 +54,18 @@ func main() {
 		log.Fatalf("LoadDefaultConfig: %v\n", err)
 	}
 
-	appProvisioner := awsProvisioner.NewAWSProvisioner(cfg,
-		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU, roleName)
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
+
+	// Look up the account to get the role name
+	accountStore := store_dynamodb.NewAccountStore(dynamoDBClient, accountsTable)
+	account, err := accountStore.GetById(ctx, accountUuid)
+	if err != nil {
+		log.Fatalf("error looking up account %s: %v", accountUuid, err)
+	}
+	log.Printf("resolved roleName %q for account %s", account.RoleName, accountUuid)
+
+	appProvisioner := awsProvisioner.NewAWSProvisioner(cfg,
+		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU, account.RoleName)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	statusManager := status.NewManager(applicationsStore, applicationUuid)
 
