@@ -45,7 +45,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
 	DeployerTaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
 	deploymentsTable := os.Getenv(deploymentsTableNameKey)
-	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	applicationsTable := os.Getenv(appstoreApplicationsTableNameKey)
 	var applicationUuid string
 	deploymentId := uuid.NewString()
 	actionKey := "ACTION"
@@ -186,6 +186,9 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
 
+	authTokenKey := "AUTH_TOKEN"
+	authTokenValue := application.Source.AuthToken
+
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
 		Cluster:        aws.String(cluster),
@@ -257,6 +260,10 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 							Name:  aws.String(applicationsTableNameKey),
 							Value: aws.String(applicationsTable),
 						},
+						{
+							Name:  &authTokenKey,
+							Value: &authTokenValue,
+						},
 					},
 				},
 			},
@@ -265,6 +272,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		Tags: []types.Tag{
 			{Key: aws.String(deploymentIdTag), Value: aws.String(deploymentId)},
 			{Key: aws.String(applicationIdTag), Value: aws.String(applicationUuid)},
+			{Key: aws.String("ApplicationsTable"), Value: aws.String(applicationsTable)},
 		},
 	}
 

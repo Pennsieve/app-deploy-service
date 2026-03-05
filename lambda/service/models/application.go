@@ -45,6 +45,7 @@ type DeploymentSource struct {
 	Url        string `json:"url"`
 	Tag        string `json:"tag"`
 	IsPrivate  bool   `json:"isPrivate,omitempty"`
+	AuthToken  string `json:"authToken,omitempty"`
 }
 
 type Source struct {

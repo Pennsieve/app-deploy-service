@@ -129,6 +129,8 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
     resources = [
       aws_dynamodb_table.applications_table.arn,
       "${aws_dynamodb_table.applications_table.arn}/*",
+      aws_dynamodb_table.appstore_applications_table.arn,
+      "${aws_dynamodb_table.appstore_applications_table.arn}/*",
       aws_dynamodb_table.deployments_table.arn,
       "${aws_dynamodb_table.deployments_table.arn}/*"
     ]
@@ -213,6 +215,8 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
     resources = [
       aws_dynamodb_table.applications_table.arn,
       "${aws_dynamodb_table.applications_table.arn}/*",
+      aws_dynamodb_table.appstore_applications_table.arn,
+      "${aws_dynamodb_table.appstore_applications_table.arn}/*",
       aws_dynamodb_table.deployments_table.arn,
       "${aws_dynamodb_table.deployments_table.arn}/*"
     ]
@@ -363,6 +367,8 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
     resources = [
       aws_dynamodb_table.applications_table.arn,
       "${aws_dynamodb_table.applications_table.arn}/*",
+      aws_dynamodb_table.appstore_applications_table.arn,
+      "${aws_dynamodb_table.appstore_applications_table.arn}/*",
       aws_dynamodb_table.deployments_table.arn,
       "${aws_dynamodb_table.deployments_table.arn}/*",
       data.terraform_remote_state.account_service.outputs.accounts_table_arn,

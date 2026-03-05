@@ -28,7 +28,7 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 		}, nil
 	}
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
-	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	applicationsTable := os.Getenv(appstoreApplicationsTableNameKey)
 	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 
 	dynamo_store := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)

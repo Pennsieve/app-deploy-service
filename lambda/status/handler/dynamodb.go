@@ -96,7 +96,7 @@ func setOptionalString(updateBuilder expression.UpdateBuilder, name string, opti
 	}
 }
 
-func (h *DeployTaskStateChangeHandler) UpdateApplicationsTable(ctx context.Context, applicationId string, finalState *FinalState) error {
+func (h *DeployTaskStateChangeHandler) UpdateApplicationsTable(ctx context.Context, applicationId string, finalState *FinalState, tableName string) error {
 	key := models.ApplicationKey(applicationId)
 	status := finalState.Status()
 	expressions, err := expression.NewBuilder().
@@ -109,7 +109,7 @@ func (h *DeployTaskStateChangeHandler) UpdateApplicationsTable(ctx context.Conte
 	}
 	updateIn := &dynamodb.UpdateItemInput{
 		Key:                       key,
-		TableName:                 aws.String(h.ApplicationsTable),
+		TableName:                 aws.String(tableName),
 		ConditionExpression:       expressions.Condition(),
 		ExpressionAttributeNames:  expressions.Names(),
 		ExpressionAttributeValues: expressions.Values(),

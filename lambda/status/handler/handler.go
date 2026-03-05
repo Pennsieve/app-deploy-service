@@ -41,9 +41,14 @@ func (h *DeployTaskStateChangeHandler) Handle(ctx context.Context, event models.
 
 	deploymentId := ids.DeploymentId
 	applicationId := ids.ApplicationId
+	applicationsTable := h.ApplicationsTable
+	if ids.ApplicationsTable != "" {
+		applicationsTable = ids.ApplicationsTable
+	}
 	h.logger = h.logger.With(
 		slog.String("deploymentId", deploymentId),
-		slog.String("applicationId", applicationId))
+		slog.String("applicationId", applicationId),
+		slog.String("applicationsTable", applicationsTable))
 
 	if err := h.UpdateDeploymentsTable(ctx, applicationId, deploymentId, event); err != nil {
 		var conflict *DeploymentUpdateConflict
@@ -64,7 +69,7 @@ func (h *DeployTaskStateChangeHandler) Handle(ctx context.Context, event models.
 
 	if final := IsFinalState(event); final != nil {
 		h.SendApplicationStatusEvent(applicationId, deploymentId, final, event.Detail.UpdatedAt)
-		if err := h.UpdateApplicationsTable(ctx, applicationId, final); err != nil {
+		if err := h.UpdateApplicationsTable(ctx, applicationId, final, applicationsTable); err != nil {
 			return err
 		}
 	}
