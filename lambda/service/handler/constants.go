@@ -4,6 +4,7 @@ const deploymentIdKey = "DEPLOYMENT_ID"
 const deploymentsTableNameKey = "DEPLOYMENTS_TABLE"
 const applicationUuidKey = "APPLICATION_UUID"
 const applicationsTableNameKey = "APPLICATIONS_TABLE"
+const appstoreApplicationsTableNameKey = "APPSTORE_APPLICATIONS_TABLE"
 
 // ECS Task tags for deployment tracking
 const deploymentIdTag = "DeploymentId"

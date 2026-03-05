@@ -31,6 +31,7 @@ resource "aws_lambda_function" "service_lambda" {
       TASK_DEF_CONTAINER_NAME          = var.tier,
       DEPLOYER_TASK_DEF_CONTAINER_NAME = var.deployer_tier,
       APPLICATIONS_TABLE               = aws_dynamodb_table.applications_table.name,
+      APPSTORE_APPLICATIONS_TABLE      = aws_dynamodb_table.appstore_applications_table.name,
       DEPLOYMENTS_TABLE                = aws_dynamodb_table.deployments_table.name
     }
   }
@@ -60,8 +61,9 @@ resource "aws_lambda_function" "status_lambda" {
       ENV                = var.environment_name,
       REGION             = var.aws_region,
       LOG_LEVEL          = "info",
-      APPLICATIONS_TABLE = aws_dynamodb_table.applications_table.name,
-      DEPLOYMENTS_TABLE  = aws_dynamodb_table.deployments_table.name
+      APPLICATIONS_TABLE          = aws_dynamodb_table.applications_table.name,
+      APPSTORE_APPLICATIONS_TABLE = aws_dynamodb_table.appstore_applications_table.name,
+      DEPLOYMENTS_TABLE           = aws_dynamodb_table.deployments_table.name
     }
   }
 }
