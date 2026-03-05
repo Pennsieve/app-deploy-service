@@ -30,24 +30,19 @@ type AWSProvisioner struct {
 	ComputeNodeEfsId string
 	AppSlug          string
 	RunOnGPU         bool
+	RoleName         string
 }
 
-func NewAWSProvisioner(cfg aws.Config, accountId string, action string, env string, gitUrl string, computeNodeEfsId string, app_slug string, runOnGPU bool) provisioner.Provisioner {
-	return &AWSProvisioner{Config: cfg, AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, AppSlug: app_slug, RunOnGPU: runOnGPU}
+func NewAWSProvisioner(cfg aws.Config, accountId string, action string, env string, gitUrl string, computeNodeEfsId string, app_slug string, runOnGPU bool, roleName string) provisioner.Provisioner {
+	return &AWSProvisioner{Config: cfg, AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, AppSlug: app_slug, RunOnGPU: runOnGPU, RoleName: roleName}
 }
 
 func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error) {
-	log.Println("assuming role ...")
+	log.Printf("assuming role %s ...", p.RoleName)
 
 	stsClient := sts.NewFromConfig(p.Config)
 
-	provisionerAccountId, err := stsClient.GetCallerIdentity(ctx,
-		&sts.GetCallerIdentityInput{})
-	if err != nil {
-		return aws.Credentials{}, err
-	}
-
-	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/ROLE-%s", p.AccountId, *provisionerAccountId.Account)
+	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", p.AccountId, p.RoleName)
 	appCreds := stscreds.NewAssumeRoleProvider(stsClient, roleArn)
 	credentials, err := appCreds.Retrieve(ctx)
 	if err != nil {
@@ -70,14 +65,7 @@ func (p *AWSProvisioner) GetProvisionerCreds(ctx context.Context) (aws.Credentia
 
 func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 	log.Println("creating an inline policy ...")
-	stsClient := sts.NewFromConfig(p.Config)
 	iamClient := iam.NewFromConfig(p.Config)
-
-	provisionerAccountId, err := stsClient.GetCallerIdentity(ctx,
-		&sts.GetCallerIdentityInput{})
-	if err != nil {
-		return err
-	}
 
 	policyDoc := fmt.Sprintf(`{
 					"Version": "2012-10-17",
@@ -85,12 +73,11 @@ func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
 						{
 							"Effect": "Allow",
 							"Action": "sts:AssumeRole",
-							"Resource": "arn:aws:iam::%s:role/ROLE-%s"
+							"Resource": "arn:aws:iam::%s:role/%s"
 						}
 					]
-				}`, p.AccountId, *provisionerAccountId.Account)
+				}`, p.AccountId, p.RoleName)
 
-	// TODO: find a cleaner way to get RoleName
 	output, err := iamClient.PutRolePolicy(context.Background(), &iam.PutRolePolicyInput{
 		PolicyName:     aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
 		PolicyDocument: aws.String(policyDoc),
@@ -112,7 +99,6 @@ func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
 
 	iamClient := iam.NewFromConfig(p.Config)
 
-	// TODO: find a cleaner way to get RoleName
 	output, err := iamClient.GetRolePolicy(context.Background(), &iam.GetRolePolicyInput{
 		PolicyName: aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
 		RoleName:   aws.String(fmt.Sprintf("%s-app-deploy-service-fargate-task-role-use1", p.Env)),

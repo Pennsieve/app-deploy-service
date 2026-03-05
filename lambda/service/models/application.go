@@ -6,8 +6,9 @@ type Application struct {
 	ApplicationContainerName string               `json:"applicationContainerName"`
 	Name                     string               `json:"name"`
 	Description              string               `json:"description"`
-	Resources                ApplicationResources `json:"resources"` // task level resources
-	RunOnGPU                 bool                 `json:"runOnGpu"`  // container level requirement
+	Resources                ApplicationResources `json:"resources"`                // task level resources
+	RunOnGPU                 bool                 `json:"runOnGpu"`                 // container level requirement
+	ComputeTypes             []string             `json:"computeTypes,omitempty"`   // supported runtimes, e.g. ["ecs", "lambda"]
 	Account                  Account              `json:"account"`
 	ComputeNode              ComputeNode          `json:"computeNode"`
 	Source                   Source               `json:"source"`

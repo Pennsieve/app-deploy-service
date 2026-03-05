@@ -26,9 +26,10 @@ type Application struct {
 	DestinationType string `dynamodbav:"destinationType"`
 	DestinationUrl  string `dynamodbav:"destinationUrl"`
 
-	CPU      int  `dynamodbav:"cpu"`
-	Memory   int  `dynamodbav:"memory"`
-	RunOnGPU bool `dynamodbav:"runOnGpu"`
+	CPU          int      `dynamodbav:"cpu"`
+	Memory       int      `dynamodbav:"memory"`
+	RunOnGPU     bool     `dynamodbav:"runOnGpu"`
+	ComputeTypes []string `dynamodbav:"computeTypes,omitempty"`
 
 	Env string `dynamodbav:"environment"`
 

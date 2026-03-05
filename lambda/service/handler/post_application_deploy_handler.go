@@ -87,6 +87,8 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	accountTypeValue := application.Account.AccountType
 	accountUuidKey := "ACCOUNT_UUID"
 	accountUuidValue := application.Account.Uuid
+	accountsTableKey := "ACCOUNTS_TABLE"
+	accountsTableValue := os.Getenv("ACCOUNTS_TABLE")
 	organizationIdKey := "ORG_ID"
 	organizationIdValue := organizationId
 	userIdKey := "USER_ID"
@@ -290,6 +292,10 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 						{
 							Name:  &runOnGPUKey,
 							Value: &runOnGPUValue,
+						},
+						{
+							Name:  &accountsTableKey,
+							Value: &accountsTableValue,
 						},
 					},
 				},

@@ -7,3 +7,24 @@ resource "aws_ecr_repository" "app" {
     scan_on_push = false
   }
 }
+
+resource "aws_ecr_repository_policy" "lambda_access" {
+  repository = aws_ecr_repository.app.name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "LambdaECRImageRetrievalPolicy"
+        Effect    = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+        Action = [
+          "ecr:BatchGetImage",
+          "ecr:GetDownloadUrlForLayer"
+        ]
+      }
+    ]
+  })
+}

@@ -86,6 +86,8 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	accountTypeValue := application.Account.AccountType
 	accountUuidKey := "ACCOUNT_UUID"
 	accountUuidValue := application.Account.Uuid
+	accountsTableKey := "ACCOUNTS_TABLE"
+	accountsTableValue := os.Getenv("ACCOUNTS_TABLE")
 	organizationIdKey := "ORG_ID"
 	organizationIdValue := organizationId
 	userIdKey := "USER_ID"
@@ -218,6 +220,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		CreatedAt:        time.Now().UTC().String(),
 		Params:           application.Params,
 		CommandArguments: application.CommandArguments,
+		ComputeTypes:    application.ComputeTypes,
 		Status:           "registering",
 	}
 	err = statusManager.NewApplication(ctx, store_applications)
@@ -359,6 +362,10 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		{
 			Name:  &runOnGPUKey,
 			Value: &runOnGPUValue,
+		},
+		{
+			Name:  &accountsTableKey,
+			Value: &accountsTableValue,
 		},
 	}
 
