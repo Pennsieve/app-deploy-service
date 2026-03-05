@@ -56,16 +56,20 @@ func main() {
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 
-	// Look up the account to get the role name
-	accountStore := store_dynamodb.NewAccountStore(dynamoDBClient, accountsTable)
-	account, err := accountStore.GetById(ctx, accountUuid)
-	if err != nil {
-		log.Fatalf("error looking up account %s: %v", accountUuid, err)
+	// Look up the account to get the role name (not needed for appstore deployments)
+	var roleName string
+	if action != "ADD_TO_APPSTORE" {
+		accountStore := store_dynamodb.NewAccountStore(dynamoDBClient, accountsTable)
+		account, err := accountStore.GetById(ctx, accountUuid)
+		if err != nil {
+			log.Fatalf("error looking up account %s: %v", accountUuid, err)
+		}
+		log.Printf("resolved roleName %q for account %s", account.RoleName, accountUuid)
+		roleName = account.RoleName
 	}
-	log.Printf("resolved roleName %q for account %s", account.RoleName, accountUuid)
 
 	appProvisioner := awsProvisioner.NewAWSProvisioner(cfg,
-		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU, account.RoleName)
+		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU, roleName)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	statusManager := status.NewManager(applicationsStore, applicationUuid)
 
