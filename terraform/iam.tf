@@ -409,6 +409,22 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
   }
 
   statement {
+    sid    = "PrivateECRPush"
+    effect = "Allow"
+    actions = [
+      "ecr:GetAuthorizationToken",
+      "ecr:BatchCheckLayerAvailability",
+      "ecr:GetDownloadUrlForLayer",
+      "ecr:BatchGetImage",
+      "ecr:PutImage",
+      "ecr:InitiateLayerUpload",
+      "ecr:UploadLayerPart",
+      "ecr:CompleteLayerUpload"
+    ]
+    resources = ["*"]
+  }
+
+  statement {
     sid    = "PublicECRRepo"
     effect = "Allow"
     actions = [
