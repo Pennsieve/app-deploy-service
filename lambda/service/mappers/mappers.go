@@ -55,3 +55,41 @@ func DynamoDBApplicationToJsonApplication(dynamoApplications []store_dynamodb.Ap
 
 	return applications
 }
+
+func AppStoreAppToModel(a store_dynamodb.AppStoreApplication) models.AppStoreApplication {
+	return models.AppStoreApplication{
+		Uuid:       a.Uuid,
+		SourceUrl:  a.SourceUrl,
+		SourceType: a.SourceType,
+		IsPrivate:  a.IsPrivate,
+		CreatedAt:  a.CreatedAt,
+	}
+}
+
+func AppStoreAppsToModels(apps []store_dynamodb.AppStoreApplication) []models.AppStoreApplication {
+	result := []models.AppStoreApplication{}
+	for _, a := range apps {
+		result = append(result, AppStoreAppToModel(a))
+	}
+	return result
+}
+
+func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVersion {
+	return models.AppStoreVersion{
+		Uuid:           v.Uuid,
+		ApplicationId:  v.ApplicationId,
+		Version:        v.Version,
+		ReleaseId:      v.ReleaseId,
+		DestinationUrl: v.DestinationUrl,
+		CreatedAt:      v.CreatedAt,
+		Status:         v.Status,
+	}
+}
+
+func AppStoreVersionsToModels(versions []store_dynamodb.AppStoreVersion) []models.AppStoreVersion {
+	result := []models.AppStoreVersion{}
+	for _, v := range versions {
+		result = append(result, AppStoreVersionToModel(v))
+	}
+	return result
+}

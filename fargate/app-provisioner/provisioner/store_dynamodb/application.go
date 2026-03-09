@@ -53,3 +53,14 @@ func (i Application) GetKey() map[string]types.AttributeValue {
 
 	return map[string]types.AttributeValue{"uuid": uuid}
 }
+
+// AppStoreVersion represents a specific version entry in the appstore versions table.
+type AppStoreVersion struct {
+	Uuid           string `dynamodbav:"uuid"`
+	ApplicationId  string `dynamodbav:"applicationId"`
+	Version        string `dynamodbav:"version"`
+	ReleaseId      int    `dynamodbav:"releaseId"`
+	DestinationUrl string `dynamodbav:"destinationUrl"`
+	CreatedAt      string `dynamodbav:"createdAt"`
+	Status         string `dynamodbav:"registrationStatus"`
+}

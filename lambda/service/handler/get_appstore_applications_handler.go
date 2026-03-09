@@ -16,8 +16,6 @@ import (
 
 func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "GetAppstoreApplicationsHandler"
-	queryParams := request.QueryStringParameters
-	log.Println(queryParams)
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -29,12 +27,21 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 	}
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsTable := os.Getenv(appstoreApplicationsTableNameKey)
+	versionsTable := os.Getenv(appstoreVersionsTableNameKey)
 	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 
-	dynamo_store := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
+	appStoreStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, applicationsTable)
+	versionStore := store_dynamodb.NewAppStoreVersionDatabaseStore(dynamoDBClient, versionsTable)
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 
-	dynamoApplications, err := dynamo_store.Get(ctx, "APP_STORE", queryParams)
+	// Get all apps (or filter by sourceUrl if provided)
+	queryParams := request.QueryStringParameters
+	var dynamoApps []store_dynamodb.AppStoreApplication
+	if sourceUrl, found := queryParams["sourceUrl"]; found {
+		dynamoApps, err = appStoreStore.GetBySourceUrl(ctx, sourceUrl)
+	} else {
+		dynamoApps, err = appStoreStore.GetAll(ctx)
+	}
 	if err != nil {
 		log.Println(err.Error())
 		return events.APIGatewayV2HTTPResponse{
@@ -43,17 +50,28 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 		}, nil
 	}
 
-	applications := mappers.DynamoDBApplicationToJsonApplication(dynamoApplications)
+	applications := mappers.AppStoreAppsToModels(dynamoApps)
 
-	// Fetch and populate deployments for each application
+	// For each app, fetch its versions and their deployments
 	for i := range applications {
-		deployments, err := deploymentsStore.GetHistory(ctx, applications[i].Uuid)
+		dynamoVersions, err := versionStore.GetByApplicationId(ctx, applications[i].Uuid)
 		if err != nil {
-			log.Printf("error fetching deployments for application %s: %v", applications[i].ApplicationId, err)
-			// Continue processing other applications instead of failing completely
+			log.Printf("error fetching versions for application %s: %v", applications[i].Uuid, err)
 			continue
 		}
-		applications[i].Deployments = mappers.DeploymentItemsToModels(deployments)
+		versions := mappers.AppStoreVersionsToModels(dynamoVersions)
+
+		// Fetch deployments for each version (keyed by version uuid)
+		for j := range versions {
+			deployments, err := deploymentsStore.GetHistory(ctx, versions[j].Uuid)
+			if err != nil {
+				log.Printf("error fetching deployments for version %s: %v", versions[j].Uuid, err)
+				continue
+			}
+			versions[j].Deployments = mappers.DeploymentItemsToModels(deployments)
+		}
+
+		applications[i].Versions = versions
 	}
 
 	m, err := json.Marshal(applications)
@@ -64,9 +82,8 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 			Body:       handlerError(handlerName, ErrMarshaling),
 		}, nil
 	}
-	response := events.APIGatewayV2HTTPResponse{
+	return events.APIGatewayV2HTTPResponse{
 		StatusCode: http.StatusOK,
 		Body:       string(m),
-	}
-	return response, nil
+	}, nil
 }
