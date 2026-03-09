@@ -106,6 +106,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		Uuid:          versionUuid,
 		ApplicationId: applicationId,
 		Version:       application.Source.Tag,
+		ReleaseId:     application.Release.ID,
 		CreatedAt:     time.Now().UTC().String(),
 		Status:        "registering",
 	}

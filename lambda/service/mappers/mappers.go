@@ -79,6 +79,7 @@ func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVer
 		Uuid:           v.Uuid,
 		ApplicationId:  v.ApplicationId,
 		Version:        v.Version,
+		ReleaseId:      v.ReleaseId,
 		DestinationUrl: v.DestinationUrl,
 		CreatedAt:      v.CreatedAt,
 		Status:         v.Status,

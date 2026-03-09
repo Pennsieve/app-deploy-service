@@ -81,6 +81,7 @@ type AppStoreVersion struct {
 	Uuid           string `dynamodbav:"uuid"`
 	ApplicationId  string `dynamodbav:"applicationId"`
 	Version        string `dynamodbav:"version"`
+	ReleaseId      int    `dynamodbav:"releaseId"`
 	DestinationUrl string `dynamodbav:"destinationUrl"`
 	CreatedAt      string `dynamodbav:"createdAt"`
 	Status         string `dynamodbav:"registrationStatus"`

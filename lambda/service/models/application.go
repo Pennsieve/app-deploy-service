@@ -100,6 +100,7 @@ type AppStoreVersion struct {
 	Uuid           string       `json:"uuid"`
 	ApplicationId  string       `json:"applicationId"`
 	Version        string       `json:"version"`
+	ReleaseId      int          `json:"releaseId"`
 	DestinationUrl string       `json:"destinationUrl"`
 	CreatedAt      string       `json:"createdAt"`
 	Status         string       `json:"status"`
