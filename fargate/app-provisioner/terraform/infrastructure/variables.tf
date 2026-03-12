@@ -26,3 +26,6 @@ variable "run_on_gpu" {
     type = bool
     default = false
 }
+variable "compute_node_uuid" {
+    type = string
+}
