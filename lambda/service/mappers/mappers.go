@@ -62,8 +62,32 @@ func AppStoreAppToModel(a store_dynamodb.AppStoreApplication) models.AppStoreApp
 		SourceUrl:  a.SourceUrl,
 		SourceType: a.SourceType,
 		IsPrivate:  a.IsPrivate,
+		Visibility: a.Visibility,
+		OwnerId:    a.OwnerId,
 		CreatedAt:  a.CreatedAt,
 	}
+}
+
+func AppAccessToModel(a store_dynamodb.AppAccess) models.AppAccess {
+	return models.AppAccess{
+		EntityId:       a.EntityId,
+		AppId:          a.AppId,
+		EntityType:     a.EntityType,
+		EntityRawId:    a.EntityRawId,
+		AppUuid:        a.AppUuid,
+		AccessType:     a.AccessType,
+		OrganizationId: a.OrganizationId,
+		GrantedAt:      a.GrantedAt,
+		GrantedBy:      a.GrantedBy,
+	}
+}
+
+func AppAccessItemsToModels(items []store_dynamodb.AppAccess) []models.AppAccess {
+	result := []models.AppAccess{}
+	for _, a := range items {
+		result = append(result, AppAccessToModel(a))
+	}
+	return result
 }
 
 func AppStoreAppsToModels(apps []store_dynamodb.AppStoreApplication) []models.AppStoreApplication {

@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
+	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
 
 // GetAppStoreAuthorizeHandler checks whether a user is authorized to pull
@@ -112,8 +113,22 @@ func GetAppStoreAuthorizeHandler(ctx context.Context, request events.APIGatewayV
 		}, nil
 	}
 
-	// TODO: Add per-user/per-org access control checks here.
-	// For now, any valid user can access any deployed appstore image (happy path).
+	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
+	appAccessTable := os.Getenv(appAccessTableNameKey)
+	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, appAccessTable)
+
+	if !CanAccessApp(ctx, claims, &apps[0], appAccessStore) {
+		resp := models.AuthorizeImageResponse{
+			Authorized: false,
+			Message:    "user does not have access to this application",
+		}
+		m, _ := json.Marshal(resp)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusForbidden,
+			Body:       string(m),
+		}, nil
+	}
+
 	log.Printf("%s: authorizing user %s for image %s (source: %s, version: %s)",
 		handlerName, userId, ver.DestinationUrl, sourceUrl, version)
 

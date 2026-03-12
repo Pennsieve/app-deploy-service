@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/pennsieve/app-deploy-service/service/mappers"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
+	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
 
 func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -33,6 +34,10 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 	appStoreStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, applicationsTable)
 	versionStore := store_dynamodb.NewAppStoreVersionDatabaseStore(dynamoDBClient, versionsTable)
 	deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+	appAccessTable := os.Getenv(appAccessTableNameKey)
+	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, appAccessTable)
+
+	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
 
 	// Get all apps (or filter by sourceUrl if provided)
 	queryParams := request.QueryStringParameters
@@ -50,7 +55,14 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 		}, nil
 	}
 
-	applications := mappers.AppStoreAppsToModels(dynamoApps)
+	var filteredApps []store_dynamodb.AppStoreApplication
+	for _, app := range dynamoApps {
+		if CanAccessApp(ctx, claims, &app, appAccessStore) {
+			filteredApps = append(filteredApps, app)
+		}
+	}
+
+	applications := mappers.AppStoreAppsToModels(filteredApps)
 
 	// For each app, fetch its versions and their deployments
 	for i := range applications {
