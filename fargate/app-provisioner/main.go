@@ -56,23 +56,27 @@ func main() {
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 
-	// Look up the account to get the role name
-	accountStore := store_dynamodb.NewAccountStore(dynamoDBClient, accountsTable)
-	account, err := accountStore.GetById(ctx, accountUuid)
-	if err != nil {
-		log.Fatalf("error looking up account %s: %v", accountUuid, err)
+	// Look up the account to get the role name (not needed for appstore deployments)
+	var roleName string
+	if action != "ADD_TO_APPSTORE" {
+		accountStore := store_dynamodb.NewAccountStore(dynamoDBClient, accountsTable)
+		account, err := accountStore.GetById(ctx, accountUuid)
+		if err != nil {
+			log.Fatalf("error looking up account %s: %v", accountUuid, err)
+		}
+		log.Printf("resolved roleName %q for account %s", account.RoleName, accountUuid)
+		roleName = account.RoleName
 	}
-	log.Printf("resolved roleName %q for account %s", account.RoleName, accountUuid)
 
 	appProvisioner := awsProvisioner.NewAWSProvisioner(cfg,
-		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU, account.RoleName)
+		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU, roleName)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	statusManager := status.NewManager(applicationsStore, applicationUuid)
 
-	// deploymentId will only be present if this is not a DELETE. DELETE does not
-	// generate a Deployment record that needs to be updated.
+	// deploymentId will only be present if this is not a DELETE or ADD_TO_APPSTORE.
+	// ADD_TO_APPSTORE handles its own status manager setup.
 	var deploymentId string
-	if action == "CREATE" || action == "DEPLOY" || action == "ADD_TO_APPSTORE" {
+	if action == "CREATE" || action == "DEPLOY" {
 		deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
 		deploymentId = os.Getenv(provisioner.DeploymentIdKey)
 		deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
@@ -107,10 +111,24 @@ func main() {
 			log.Fatal(err)
 		}
 	case "ADD_TO_APPSTORE":
+		// APPLICATIONS_TABLE points to the versions table for appstore deployments
+		versionStore := store_dynamodb.NewAppStoreVersionDatabaseStore(dynamoDBClient, applicationsTable)
+		appStoreStatusManager := status.NewAppStoreManager(versionStore, applicationUuid)
+		deploymentsTable := os.Getenv(provisioner.DeploymentsTableNameKey)
+		appStoreDeploymentId := os.Getenv(provisioner.DeploymentIdKey)
+		deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
+		appStoreStatusManager = appStoreStatusManager.WithDeployment(deploymentsStore, appStoreDeploymentId)
+		if pusherConfig, err := pusher_config.Get(ctx, ssm.NewFromConfig(cfg)); err != nil {
+			log.Printf("warning: unable to configure Pusher: %s\n", err.Error())
+		} else {
+			appStoreStatusManager = appStoreStatusManager.WithPusher(pusherConfig)
+		}
+
 		ecsClient := ecs.NewFromConfig(cfg)
-		err := AddToAppstore(ctx, applicationUuid, deploymentId, sourceUrl, tag, appProvisioner, ecsClient, applicationsStore, statusManager)
+		authToken := os.Getenv("AUTH_TOKEN")
+		err := AddToAppstore(ctx, applicationUuid, appStoreDeploymentId, sourceUrl, tag, authToken, appProvisioner, ecsClient, appStoreStatusManager, versionStore)
 		if err != nil {
-			statusManager.SetErrorStatus(ctx, err)
+			appStoreStatusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
 		}
 	default:
@@ -154,64 +172,31 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-const appstoreIdentifier = "APP_STORE"
-
-func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, applicationsStore store_dynamodb.DynamoDBStore, statusManager *status.Manager) error {
-	var destinationUrl string
-	var needsRepositoryCreation bool
-
-	// Check if an application with this source URL already exists in the appstore
-	applications, err := applicationsStore.Get(ctx, appstoreIdentifier, sourceUrl)
-	if err != nil {
-		return fmt.Errorf("error checking for existing application: %w", err)
+func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, authToken string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager, versionStore store_dynamodb.AppStoreVersionDBStore) error {
+	// Get the pre-existing private ECR URL from environment variable
+	ecrRepoUrl := os.Getenv("APPSTORE_PRIVATE_ECR_URL")
+	if ecrRepoUrl == "" {
+		return fmt.Errorf("APPSTORE_PRIVATE_ECR_URL environment variable is not set")
 	}
 
-	if len(applications) > 0 && applications[0].DestinationUrl != "" {
-		log.Printf("Application with source URL %s already exists with destination URL (found %d), skipping repository creation", sourceUrl, len(applications))
-		destinationUrl = applications[0].DestinationUrl
-		needsRepositoryCreation = false
-	} else {
-		needsRepositoryCreation = true
-		if len(applications) > 0 {
-			log.Printf("Application with source URL %s exists but has no destination URL, creating public repository", sourceUrl)
-		} else {
-			log.Println("No existing application found, creating public repository and updating application record")
-		}
+	// Generate unique tag using source URL hash: {hash}-{source_tag}
+	// This ensures each source gets unique tags in the shared ECR repo
+	sourceUrlHash := utils.GenerateHash(sourceUrl)
+	uniqueTag := fmt.Sprintf("%d-%s", sourceUrlHash, tag)
+	destinationUrl := fmt.Sprintf("%s:%s", ecrRepoUrl, uniqueTag)
+
+	log.Printf("Using private ECR repository with unique tag: %s", destinationUrl)
+
+	// Update the version record with destination URL
+	if err := versionStore.UpdateDestinationUrl(ctx, applicationUuid, destinationUrl, "deploying"); err != nil {
+		return fmt.Errorf("error updating appstore version with destination URL: %w", err)
 	}
-
-	// Create repository if needed
-	if needsRepositoryCreation {
-		// CreatePublicRepository
-		if err := appProvisioner.CreatePublicRepository(ctx); err != nil {
-			return fmt.Errorf("error creating public repository: %w", err)
-		}
-
-		// parse output file created after infrastructure creation
-		parser := parser.NewOutputParser("/usr/src/app/terraform/pennsieve/public-repository/outputs.json")
-		outputs, err := parser.Run(ctx)
-		if err != nil {
-			return fmt.Errorf("error running output parser: %w", err)
-		}
-
-		log.Println(outputs)
-		destinationUrl = outputs.AppPublicEcrUrl.Value
-		if destinationUrl == "" {
-			return fmt.Errorf("error creating public repository, destination URL is empty")
-		}
-		// Update or create application record with destination URL
-		store_application := store_dynamodb.Application{
-			DestinationUrl:  destinationUrl,
-			DestinationType: "ecr",
-			Status:          "deploying",
-		}
-		if err := statusManager.ApplicationCreateUpdate(ctx, store_application); err != nil {
-			return fmt.Errorf("error updating application with destination URL: %w", err)
-		}
-	}
+	statusManager.UpdateApplicationStatus(ctx, "deploying", false)
 
 	// Build and push
 	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", sourceUrl, tag, destinationUrl)
-	if err := PublicDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, appProvisioner, ecsClient); err != nil {
+	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
+	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, authToken, applicationsTable, appProvisioner, ecsClient); err != nil {
 		return err
 	}
 
@@ -372,6 +357,102 @@ func PublicDeploy(ctx context.Context, applicationUuid string, deploymentId stri
 			{Key: aws.String(provisioner.DeploymentIdTag), Value: aws.String(deploymentId)},
 			{Key: aws.String(provisioner.ApplicationIdTag), Value: aws.String(applicationUuid)},
 		},
+	}
+
+	taskRunner := runner.NewECSTaskRunner(ecsClient, runTaskIn)
+	runTaskOut, err := taskRunner.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("error running deployment task: %w", err)
+	}
+	if err := runner.GetRunFailures(runTaskOut); err != nil {
+		return fmt.Errorf("error: run failures: %w", err)
+	}
+	return nil
+}
+
+func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, authToken string, applicationsTable string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+	creds, err := appProvisioner.GetProvisionerCreds(ctx)
+	if err != nil {
+		return fmt.Errorf("error retrieving credentials: %w", err)
+	}
+
+	deploymentSourceUrl, err := utils.DetermineSourceURL(sourceUrl, tag)
+	if err != nil {
+		return fmt.Errorf("error determining sourceUrl variable for deployment: %w", err)
+	}
+
+	// destinationUrl already contains the full image reference with unique tag
+	// Format: {ecr_repo}:{source_hash}-{source_tag}
+
+	accessKeyId := "AWS_ACCESS_KEY_ID"
+	accessKeyIdValue := creds.AccessKeyID
+	secretAccessKey := "AWS_SECRET_ACCESS_KEY"
+	secretAccessKeyValue := creds.SecretAccessKey
+	sessionToken := "AWS_SESSION_TOKEN"
+	sessionTokenValue := creds.SessionToken
+
+	TaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
+	subIdStr := os.Getenv("SUBNET_IDS")
+	SubNetIds := strings.Split(subIdStr, ",")
+	cluster := os.Getenv("CLUSTER_ARN")
+	SecurityGroup := os.Getenv("SECURITY_GROUP")
+	TaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
+
+	envVars := []types.KeyValuePair{
+		{
+			Name:  &accessKeyId,
+			Value: &accessKeyIdValue,
+		},
+		{
+			Name:  &sessionToken,
+			Value: &sessionTokenValue,
+		},
+		{
+			Name:  &secretAccessKey,
+			Value: &secretAccessKeyValue,
+		},
+	}
+
+	// Add GIT_TOKEN for kaniko to authenticate with private GitHub repos
+	if authToken != "" {
+		envVars = append(envVars, types.KeyValuePair{
+			Name:  aws.String("GIT_TOKEN"),
+			Value: aws.String(authToken),
+		})
+	}
+
+	runTaskIn := &ecs.RunTaskInput{
+		TaskDefinition: aws.String(TaskDefinitionArn),
+		Cluster:        aws.String(cluster),
+		NetworkConfiguration: &types.NetworkConfiguration{
+			AwsvpcConfiguration: &types.AwsVpcConfiguration{
+				Subnets:        SubNetIds,
+				SecurityGroups: []string{SecurityGroup},
+				AssignPublicIp: types.AssignPublicIpEnabled,
+			},
+		},
+		Overrides: &types.TaskOverride{
+			ContainerOverrides: []types.ContainerOverride{
+				{
+					Name:        &TaskDefContainerName,
+					Command:     []string{"--context", deploymentSourceUrl, "--destination", destinationUrl, "--force"},
+					Environment: envVars,
+				},
+			},
+		},
+		LaunchType: types.LaunchTypeFargate,
+		Tags: []types.Tag{
+			{Key: aws.String(provisioner.DeploymentIdTag), Value: aws.String(deploymentId)},
+			{Key: aws.String(provisioner.ApplicationIdTag), Value: aws.String(applicationUuid)},
+		},
+	}
+
+	// Propagate ApplicationsTable tag so the status lambda updates the correct table
+	if applicationsTable != "" {
+		runTaskIn.Tags = append(runTaskIn.Tags, types.Tag{
+			Key:   aws.String(provisioner.ApplicationsTableTag),
+			Value: aws.String(applicationsTable),
+		})
 	}
 
 	taskRunner := runner.NewECSTaskRunner(ecsClient, runTaskIn)

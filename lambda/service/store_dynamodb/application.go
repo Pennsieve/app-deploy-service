@@ -55,3 +55,43 @@ func (i Application) GetKey() map[string]types.AttributeValue {
 
 	return map[string]types.AttributeValue{"uuid": uuid}
 }
+
+// AppStoreApplication represents an application in the appstore.
+// One record per unique sourceUrl (the git repository).
+type AppStoreApplication struct {
+	Uuid       string `dynamodbav:"uuid"`
+	SourceUrl  string `dynamodbav:"sourceUrl"`
+	SourceType string `dynamodbav:"sourceType"`
+	IsPrivate  bool   `dynamodbav:"isPrivate"`
+	CreatedAt  string `dynamodbav:"createdAt"`
+}
+
+func (i AppStoreApplication) GetKey() map[string]types.AttributeValue {
+	uuid, err := attributevalue.Marshal(i.Uuid)
+	if err != nil {
+		panic(err)
+	}
+
+	return map[string]types.AttributeValue{"uuid": uuid}
+}
+
+// AppStoreVersion represents a specific version of an appstore application.
+// Multiple versions can exist for a single application (sourceUrl).
+type AppStoreVersion struct {
+	Uuid           string `dynamodbav:"uuid"`
+	ApplicationId  string `dynamodbav:"applicationId"`
+	Version        string `dynamodbav:"version"`
+	ReleaseId      int    `dynamodbav:"releaseId"`
+	DestinationUrl string `dynamodbav:"destinationUrl"`
+	CreatedAt      string `dynamodbav:"createdAt"`
+	Status         string `dynamodbav:"registrationStatus"`
+}
+
+func (i AppStoreVersion) GetKey() map[string]types.AttributeValue {
+	uuid, err := attributevalue.Marshal(i.Uuid)
+	if err != nil {
+		panic(err)
+	}
+
+	return map[string]types.AttributeValue{"uuid": uuid}
+}

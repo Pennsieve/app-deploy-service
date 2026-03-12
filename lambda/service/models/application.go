@@ -45,6 +45,7 @@ type DeploymentSource struct {
 	Url        string `json:"url"`
 	Tag        string `json:"tag"`
 	IsPrivate  bool   `json:"isPrivate,omitempty"`
+	AuthToken  string `json:"authToken,omitempty"`
 }
 
 type Source struct {
@@ -81,4 +82,34 @@ type DeployApplicationResponse struct {
 
 type AppStoreRegistrationResponse struct {
 	RegistrationId string `json:"registrationId"`
+}
+
+// AppStoreApplication is the API model for an appstore application.
+// One per unique sourceUrl. Versions are nested.
+type AppStoreApplication struct {
+	Uuid       string             `json:"uuid"`
+	SourceUrl  string             `json:"sourceUrl"`
+	SourceType string             `json:"sourceType"`
+	IsPrivate  bool               `json:"isPrivate"`
+	CreatedAt  string             `json:"createdAt"`
+	Versions   []AppStoreVersion  `json:"versions"`
+}
+
+// AppStoreVersion is the API model for a specific version of an appstore application.
+type AppStoreVersion struct {
+	Uuid           string       `json:"uuid"`
+	ApplicationId  string       `json:"applicationId"`
+	Version        string       `json:"version"`
+	ReleaseId      int          `json:"releaseId"`
+	DestinationUrl string       `json:"destinationUrl"`
+	CreatedAt      string       `json:"createdAt"`
+	Status         string       `json:"status"`
+	Deployments    []Deployment `json:"deployments"`
+}
+
+// AuthorizeImageResponse is returned by the authorization endpoint.
+type AuthorizeImageResponse struct {
+	Authorized bool   `json:"authorized"`
+	ImageUrl   string `json:"imageUrl,omitempty"`
+	Message    string `json:"message,omitempty"`
 }

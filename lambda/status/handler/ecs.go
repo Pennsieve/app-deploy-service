@@ -10,8 +10,9 @@ import (
 )
 
 type DeploymentApplicationIds struct {
-	DeploymentId  string
-	ApplicationId string
+	DeploymentId      string
+	ApplicationId     string
+	ApplicationsTable string
 }
 
 func (i DeploymentApplicationIds) CheckIds() error {
@@ -50,6 +51,8 @@ func (h *DeployTaskStateChangeHandler) GetIdsFromTags(ctx context.Context, taskA
 			ids.DeploymentId = aws.ToString(tag.Value)
 		} else if key == ApplicationIdTag {
 			ids.ApplicationId = aws.ToString(tag.Value)
+		} else if key == ApplicationsTableTag {
+			ids.ApplicationsTable = aws.ToString(tag.Value)
 		}
 	}
 	if err := ids.CheckIds(); err != nil {

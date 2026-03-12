@@ -40,7 +40,7 @@ func TestDeployTaskStateChangeHandler_UpdateApplicationsTable_Expressions(t *tes
 	applicationId := uuid.NewString()
 	finalState := &FinalState{}
 
-	err := handler.UpdateApplicationsTable(context.Background(), applicationId, finalState)
+	err := handler.UpdateApplicationsTable(context.Background(), applicationId, finalState, applicationsTable)
 	require.NoError(t, err)
 
 	updateItemIn := argCaptureDynamo.UpdateItemIn

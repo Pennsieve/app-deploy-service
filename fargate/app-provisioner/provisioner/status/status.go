@@ -11,12 +11,19 @@ import (
 	"time"
 )
 
+// StatusUpdater is a minimal interface for updating application status.
+// Both DynamoDBStore and AppStoreDatabaseStore satisfy this interface.
+type StatusUpdater interface {
+	UpdateStatus(ctx context.Context, newStatus string, applicationUuid string) error
+}
+
 // Manager is responsible for managing both Application and Deployment statuses. Any change to an Application or
 // Deployment status should be routed through this object rather than directly to store_dynamodb, so that status updates are
 // centralized, and we can update other interested parties here. For example, Pusher
 type Manager struct {
 	HandlerName       string
 	ApplicationsStore store_dynamodb.DynamoDBStore
+	StatusStore       StatusUpdater
 	DeploymentsStore  *store_dynamodb.DeploymentsStore
 	Pusher            *pusher.Client
 	ApplicationId     string
@@ -24,7 +31,13 @@ type Manager struct {
 }
 
 func NewManager(applicationsStore store_dynamodb.DynamoDBStore, applicationId string) *Manager {
-	return &Manager{HandlerName: "AppProvisioner", ApplicationsStore: applicationsStore, ApplicationId: applicationId}
+	return &Manager{HandlerName: "AppProvisioner", ApplicationsStore: applicationsStore, StatusStore: applicationsStore, ApplicationId: applicationId}
+}
+
+// NewAppStoreManager creates a Manager for appstore operations that uses
+// the AppStoreDatabaseStore for status updates.
+func NewAppStoreManager(statusStore StatusUpdater, applicationId string) *Manager {
+	return &Manager{HandlerName: "AppProvisioner", StatusStore: statusStore, ApplicationId: applicationId}
 }
 
 func (m *Manager) WithDeployment(deploymentsStore *store_dynamodb.DeploymentsStore, deploymentId string) *Manager {
@@ -46,7 +59,7 @@ func (m *Manager) WithPusher(pusherConfig *pennsievePusher.Config) *Manager {
 
 func (m *Manager) SetErrorStatus(ctx context.Context, err error) {
 	msg := fmt.Sprintf("error: %s", err.Error())
-	if appStoreErr := m.ApplicationsStore.UpdateStatus(ctx, msg, m.ApplicationId); appStoreErr != nil {
+	if appStoreErr := m.StatusStore.UpdateStatus(ctx, msg, m.ApplicationId); appStoreErr != nil {
 		log.Printf("warning: error updating applications table with error: %s: %s\n", msg, appStoreErr.Error())
 	}
 	if m.DeploymentsStore != nil {
@@ -58,7 +71,7 @@ func (m *Manager) SetErrorStatus(ctx context.Context, err error) {
 }
 
 func (m *Manager) UpdateApplicationStatus(ctx context.Context, newStatus string, isError bool) {
-	if err := m.ApplicationsStore.UpdateStatus(ctx, newStatus, m.ApplicationId); err != nil {
+	if err := m.StatusStore.UpdateStatus(ctx, newStatus, m.ApplicationId); err != nil {
 		log.Printf("warning: error updating status of application %s to %q: %s\n", m.ApplicationId, newStatus, err.Error())
 	}
 	m.sendApplicationStatusEvent(newStatus, isError)
