@@ -6,13 +6,11 @@ import (
 	"log"
 	"os/exec"
 	"strconv"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner"
@@ -62,60 +60,8 @@ func (p *AWSProvisioner) GetProvisionerCreds(ctx context.Context) (aws.Credentia
 	return credentials, nil
 }
 
-func (p *AWSProvisioner) CreatePolicy(ctx context.Context) error {
-	log.Println("creating an inline policy ...")
-	iamClient := iam.NewFromConfig(p.Config)
-
-	policyDoc := fmt.Sprintf(`{
-					"Version": "2012-10-17",
-					"Statement": [
-						{
-							"Effect": "Allow",
-							"Action": "sts:AssumeRole",
-							"Resource": "arn:aws:iam::%s:role/%s"
-						}
-					]
-				}`, p.AccountId, p.RoleName)
-
-	output, err := iamClient.PutRolePolicy(context.Background(), &iam.PutRolePolicyInput{
-		PolicyName:     aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
-		PolicyDocument: aws.String(policyDoc),
-		RoleName:       aws.String(fmt.Sprintf("%s-app-deploy-service-fargate-task-role-use1", p.Env)),
-	})
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(output)
-	// wait for policy to be attached
-	time.Sleep(25 * time.Second)
-
-	return nil
-}
-
-func (p *AWSProvisioner) GetPolicy(ctx context.Context) (*string, error) {
-	log.Println("getting policy ...")
-
-	iamClient := iam.NewFromConfig(p.Config)
-
-	output, err := iamClient.GetRolePolicy(context.Background(), &iam.GetRolePolicyInput{
-		PolicyName: aws.String(fmt.Sprintf("ExternalAccountInlinePolicy-%s", p.AccountId)),
-		RoleName:   aws.String(fmt.Sprintf("%s-app-deploy-service-fargate-task-role-use1", p.Env)),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Printf("%v", output.PolicyDocument)
-	return output.PolicyDocument, err
-}
-
 func (p *AWSProvisioner) Create(ctx context.Context) error {
 	log.Println("creating infrastructure ...")
-
-	if err := p.CreatePolicy(context.Background()); err != nil {
-		return fmt.Errorf("error creating/updating inline policy for account %s: %w", p.AccountId, err)
-	}
 
 	creds, err := p.AssumeRole(ctx)
 	if err != nil {

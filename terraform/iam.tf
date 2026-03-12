@@ -392,8 +392,6 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
       "ecs:ListTasks",
       "ecs:TagResource",
       "iam:PassRole",
-      "iam:PutRolePolicy",
-      "iam:GetRolePolicy",
     ]
 
     resources = ["*"]
@@ -447,6 +445,17 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
       "ecr-public:ListTagsForResource"
     ]
     resources = ["*"]
+  }
+
+  statement {
+    sid    = "CrossAccountAssumeRole"
+    effect = "Allow"
+    actions = [
+      "sts:AssumeRole",
+    ]
+    resources = [
+      "arn:aws:iam::*:role/Pennsieve-Compute-*",
+    ]
   }
 
   statement {
