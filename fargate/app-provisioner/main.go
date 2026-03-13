@@ -69,7 +69,8 @@ func main() {
 	}
 
 	appProvisioner := awsProvisioner.NewAWSProvisioner(cfg,
-		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU, roleName)
+
+		accountId, action, env, utils.ExtractGitUrl(sourceUrl), storageId, computeNodeUuid, utils.AppSlug(sourceUrl, computeNodeUuid), runOnGPU, roleName)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, applicationsTable)
 	statusManager := status.NewManager(applicationsStore, applicationUuid)
 

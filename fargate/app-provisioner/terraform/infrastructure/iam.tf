@@ -1,8 +1,15 @@
+// Construct the permissions boundary ARN directly to avoid needing iam:ListPolicies.
+// Required by the Pennsieve-Compute role's DenyCreateRoleWithoutBoundary statement.
+locals {
+  permissions_boundary_arn = "arn:aws:iam::${var.account_id}:policy/pennsieve-boundary-${substr(var.compute_node_uuid, 0, 8)}"
+}
+
 // ## App ##
-resource "aws_iam_role" "task_role_for_app" { #
-  name               = "task_role_for_${var.app_slug}-${var.env}"
-  assume_role_policy = data.aws_iam_policy_document.app_role_assume_role.json
-  managed_policy_arns = [aws_iam_policy.app_efs_policy.arn]
+resource "aws_iam_role" "task_role_for_app" {
+  name                 = "task_role_for_${var.app_slug}-${var.env}"
+  assume_role_policy   = data.aws_iam_policy_document.app_role_assume_role.json
+  managed_policy_arns  = [aws_iam_policy.app_efs_policy.arn]
+  permissions_boundary = local.permissions_boundary_arn
 }
 
 # TODO: resource should be specific EFS ID
@@ -39,10 +46,11 @@ data "aws_iam_policy_document" "app_role_assume_role" { #
 }
 
 // ECS Task Execution IAM role
-resource "aws_iam_role" "execution_role_for_app" { #
-  name               = "execution_role_for_${var.app_slug}-${var.env}"
-  assume_role_policy = data.aws_iam_policy_document.app_execution_role_assume_role.json
-  managed_policy_arns = [aws_iam_policy.app_execution_role_policy.arn]
+resource "aws_iam_role" "execution_role_for_app" {
+  name                 = "execution_role_for_${var.app_slug}-${var.env}"
+  assume_role_policy   = data.aws_iam_policy_document.app_execution_role_assume_role.json
+  managed_policy_arns  = [aws_iam_policy.app_execution_role_policy.arn]
+  permissions_boundary = local.permissions_boundary_arn
 }
 
 resource "aws_iam_policy" "app_execution_role_policy" { #

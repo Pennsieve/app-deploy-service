@@ -28,6 +28,22 @@ import (
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
 
+func defaultComputeTypes(ct []string) []string {
+	if len(ct) == 0 {
+		return []string{"standard"}
+	}
+	return ct
+}
+
+func containsGPU(ct []string) bool {
+	for _, t := range ct {
+		if t == "gpu" {
+			return true
+		}
+	}
+	return false
+}
+
 func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "PostApplicationsHandler"
 	var application models.Application
@@ -132,24 +148,25 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	cpuKey := "APP_CPU"
 	memoryKey := "APP_MEMORY"
-	cpuValue := application.Resources.CPU
-	memoryValue := application.Resources.Memory
+	cpuValue := application.RuntimeConfig.CPU
+	memoryValue := application.RuntimeConfig.Memory
 	defaultCPU := 2048
 	defaultMemory := 4096
 
-	if application.Resources.CPU == 0 {
+	if application.RuntimeConfig.CPU == 0 {
 		cpuValue = defaultCPU
 	}
 
-	if application.Resources.Memory == 0 {
+	if application.RuntimeConfig.Memory == 0 {
 		memoryValue = defaultMemory
 	}
 
 	cpuValueStr := strconv.Itoa(cpuValue)
 	memoryValueStr := strconv.Itoa(memoryValue)
 
+	computeTypes := defaultComputeTypes(application.RuntimeConfig.ComputeTypes)
 	runOnGPUKey := "RUN_ON_GPU"
-	runOnGPUValue := strconv.FormatBool(application.RunOnGPU)
+	runOnGPUValue := strconv.FormatBool(containsGPU(computeTypes))
 
 	applicationUuid := uuid.NewString()
 	deploymentId := uuid.NewString()
@@ -213,14 +230,14 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		DestinationUrl:   destinationUrlValue,
 		CPU:              cpuValue,
 		Memory:           memoryValue,
-		RunOnGPU:         application.RunOnGPU,
+		RunOnGPU:         containsGPU(computeTypes),
+		ComputeTypes:     computeTypes,
 		Env:              envValue,
 		OrganizationId:   organizationId,
 		UserId:           userId,
 		CreatedAt:        time.Now().UTC().String(),
 		Params:           application.Params,
 		CommandArguments: application.CommandArguments,
-		ComputeTypes:    application.ComputeTypes,
 		Status:           "registering",
 	}
 	err = statusManager.NewApplication(ctx, store_applications)
