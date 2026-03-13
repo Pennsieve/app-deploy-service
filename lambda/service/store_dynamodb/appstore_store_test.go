@@ -14,12 +14,15 @@ import (
 )
 
 type ArgCaptureAppStoreTableAPI struct {
-	PutItemInput *dynamodb.PutItemInput
-	QueryInput   *dynamodb.QueryInput
-	ScanInput    *dynamodb.ScanInput
+	PutItemInput    *dynamodb.PutItemInput
+	QueryInput      *dynamodb.QueryInput
+	ScanInput       *dynamodb.ScanInput
+	GetItemInput    *dynamodb.GetItemInput
+	UpdateItemInput *dynamodb.UpdateItemInput
 
-	QueryOutput *dynamodb.QueryOutput
-	ScanOutput  *dynamodb.ScanOutput
+	QueryOutput   *dynamodb.QueryOutput
+	ScanOutput    *dynamodb.ScanOutput
+	GetItemOutput *dynamodb.GetItemOutput
 }
 
 func (m *ArgCaptureAppStoreTableAPI) PutItem(_ context.Context, params *dynamodb.PutItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
@@ -41,6 +44,19 @@ func (m *ArgCaptureAppStoreTableAPI) Scan(_ context.Context, params *dynamodb.Sc
 		return m.ScanOutput, nil
 	}
 	return &dynamodb.ScanOutput{}, nil
+}
+
+func (m *ArgCaptureAppStoreTableAPI) GetItem(_ context.Context, params *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	m.GetItemInput = params
+	if m.GetItemOutput != nil {
+		return m.GetItemOutput, nil
+	}
+	return &dynamodb.GetItemOutput{}, nil
+}
+
+func (m *ArgCaptureAppStoreTableAPI) UpdateItem(_ context.Context, params *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	m.UpdateItemInput = params
+	return &dynamodb.UpdateItemOutput{}, nil
 }
 
 func TestAppStoreDatabaseStore_Insert(t *testing.T) {
@@ -207,7 +223,78 @@ func TestAppStoreApplication_IsPrivateDefaultsFalse(t *testing.T) {
 	assert.Equal(t, "test-uuid", app.Uuid)
 }
 
+func TestAppStoreDatabaseStore_GetById(t *testing.T) {
+	app := AppStoreApplication{
+		Uuid:       "test-uuid-123",
+		SourceUrl:  "https://github.com/test/repo",
+		SourceType: "github",
+		IsPrivate:  false,
+		Visibility: "public",
+		OwnerId:    "N:user:abc-123",
+		CreatedAt:  "2026-01-01",
+	}
+	item, err := attributevalue.MarshalMap(app)
+	require.NoError(t, err)
+
+	mock := &ArgCaptureAppStoreTableAPI{
+		GetItemOutput: &dynamodb.GetItemOutput{
+			Item: item,
+		},
+	}
+	store := NewAppStoreDatabaseStore(mock, "test-table")
+
+	result, err := store.GetById(context.Background(), "test-uuid-123")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, app, *result)
+}
+
+func TestAppStoreDatabaseStore_GetById_NotFound(t *testing.T) {
+	mock := &ArgCaptureAppStoreTableAPI{
+		GetItemOutput: &dynamodb.GetItemOutput{
+			Item: nil,
+		},
+	}
+	store := NewAppStoreDatabaseStore(mock, "test-table")
+
+	result, err := store.GetById(context.Background(), "nonexistent")
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
+func TestAppStoreDatabaseStore_UpdateVisibility(t *testing.T) {
+	mock := &ArgCaptureAppStoreTableAPI{}
+	tableName := "test-table"
+	store := NewAppStoreDatabaseStore(mock, tableName)
+
+	err := store.UpdateVisibility(context.Background(), "test-uuid", "private")
+	require.NoError(t, err)
+	require.NotNil(t, mock.UpdateItemInput)
+	assert.Equal(t, tableName, aws.ToString(mock.UpdateItemInput.TableName))
+}
+
+func TestAppStoreApplication_VisibilityAndOwnerFields(t *testing.T) {
+	original := AppStoreApplication{
+		Uuid:       "test-uuid",
+		SourceUrl:  "https://github.com/test/repo",
+		SourceType: "github",
+		IsPrivate:  true,
+		Visibility: "private",
+		OwnerId:    "N:user:owner-123",
+		CreatedAt:  "2026-01-01",
+	}
+
+	item, err := attributevalue.MarshalMap(original)
+	require.NoError(t, err)
+
+	var roundTripped AppStoreApplication
+	err = attributevalue.UnmarshalMap(item, &roundTripped)
+	require.NoError(t, err)
+	assert.Equal(t, original, roundTripped)
+	assert.Equal(t, "private", roundTripped.Visibility)
+	assert.Equal(t, "N:user:owner-123", roundTripped.OwnerId)
+}
+
 func TestAppStoreDatabaseStore_ImplementsInterface(t *testing.T) {
-	// Compile-time check that AppStoreDatabaseStore implements AppStoreDBStore
 	var _ AppStoreDBStore = (*AppStoreDatabaseStore)(nil)
 }

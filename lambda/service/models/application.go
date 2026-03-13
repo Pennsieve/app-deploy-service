@@ -86,12 +86,41 @@ type AppStoreRegistrationResponse struct {
 // AppStoreApplication is the API model for an appstore application.
 // One per unique sourceUrl. Versions are nested.
 type AppStoreApplication struct {
-	Uuid       string             `json:"uuid"`
-	SourceUrl  string             `json:"sourceUrl"`
-	SourceType string             `json:"sourceType"`
-	IsPrivate  bool               `json:"isPrivate"`
-	CreatedAt  string             `json:"createdAt"`
-	Versions   []AppStoreVersion  `json:"versions"`
+	Uuid       string            `json:"uuid"`
+	SourceUrl  string            `json:"sourceUrl"`
+	SourceType string            `json:"sourceType"`
+	IsPrivate  bool              `json:"isPrivate"`
+	Visibility string            `json:"visibility"`
+	OwnerId    string            `json:"ownerId"`
+	CreatedAt  string            `json:"createdAt"`
+	Versions   []AppStoreVersion `json:"versions"`
+}
+
+type AppAccess struct {
+	EntityId       string `json:"entityId"`
+	AppId          string `json:"appId"`
+	EntityType     string `json:"entityType"`
+	EntityRawId    string `json:"entityRawId"`
+	AppUuid        string `json:"appUuid"`
+	AccessType     string `json:"accessType"`
+	OrganizationId string `json:"organizationId,omitempty"`
+	GrantedAt      string `json:"grantedAt"`
+	GrantedBy      string `json:"grantedBy"`
+}
+
+type AppPermissions struct {
+	Visibility string      `json:"visibility"`
+	OwnerId    string      `json:"ownerId"`
+	Access     []AppAccess `json:"access"`
+}
+
+type SetVisibilityRequest struct {
+	Visibility string `json:"visibility"`
+}
+
+type GrantAccessRequest struct {
+	EntityId       string `json:"entityId"`
+	OrganizationId string `json:"organizationId,omitempty"`
 }
 
 // AppStoreVersion is the API model for a specific version of an appstore application.

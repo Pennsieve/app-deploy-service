@@ -63,7 +63,21 @@ type AppStoreApplication struct {
 	SourceUrl  string `dynamodbav:"sourceUrl"`
 	SourceType string `dynamodbav:"sourceType"`
 	IsPrivate  bool   `dynamodbav:"isPrivate"`
+	Visibility string `dynamodbav:"visibility"`
+	OwnerId    string `dynamodbav:"ownerId"`
 	CreatedAt  string `dynamodbav:"createdAt"`
+}
+
+type AppAccess struct {
+	EntityId       string `dynamodbav:"entityId"`
+	AppId          string `dynamodbav:"appId"`
+	EntityType     string `dynamodbav:"entityType"`
+	EntityRawId    string `dynamodbav:"entityRawId"`
+	AppUuid        string `dynamodbav:"appUuid"`
+	AccessType     string `dynamodbav:"accessType"`
+	OrganizationId string `dynamodbav:"organizationId,omitempty"`
+	GrantedAt      string `dynamodbav:"grantedAt"`
+	GrantedBy      string `dynamodbav:"grantedBy"`
 }
 
 func (i AppStoreApplication) GetKey() map[string]types.AttributeValue {

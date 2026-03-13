@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -20,6 +21,8 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
+	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
+	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 	"github.com/pusher/pusher-http-go/v5"
 )
 
@@ -60,7 +63,15 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}, nil
 	}
 
-	// TODO: add authorization and authentication
+	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
+	if !authorizer.HasOrgRole(claims, role.Viewer) {
+		log.Printf("user not permitted to add to appstore with claims: %+v", claims)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusUnauthorized,
+			Body:       handlerError(handlerName, ErrNotPermitted),
+		}, nil
+	}
+	userId := claims.UserClaim.NodeId
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	appStoreStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, applicationsTable)
@@ -83,11 +94,17 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		log.Printf("application %s already exists for sourceUrl %s", applicationId, application.Source.Url)
 	} else {
 		applicationId = uuid.NewString()
+		visibility := "public"
+		if application.Source.IsPrivate {
+			visibility = "private"
+		}
 		appRecord := store_dynamodb.AppStoreApplication{
 			Uuid:       applicationId,
 			SourceUrl:  application.Source.Url,
 			SourceType: application.Source.SourceType,
 			IsPrivate:  application.Source.IsPrivate,
+			Visibility: visibility,
+			OwnerId:    userId,
 			CreatedAt:  time.Now().UTC().String(),
 		}
 		if err := appStoreStore.Insert(ctx, appRecord); err != nil {
@@ -97,6 +114,23 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 				Body:       handlerError(handlerName, ErrStoringApplication),
 			}, nil
 		}
+
+		appAccessTable := os.Getenv(appAccessTableNameKey)
+		appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, appAccessTable)
+		ownerAccess := store_dynamodb.AppAccess{
+			EntityId:    fmt.Sprintf("user#%s", userId),
+			AppId:       fmt.Sprintf("app#%s", applicationId),
+			EntityType:  "user",
+			EntityRawId: userId,
+			AppUuid:     applicationId,
+			AccessType:  "owner",
+			GrantedAt:   time.Now().UTC().String(),
+			GrantedBy:   userId,
+		}
+		if err := appAccessStore.Insert(ctx, ownerAccess); err != nil {
+			log.Println("error inserting owner access: ", err.Error())
+		}
+
 		log.Printf("created new appstore application %s for sourceUrl %s", applicationId, application.Source.Url)
 	}
 

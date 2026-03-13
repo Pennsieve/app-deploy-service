@@ -43,5 +43,13 @@ func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTT
 	router.GET("/applications/store", GetAppstoreApplicationsHandler)
 	router.GET("/applications/store/authorize", GetAppStoreAuthorizeHandler)
 
+	// AppStore permission routes
+	router.GET("/applications/store/{id}/permissions", GetAppPermissionsHandler)
+	router.PUT("/applications/store/{id}/permissions", PutAppVisibilityHandler)
+	router.POST("/applications/store/{id}/permissions/users", PostAppGrantUserHandler)
+	router.DELETE("/applications/store/{id}/permissions/users/{userId}", DeleteAppRevokeUserHandler)
+	router.POST("/applications/store/{id}/permissions/teams", PostAppGrantTeamHandler)
+	router.DELETE("/applications/store/{id}/permissions/teams/{teamId}", DeleteAppRevokeTeamHandler)
+
 	return router.Start(ctx, request)
 }
