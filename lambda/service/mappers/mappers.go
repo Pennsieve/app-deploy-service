@@ -5,6 +5,13 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 )
 
+func defaultComputeTypes(ct []string) []string {
+	if len(ct) == 0 {
+		return []string{"standard"}
+	}
+	return ct
+}
+
 func StoreToModel(a store_dynamodb.Application) models.Application {
 	return models.Application{
 		Uuid:                     a.Uuid,
@@ -12,12 +19,11 @@ func StoreToModel(a store_dynamodb.Application) models.Application {
 		ApplicationContainerName: a.ApplicationContainerName,
 		Name:                     a.Name,
 		Description:              a.Description,
-		Resources: models.ApplicationResources{
-			CPU:    a.CPU,
-			Memory: a.Memory,
+		RuntimeConfig: models.RuntimeConfig{
+			CPU:          a.CPU,
+			Memory:       a.Memory,
+			ComputeTypes: defaultComputeTypes(a.ComputeTypes),
 		},
-		RunOnGPU:        a.RunOnGPU,
-		ComputeTypes:    a.ComputeTypes,
 		ApplicationType: a.ApplicationType,
 		Account: models.Account{
 			Uuid:        a.AccountUuid,

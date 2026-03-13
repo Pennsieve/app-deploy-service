@@ -6,9 +6,7 @@ type Application struct {
 	ApplicationContainerName string               `json:"applicationContainerName"`
 	Name                     string               `json:"name"`
 	Description              string               `json:"description"`
-	Resources                ApplicationResources `json:"resources"`                // task level resources
-	RunOnGPU                 bool                 `json:"runOnGpu"`                 // container level requirement
-	ComputeTypes             []string             `json:"computeTypes,omitempty"`   // supported runtimes, e.g. ["ecs", "lambda"]
+	RuntimeConfig            RuntimeConfig        `json:"runtimeConfig"`
 	Account                  Account              `json:"account"`
 	ComputeNode              ComputeNode          `json:"computeNode"`
 	Source                   Source               `json:"source"`
@@ -62,9 +60,10 @@ type Release struct {
 	ID int `json:"id"`
 }
 
-type ApplicationResources struct {
-	CPU    int `json:"cpu"`
-	Memory int `json:"memory"`
+type RuntimeConfig struct {
+	CPU          int      `json:"cpu"`
+	Memory       int      `json:"memory"`
+	ComputeTypes []string `json:"computeTypes,omitempty"`
 }
 
 type ApplicationResponse struct {

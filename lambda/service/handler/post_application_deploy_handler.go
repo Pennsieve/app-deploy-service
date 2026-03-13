@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -130,9 +129,6 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 	securityGroupValue := SecurityGroup
 	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
 	deployertaskDefnContainerValue := DeployerTaskDefContainerName
-
-	runOnGPUKey := "RUN_ON_GPU"
-	runOnGPUValue := strconv.FormatBool(application.RunOnGPU)
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	applicationsStore := store_dynamodb.NewApplicationDatabaseStore(dynamoDBClient, tableValue)
@@ -288,10 +284,6 @@ func PostApplicationDeployHandler(ctx context.Context, request events.APIGateway
 						{
 							Name:  aws.String(deploymentsTableNameKey),
 							Value: aws.String(deploymentsTable),
-						},
-						{
-							Name:  &runOnGPUKey,
-							Value: &runOnGPUValue,
 						},
 						{
 							Name:  &accountsTableKey,
