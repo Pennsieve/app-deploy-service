@@ -15,6 +15,7 @@ type AppAccessTableAPI interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
+	BatchWriteItem(ctx context.Context, params *dynamodb.BatchWriteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error)
 }
 
 type AppAccessDBStore interface {
@@ -23,6 +24,7 @@ type AppAccessDBStore interface {
 	GetAccess(context.Context, string, string) (*AppAccess, error)
 	Insert(context.Context, AppAccess) error
 	Delete(context.Context, string, string) error
+	ReplaceByApp(context.Context, string, []AppAccess) error
 }
 
 type AppAccessDatabaseStore struct {
@@ -127,6 +129,67 @@ func (r *AppAccessDatabaseStore) Insert(ctx context.Context, access AppAccess) e
 	if err != nil {
 		return fmt.Errorf("error inserting app access: %w", err)
 	}
+	return nil
+}
+
+func (r *AppAccessDatabaseStore) ReplaceByApp(ctx context.Context, appUuid string, newEntries []AppAccess) error {
+	existing, err := r.GetByApp(ctx, appUuid)
+	if err != nil {
+		return fmt.Errorf("error fetching existing access entries: %w", err)
+	}
+
+	var writeRequests []types.WriteRequest
+
+	for _, entry := range existing {
+		entityIdAv, err := attributevalue.Marshal(entry.EntityId)
+		if err != nil {
+			return fmt.Errorf("error marshaling entityId for delete: %w", err)
+		}
+		appIdAv, err := attributevalue.Marshal(entry.AppId)
+		if err != nil {
+			return fmt.Errorf("error marshaling appId for delete: %w", err)
+		}
+		writeRequests = append(writeRequests, types.WriteRequest{
+			DeleteRequest: &types.DeleteRequest{
+				Key: map[string]types.AttributeValue{
+					"entityId": entityIdAv,
+					"appId":    appIdAv,
+				},
+			},
+		})
+	}
+
+	for _, entry := range newEntries {
+		item, err := attributevalue.MarshalMap(entry)
+		if err != nil {
+			return fmt.Errorf("error marshaling access entry: %w", err)
+		}
+		writeRequests = append(writeRequests, types.WriteRequest{
+			PutRequest: &types.PutRequest{Item: item},
+		})
+	}
+
+	if len(writeRequests) == 0 {
+		return nil
+	}
+
+	const maxBatchSize = 25
+	for i := 0; i < len(writeRequests); i += maxBatchSize {
+		end := i + maxBatchSize
+		if end > len(writeRequests) {
+			end = len(writeRequests)
+		}
+		batch := writeRequests[i:end]
+		_, err := r.api.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
+			RequestItems: map[string][]types.WriteRequest{
+				r.TableName: batch,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error batch writing app access: %w", err)
+		}
+	}
+
 	return nil
 }
 

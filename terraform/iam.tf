@@ -123,7 +123,8 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
       "dynamodb:Scan",
       "dynamodb:BatchWriteItem",
       "dynamodb:PutItem",
-      "dynamodb:UpdateItem"
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem"
     ]
 
     resources = [

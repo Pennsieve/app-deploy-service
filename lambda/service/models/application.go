@@ -114,11 +114,14 @@ type AppPermissions struct {
 	Access     []AppAccess `json:"access"`
 }
 
-type SetVisibilityRequest struct {
-	Visibility string `json:"visibility"`
+type SetPermissionsRequest struct {
+	Visibility string             `json:"visibility"`
+	Users      []PermissionEntity `json:"users,omitempty"`
+	Teams      []PermissionEntity `json:"teams,omitempty"`
+	Workspaces []PermissionEntity `json:"workspaces,omitempty"`
 }
 
-type GrantAccessRequest struct {
+type PermissionEntity struct {
 	EntityId       string `json:"entityId"`
 	OrganizationId string `json:"organizationId,omitempty"`
 }

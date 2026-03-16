@@ -38,6 +38,10 @@ func (m *mockAppAccessTableAPI) DeleteItem(_ context.Context, _ *dynamodb.Delete
 	return &dynamodb.DeleteItemOutput{}, nil
 }
 
+func (m *mockAppAccessTableAPI) BatchWriteItem(_ context.Context, _ *dynamodb.BatchWriteItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error) {
+	return &dynamodb.BatchWriteItemOutput{}, nil
+}
+
 func newTestClaims(userId string, orgId string, teams []teamUser.Claim) *authorizer.Claims {
 	return &authorizer.Claims{
 		UserClaim: &user.Claim{

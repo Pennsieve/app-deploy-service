@@ -13,9 +13,11 @@ import (
 )
 
 type ArgCaptureAppAccessTableAPI struct {
-	PutItemInput    *dynamodb.PutItemInput
-	QueryInput      *dynamodb.QueryInput
-	DeleteItemInput *dynamodb.DeleteItemInput
+	PutItemInput         *dynamodb.PutItemInput
+	QueryInput           *dynamodb.QueryInput
+	DeleteItemInput      *dynamodb.DeleteItemInput
+	BatchWriteItemInput  *dynamodb.BatchWriteItemInput
+	BatchWriteItemInputs []*dynamodb.BatchWriteItemInput
 
 	QueryOutput *dynamodb.QueryOutput
 }
@@ -36,6 +38,12 @@ func (m *ArgCaptureAppAccessTableAPI) Query(_ context.Context, params *dynamodb.
 func (m *ArgCaptureAppAccessTableAPI) DeleteItem(_ context.Context, params *dynamodb.DeleteItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error) {
 	m.DeleteItemInput = params
 	return &dynamodb.DeleteItemOutput{}, nil
+}
+
+func (m *ArgCaptureAppAccessTableAPI) BatchWriteItem(_ context.Context, params *dynamodb.BatchWriteItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error) {
+	m.BatchWriteItemInput = params
+	m.BatchWriteItemInputs = append(m.BatchWriteItemInputs, params)
+	return &dynamodb.BatchWriteItemOutput{}, nil
 }
 
 func TestAppAccessDatabaseStore_Insert(t *testing.T) {
@@ -200,6 +208,205 @@ func TestAppAccessDatabaseStore_Delete(t *testing.T) {
 
 func TestAppAccessDatabaseStore_ImplementsInterface(t *testing.T) {
 	var _ AppAccessDBStore = (*AppAccessDatabaseStore)(nil)
+}
+
+func TestAppAccessDatabaseStore_ReplaceByApp_EmptyToNew(t *testing.T) {
+	mock := &ArgCaptureAppAccessTableAPI{
+		QueryOutput: &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{},
+			Count: 0,
+		},
+	}
+	store := NewAppAccessDatabaseStore(mock, "test-table")
+
+	newEntries := []AppAccess{
+		{
+			EntityId:    "user#N:user:owner",
+			AppId:       "app#some-uuid",
+			EntityType:  "user",
+			EntityRawId: "N:user:owner",
+			AppUuid:     "some-uuid",
+			AccessType:  "owner",
+			GrantedAt:   "2026-01-01",
+			GrantedBy:   "N:user:owner",
+		},
+		{
+			EntityId:    "user#N:user:shared",
+			AppId:       "app#some-uuid",
+			EntityType:  "user",
+			EntityRawId: "N:user:shared",
+			AppUuid:     "some-uuid",
+			AccessType:  "shared",
+			GrantedAt:   "2026-01-01",
+			GrantedBy:   "N:user:owner",
+		},
+	}
+
+	err := store.ReplaceByApp(context.Background(), "some-uuid", newEntries)
+	require.NoError(t, err)
+
+	require.NotNil(t, mock.BatchWriteItemInput)
+	requests := mock.BatchWriteItemInput.RequestItems["test-table"]
+	assert.Len(t, requests, 2)
+	for _, req := range requests {
+		assert.NotNil(t, req.PutRequest)
+		assert.Nil(t, req.DeleteRequest)
+	}
+}
+
+func TestAppAccessDatabaseStore_ReplaceByApp_ReplacesExisting(t *testing.T) {
+	existing := AppAccess{
+		EntityId:    "user#N:user:old-shared",
+		AppId:       "app#some-uuid",
+		EntityType:  "user",
+		EntityRawId: "N:user:old-shared",
+		AppUuid:     "some-uuid",
+		AccessType:  "shared",
+		GrantedAt:   "2026-01-01",
+		GrantedBy:   "N:user:owner",
+	}
+	item, err := attributevalue.MarshalMap(existing)
+	require.NoError(t, err)
+
+	mock := &ArgCaptureAppAccessTableAPI{
+		QueryOutput: &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{item},
+			Count: 1,
+		},
+	}
+	store := NewAppAccessDatabaseStore(mock, "test-table")
+
+	newEntries := []AppAccess{
+		{
+			EntityId:    "user#N:user:owner",
+			AppId:       "app#some-uuid",
+			EntityType:  "user",
+			EntityRawId: "N:user:owner",
+			AppUuid:     "some-uuid",
+			AccessType:  "owner",
+			GrantedAt:   "2026-01-01",
+			GrantedBy:   "N:user:owner",
+		},
+	}
+
+	err = store.ReplaceByApp(context.Background(), "some-uuid", newEntries)
+	require.NoError(t, err)
+
+	require.NotNil(t, mock.BatchWriteItemInput)
+	requests := mock.BatchWriteItemInput.RequestItems["test-table"]
+	assert.Len(t, requests, 2)
+
+	var deleteCount, putCount int
+	for _, req := range requests {
+		if req.DeleteRequest != nil {
+			deleteCount++
+		}
+		if req.PutRequest != nil {
+			putCount++
+		}
+	}
+	assert.Equal(t, 1, deleteCount)
+	assert.Equal(t, 1, putCount)
+}
+
+func TestAppAccessDatabaseStore_ReplaceByApp_ClearAll(t *testing.T) {
+	existing := AppAccess{
+		EntityId:    "user#N:user:shared",
+		AppId:       "app#some-uuid",
+		EntityType:  "user",
+		EntityRawId: "N:user:shared",
+		AppUuid:     "some-uuid",
+		AccessType:  "shared",
+		GrantedAt:   "2026-01-01",
+		GrantedBy:   "N:user:owner",
+	}
+	item, err := attributevalue.MarshalMap(existing)
+	require.NoError(t, err)
+
+	mock := &ArgCaptureAppAccessTableAPI{
+		QueryOutput: &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{item},
+			Count: 1,
+		},
+	}
+	store := NewAppAccessDatabaseStore(mock, "test-table")
+
+	err = store.ReplaceByApp(context.Background(), "some-uuid", []AppAccess{})
+	require.NoError(t, err)
+
+	require.NotNil(t, mock.BatchWriteItemInput)
+	requests := mock.BatchWriteItemInput.RequestItems["test-table"]
+	assert.Len(t, requests, 1)
+	assert.NotNil(t, requests[0].DeleteRequest)
+}
+
+func TestAppAccessDatabaseStore_ReplaceByApp_NoExistingNoNew(t *testing.T) {
+	mock := &ArgCaptureAppAccessTableAPI{
+		QueryOutput: &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{},
+			Count: 0,
+		},
+	}
+	store := NewAppAccessDatabaseStore(mock, "test-table")
+
+	err := store.ReplaceByApp(context.Background(), "some-uuid", []AppAccess{})
+	require.NoError(t, err)
+	assert.Nil(t, mock.BatchWriteItemInput)
+}
+
+func TestAppAccessDatabaseStore_ReplaceByApp_WithWorkspace(t *testing.T) {
+	mock := &ArgCaptureAppAccessTableAPI{
+		QueryOutput: &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{},
+			Count: 0,
+		},
+	}
+	store := NewAppAccessDatabaseStore(mock, "test-table")
+
+	newEntries := []AppAccess{
+		{
+			EntityId:    "user#N:user:owner",
+			AppId:       "app#some-uuid",
+			EntityType:  "user",
+			EntityRawId: "N:user:owner",
+			AppUuid:     "some-uuid",
+			AccessType:  "owner",
+			GrantedAt:   "2026-01-01",
+			GrantedBy:   "N:user:owner",
+		},
+		{
+			EntityId:       "workspace#N:org:org1",
+			AppId:          "app#some-uuid",
+			EntityType:     "workspace",
+			EntityRawId:    "N:org:org1",
+			AppUuid:        "some-uuid",
+			AccessType:     "workspace",
+			OrganizationId: "N:org:org1",
+			GrantedAt:      "2026-01-01",
+			GrantedBy:      "N:user:owner",
+		},
+		{
+			EntityId:       "team#N:team:team1",
+			AppId:          "app#some-uuid",
+			EntityType:     "team",
+			EntityRawId:    "N:team:team1",
+			AppUuid:        "some-uuid",
+			AccessType:     "shared",
+			OrganizationId: "N:org:org1",
+			GrantedAt:      "2026-01-01",
+			GrantedBy:      "N:user:owner",
+		},
+	}
+
+	err := store.ReplaceByApp(context.Background(), "some-uuid", newEntries)
+	require.NoError(t, err)
+
+	require.NotNil(t, mock.BatchWriteItemInput)
+	requests := mock.BatchWriteItemInput.RequestItems["test-table"]
+	assert.Len(t, requests, 3)
+	for _, req := range requests {
+		assert.NotNil(t, req.PutRequest)
+	}
 }
 
 func TestAppAccess_MarshalRoundTrip(t *testing.T) {

@@ -88,8 +88,8 @@ func GetAppPermissionsHandler(ctx context.Context, request events.APIGatewayV2HT
 	}, nil
 }
 
-func PutAppVisibilityHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	handlerName := "PutAppVisibilityHandler"
+func PutAppPermissionsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	handlerName := "PutAppPermissionsHandler"
 
 	appId := request.PathParameters["id"]
 
@@ -101,7 +101,7 @@ func PutAppVisibilityHandler(ctx context.Context, request events.APIGatewayV2HTT
 		}, nil
 	}
 
-	var req models.SetVisibilityRequest
+	var req models.SetPermissionsRequest
 	if err := json.Unmarshal([]byte(request.Body), &req); err != nil {
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusBadRequest,
@@ -126,6 +126,7 @@ func PutAppVisibilityHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	appStoreStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, os.Getenv(appstoreApplicationsTableNameKey))
+	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, os.Getenv(appAccessTableNameKey))
 
 	app, err := appStoreStore.GetById(ctx, appId)
 	if err != nil || app == nil {
@@ -150,285 +151,89 @@ func PutAppVisibilityHandler(ctx context.Context, request events.APIGatewayV2HTT
 		}, nil
 	}
 
-	resp := models.ApplicationResponse{Message: fmt.Sprintf("visibility updated to %s", req.Visibility)}
-	m, _ := json.Marshal(resp)
-	return events.APIGatewayV2HTTPResponse{
-		StatusCode: http.StatusOK,
-		Body:       string(m),
-	}, nil
-}
+	now := time.Now().UTC().String()
+	grantedBy := claims.UserClaim.NodeId
 
-func PostAppGrantUserHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	handlerName := "PostAppGrantUserHandler"
+	var accessEntries []store_dynamodb.AppAccess
 
-	appId := request.PathParameters["id"]
+	accessEntries = append(accessEntries, store_dynamodb.AppAccess{
+		EntityId:    fmt.Sprintf("user#%s", app.OwnerId),
+		AppId:       fmt.Sprintf("app#%s", appId),
+		EntityType:  "user",
+		EntityRawId: app.OwnerId,
+		AppUuid:     appId,
+		AccessType:  "owner",
+		GrantedAt:   now,
+		GrantedBy:   grantedBy,
+	})
 
-	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, ErrNotPermitted),
-		}, nil
+	for _, u := range req.Users {
+		if u.EntityId == app.OwnerId {
+			continue
+		}
+		accessEntries = append(accessEntries, store_dynamodb.AppAccess{
+			EntityId:       fmt.Sprintf("user#%s", u.EntityId),
+			AppId:          fmt.Sprintf("app#%s", appId),
+			EntityType:     "user",
+			EntityRawId:    u.EntityId,
+			AppUuid:        appId,
+			AccessType:     "shared",
+			OrganizationId: u.OrganizationId,
+			GrantedAt:      now,
+			GrantedBy:      grantedBy,
+		})
 	}
 
-	var req models.GrantAccessRequest
-	if err := json.Unmarshal([]byte(request.Body), &req); err != nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusBadRequest,
-			Body:       handlerError(handlerName, ErrUnmarshaling),
-		}, nil
+	for _, t := range req.Teams {
+		accessEntries = append(accessEntries, store_dynamodb.AppAccess{
+			EntityId:       fmt.Sprintf("team#%s", t.EntityId),
+			AppId:          fmt.Sprintf("app#%s", appId),
+			EntityType:     "team",
+			EntityRawId:    t.EntityId,
+			AppUuid:        appId,
+			AccessType:     "shared",
+			OrganizationId: t.OrganizationId,
+			GrantedAt:      now,
+			GrantedBy:      grantedBy,
+		})
 	}
 
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrConfig),
-		}, nil
+	for _, w := range req.Workspaces {
+		accessEntries = append(accessEntries, store_dynamodb.AppAccess{
+			EntityId:       fmt.Sprintf("workspace#%s", w.EntityId),
+			AppId:          fmt.Sprintf("app#%s", appId),
+			EntityType:     "workspace",
+			EntityRawId:    w.EntityId,
+			AppUuid:        appId,
+			AccessType:     "workspace",
+			OrganizationId: w.OrganizationId,
+			GrantedAt:      now,
+			GrantedBy:      grantedBy,
+		})
 	}
 
-	dynamoDBClient := dynamodb.NewFromConfig(cfg)
-	appStoreStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, os.Getenv(appstoreApplicationsTableNameKey))
-	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, os.Getenv(appAccessTableNameKey))
-
-	app, err := appStoreStore.GetById(ctx, appId)
-	if err != nil || app == nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusNotFound,
-			Body:       handlerError(handlerName, ErrAppNotFound),
-		}, nil
-	}
-
-	if !IsAppOwner(ctx, claims, app) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusForbidden,
-			Body:       handlerError(handlerName, ErrNotOwner),
-		}, nil
-	}
-
-	access := store_dynamodb.AppAccess{
-		EntityId:       fmt.Sprintf("user#%s", req.EntityId),
-		AppId:          fmt.Sprintf("app#%s", appId),
-		EntityType:     "user",
-		EntityRawId:    req.EntityId,
-		AppUuid:        appId,
-		AccessType:     "shared",
-		OrganizationId: req.OrganizationId,
-		GrantedAt:      time.Now().UTC().String(),
-		GrantedBy:      claims.UserClaim.NodeId,
-	}
-
-	if err := appAccessStore.Insert(ctx, access); err != nil {
-		log.Printf("%s: error granting access: %v", handlerName, err)
+	if err := appAccessStore.ReplaceByApp(ctx, appId, accessEntries); err != nil {
+		log.Printf("%s: error replacing access entries: %v", handlerName, err)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       handlerError(handlerName, ErrDynamoDB),
 		}, nil
 	}
 
-	resp := models.ApplicationResponse{Message: "access granted"}
-	m, _ := json.Marshal(resp)
-	return events.APIGatewayV2HTTPResponse{
-		StatusCode: http.StatusOK,
-		Body:       string(m),
-	}, nil
-}
-
-func DeleteAppRevokeUserHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	handlerName := "DeleteAppRevokeUserHandler"
-
-	appId := request.PathParameters["id"]
-	targetUserId := request.PathParameters["userId"]
-
-	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, ErrNotPermitted),
-		}, nil
+	permissions := models.AppPermissions{
+		Visibility: req.Visibility,
+		OwnerId:    app.OwnerId,
+		Access:     mappers.AppAccessItemsToModels(accessEntries),
 	}
 
-	cfg, err := config.LoadDefaultConfig(ctx)
+	m, err := json.Marshal(permissions)
 	if err != nil {
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrConfig),
+			Body:       handlerError(handlerName, ErrMarshaling),
 		}, nil
 	}
 
-	dynamoDBClient := dynamodb.NewFromConfig(cfg)
-	appStoreStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, os.Getenv(appstoreApplicationsTableNameKey))
-	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, os.Getenv(appAccessTableNameKey))
-
-	app, err := appStoreStore.GetById(ctx, appId)
-	if err != nil || app == nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusNotFound,
-			Body:       handlerError(handlerName, ErrAppNotFound),
-		}, nil
-	}
-
-	if !IsAppOwner(ctx, claims, app) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusForbidden,
-			Body:       handlerError(handlerName, ErrNotOwner),
-		}, nil
-	}
-
-	if targetUserId == app.OwnerId {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusBadRequest,
-			Body:       handlerError(handlerName, ErrCannotRevokeOwner),
-		}, nil
-	}
-
-	entityId := fmt.Sprintf("user#%s", targetUserId)
-	appIdKey := fmt.Sprintf("app#%s", appId)
-	if err := appAccessStore.Delete(ctx, entityId, appIdKey); err != nil {
-		log.Printf("%s: error revoking access: %v", handlerName, err)
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrDynamoDB),
-		}, nil
-	}
-
-	resp := models.ApplicationResponse{Message: "access revoked"}
-	m, _ := json.Marshal(resp)
-	return events.APIGatewayV2HTTPResponse{
-		StatusCode: http.StatusOK,
-		Body:       string(m),
-	}, nil
-}
-
-func PostAppGrantTeamHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	handlerName := "PostAppGrantTeamHandler"
-
-	appId := request.PathParameters["id"]
-
-	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, ErrNotPermitted),
-		}, nil
-	}
-
-	var req models.GrantAccessRequest
-	if err := json.Unmarshal([]byte(request.Body), &req); err != nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusBadRequest,
-			Body:       handlerError(handlerName, ErrUnmarshaling),
-		}, nil
-	}
-
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrConfig),
-		}, nil
-	}
-
-	dynamoDBClient := dynamodb.NewFromConfig(cfg)
-	appStoreStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, os.Getenv(appstoreApplicationsTableNameKey))
-	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, os.Getenv(appAccessTableNameKey))
-
-	app, err := appStoreStore.GetById(ctx, appId)
-	if err != nil || app == nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusNotFound,
-			Body:       handlerError(handlerName, ErrAppNotFound),
-		}, nil
-	}
-
-	if !IsAppOwner(ctx, claims, app) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusForbidden,
-			Body:       handlerError(handlerName, ErrNotOwner),
-		}, nil
-	}
-
-	access := store_dynamodb.AppAccess{
-		EntityId:       fmt.Sprintf("team#%s", req.EntityId),
-		AppId:          fmt.Sprintf("app#%s", appId),
-		EntityType:     "team",
-		EntityRawId:    req.EntityId,
-		AppUuid:        appId,
-		AccessType:     "shared",
-		OrganizationId: req.OrganizationId,
-		GrantedAt:      time.Now().UTC().String(),
-		GrantedBy:      claims.UserClaim.NodeId,
-	}
-
-	if err := appAccessStore.Insert(ctx, access); err != nil {
-		log.Printf("%s: error granting team access: %v", handlerName, err)
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrDynamoDB),
-		}, nil
-	}
-
-	resp := models.ApplicationResponse{Message: "team access granted"}
-	m, _ := json.Marshal(resp)
-	return events.APIGatewayV2HTTPResponse{
-		StatusCode: http.StatusOK,
-		Body:       string(m),
-	}, nil
-}
-
-func DeleteAppRevokeTeamHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	handlerName := "DeleteAppRevokeTeamHandler"
-
-	appId := request.PathParameters["id"]
-	teamId := request.PathParameters["teamId"]
-
-	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, ErrNotPermitted),
-		}, nil
-	}
-
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrConfig),
-		}, nil
-	}
-
-	dynamoDBClient := dynamodb.NewFromConfig(cfg)
-	appStoreStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, os.Getenv(appstoreApplicationsTableNameKey))
-	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, os.Getenv(appAccessTableNameKey))
-
-	app, err := appStoreStore.GetById(ctx, appId)
-	if err != nil || app == nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusNotFound,
-			Body:       handlerError(handlerName, ErrAppNotFound),
-		}, nil
-	}
-
-	if !IsAppOwner(ctx, claims, app) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusForbidden,
-			Body:       handlerError(handlerName, ErrNotOwner),
-		}, nil
-	}
-
-	entityId := fmt.Sprintf("team#%s", teamId)
-	appIdKey := fmt.Sprintf("app#%s", appId)
-	if err := appAccessStore.Delete(ctx, entityId, appIdKey); err != nil {
-		log.Printf("%s: error revoking team access: %v", handlerName, err)
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrDynamoDB),
-		}, nil
-	}
-
-	resp := models.ApplicationResponse{Message: "team access revoked"}
-	m, _ := json.Marshal(resp)
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: http.StatusOK,
 		Body:       string(m),
