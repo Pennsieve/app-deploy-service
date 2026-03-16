@@ -25,7 +25,7 @@ resource "aws_lambda_function" "service_lambda" {
       TASK_DEF_ARN                     = aws_ecs_task_definition.app_provisioner_ecs_task_definition.arn,
       DEPLOYER_TASK_DEF_ARN            = aws_ecs_task_definition.app_deployer_ecs_task_definition.arn,
       CLUSTER_ARN                      = data.terraform_remote_state.fargate.outputs.ecs_cluster_arn,
-      SUBNET_IDS = join(",", data.terraform_remote_state.vpc.outputs.private_subnet_ids),
+      SUBNET_IDS                       = join(",", data.terraform_remote_state.vpc.outputs.private_subnet_ids),
       SECURITY_GROUP                   = data.terraform_remote_state.platform_infrastructure.outputs.rehydration_fargate_security_group_id,
       LOG_LEVEL                        = "info",
       TASK_DEF_CONTAINER_NAME          = var.tier,
@@ -34,6 +34,7 @@ resource "aws_lambda_function" "service_lambda" {
       APPSTORE_APPLICATIONS_TABLE      = aws_dynamodb_table.appstore_applications_table.name,
       APPSTORE_VERSIONS_TABLE          = aws_dynamodb_table.appstore_versions_table.name,
       DEPLOYMENTS_TABLE                = aws_dynamodb_table.deployments_table.name,
+      APP_ACCESS_TABLE                 = aws_dynamodb_table.app_access_table.name,
       ACCOUNTS_TABLE                   = data.terraform_remote_state.account_service.outputs.accounts_table_name
     }
   }
@@ -60,9 +61,9 @@ resource "aws_lambda_function" "status_lambda" {
 
   environment {
     variables = {
-      ENV                = var.environment_name,
-      REGION             = var.aws_region,
-      LOG_LEVEL          = "info",
+      ENV                         = var.environment_name,
+      REGION                      = var.aws_region,
+      LOG_LEVEL                   = "info",
       APPLICATIONS_TABLE          = aws_dynamodb_table.applications_table.name,
       APPSTORE_APPLICATIONS_TABLE = aws_dynamodb_table.appstore_applications_table.name,
       DEPLOYMENTS_TABLE           = aws_dynamodb_table.deployments_table.name

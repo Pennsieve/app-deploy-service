@@ -123,7 +123,8 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
       "dynamodb:Scan",
       "dynamodb:BatchWriteItem",
       "dynamodb:PutItem",
-      "dynamodb:UpdateItem"
+      "dynamodb:UpdateItem",
+      "dynamodb:DeleteItem"
     ]
 
     resources = [
@@ -134,7 +135,9 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
       aws_dynamodb_table.appstore_versions_table.arn,
       "${aws_dynamodb_table.appstore_versions_table.arn}/*",
       aws_dynamodb_table.deployments_table.arn,
-      "${aws_dynamodb_table.deployments_table.arn}/*"
+      "${aws_dynamodb_table.deployments_table.arn}/*",
+      aws_dynamodb_table.app_access_table.arn,
+      "${aws_dynamodb_table.app_access_table.arn}/*"
     ]
 
   }
@@ -462,12 +465,12 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
     sid    = "PublicECRRepoPush"
     effect = "Allow"
     actions = [
-        "ecr-public:GetAuthorizationToken",
-        "ecr-public:BatchCheckLayerAvailability",
-        "ecr-public:PutImage",
-        "ecr-public:InitiateLayerUpload",
-        "ecr-public:UploadLayerPart",
-        "ecr-public:CompleteLayerUpload"
+      "ecr-public:GetAuthorizationToken",
+      "ecr-public:BatchCheckLayerAvailability",
+      "ecr-public:PutImage",
+      "ecr-public:InitiateLayerUpload",
+      "ecr-public:UploadLayerPart",
+      "ecr-public:CompleteLayerUpload"
     ]
     resources = ["*"]
   }
