@@ -37,7 +37,7 @@ resource "aws_apigatewayv2_api" "app_deploy_service_api" {
 
 resource "aws_apigatewayv2_api_mapping" "app_deploy_service_api_map" {
   api_id          = aws_apigatewayv2_api.app_deploy_service_api.id
-  domain_name     = data.terraform_remote_state.api_gateway.outputs.api_domain_name
+  domain_name     = var.api_domain_name
   stage           = aws_apigatewayv2_stage.app_deploy_service_gateway_stage.id
   api_mapping_key = "applications"
 }
