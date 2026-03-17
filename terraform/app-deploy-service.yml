@@ -47,6 +47,18 @@ components:
         type: "request"
         enableSimpleResponses: true
         authorizerCredentials: ${gateway_authorizer_role}
+    token_workspace_auth:
+      type: "apiKey"
+      name: "Unused"
+      in: "header"
+      x-amazon-apigateway-authorizer:
+        identitySource: "$request.header.Authorization,$request.querystring.organization_id"
+        authorizerUri: ${authorize_lambda_invoke_uri}
+        authorizerPayloadFormatVersion: "2.0"
+        authorizerResultTtlInSeconds: 300
+        type: "request"
+        enableSimpleResponses: true
+        authorizerCredentials: ${gateway_authorizer_role}
   responses:
     Unauthorized:
       description: Incorrect authentication or user has incorrect permissions.
@@ -115,11 +127,18 @@ paths:
     get:
       summary: List applications
       description: Get a list of applications
+      parameters:
+        - in: query
+          name: organization_id
+          schema:
+            type: string
+          required: true
+          description: The organization ID.
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: getApplications
       security:
-        - token_auth: []
+        - token_workspace_auth: []
       tags:
         - Applications
       responses:
@@ -211,12 +230,12 @@ paths:
   /{id}/deployments:
     get:
       summary: List deployments
-      description: Get deployments for an application
+      description: Get the deployment history for an application
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: getDeployments
       security:
-        - token_auth: []
+        - token_workspace_auth: []
       tags:
         - Deployments
       parameters:
@@ -226,6 +245,12 @@ paths:
           schema:
             type: string
           description: The application ID
+        - in: query
+          name: organization_id
+          required: true
+          schema:
+            type: string
+          description: The node id of the application's workspace
       responses:
         '200':
           description: List of deployments
@@ -238,12 +263,12 @@ paths:
   /{id}/deployments/{deploymentId}:
     get:
       summary: Get deployment
-      description: Get a specific deployment for an application
+      description: Get the details for a specific application deployment
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: getDeployment
       security:
-        - token_auth: []
+        - token_workspace_auth: []
       tags:
         - Deployments
       parameters:
@@ -259,6 +284,12 @@ paths:
           schema:
             type: string
           description: The deployment ID
+        - in: query
+          name: organization_id
+          required: true
+          schema:
+            type: string
+          description: The node id of the application's workspace
       responses:
         '200':
           description: The requested deployment
