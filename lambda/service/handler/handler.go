@@ -29,23 +29,23 @@ func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	router := NewLambdaRouter()
 	// register routes based on their supported methods
-	router.POST("/applications", PostApplicationsHandler)
-	router.GET("/applications", GetApplicationsHandler)
-	router.GET("/applications/{id}", GetApplicationHandler)
-	router.GET("/applications/{id}/deployments", GetDeploymentsHandler)
-	router.GET("/applications/{id}/deployments/{deploymentId}", GetDeploymentHandler)
-	router.DELETE("/applications/{id}", DeleteApplicationHandler)
-	router.PUT("/applications/{id}", PutApplicationsHandler)
-	router.POST("/applications/deploy", PostApplicationDeployHandler)
+	router.POST("/", PostApplicationsHandler)
+	router.GET("/", GetApplicationsHandler)
+	router.GET("/{id}", GetApplicationHandler)
+	router.GET("/{id}/deployments", GetDeploymentsHandler)
+	router.GET("/{id}/deployments/{deploymentId}", GetDeploymentHandler)
+	router.DELETE("/{id}", DeleteApplicationHandler)
+	router.PUT("/{id}", PutApplicationsHandler)
+	router.POST("/deploy", PostApplicationDeployHandler)
 
 	// AppStore routes
-	router.POST("/applications/store", PostAppStoreHandler)
-	router.GET("/applications/store", GetAppstoreApplicationsHandler)
-	router.GET("/applications/store/authorize", GetAppStoreAuthorizeHandler)
+	router.POST("/store", PostAppStoreHandler)
+	router.GET("/store", GetAppstoreApplicationsHandler)
+	router.GET("/store/authorize", GetAppStoreAuthorizeHandler)
 
 	// AppStore permission routes
-	router.GET("/applications/store/{id}/permissions", GetAppPermissionsHandler)
-	router.PUT("/applications/store/{id}/permissions", PutAppPermissionsHandler)
+	router.GET("/store/{id}/permissions", GetAppPermissionsHandler)
+	router.PUT("/store/{id}/permissions", PutAppPermissionsHandler)
 
 	return router.Start(ctx, request)
 }
