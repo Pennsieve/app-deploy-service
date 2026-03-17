@@ -41,6 +41,10 @@ variable "lambda_bucket" {
   default = "pennsieve-cc-lambda-functions-use1"
 }
 
+variable "api_domain_name" {
+  default = "api2.pennsieve.net"
+}
+
 variable "deployer_image_url" {
   default = "gcr.io/kaniko-project/executor"
 }
