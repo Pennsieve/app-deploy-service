@@ -5,6 +5,17 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 )
 
+func mapRepoConfig(a store_dynamodb.Application) *models.PennsieveConfig {
+	if len(a.ExecutionTargets) == 0 && a.DefaultCPU == 0 && a.DefaultMemory == 0 {
+		return nil
+	}
+	return &models.PennsieveConfig{
+		ExecutionTargets: a.ExecutionTargets,
+		DefaultCPU:       a.DefaultCPU,
+		DefaultMemory:    a.DefaultMemory,
+	}
+}
+
 func defaultComputeTypes(ct []string) []string {
 	if len(ct) == 0 {
 		return []string{"standard"}
@@ -49,6 +60,8 @@ func StoreToModel(a store_dynamodb.Application) models.Application {
 		OrganizationId:   a.OrganizationId,
 		UserId:           a.UserId,
 		Status:           a.Status,
+		Readme:           a.Readme,
+		RepoConfig:       mapRepoConfig(a),
 	}
 }
 

@@ -41,6 +41,11 @@ type Application struct {
 	CommandArguments interface{} `dynamodbav:"commandArguments"`
 
 	Status string `dynamodbav:"registrationStatus"`
+
+	Readme           string   `dynamodbav:"readme,omitempty"`
+	ExecutionTargets []string `dynamodbav:"executionTargets,omitempty"`
+	DefaultCPU       int      `dynamodbav:"defaultCPU,omitempty"`
+	DefaultMemory    int      `dynamodbav:"defaultMemory,omitempty"`
 }
 
 type ApplicationKey struct {
