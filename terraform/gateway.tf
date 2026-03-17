@@ -3,7 +3,7 @@ data "terraform_remote_state" "api_gateway" {
 
   config = {
     bucket  = "${var.aws_account}-terraform-state"
-    key     = "aws/${data.aws_region.current_region.name}/${var.vpc_name}/${var.environment_name}/gateway-v2/terraform.tfstate"
+    key     = "aws/${data.aws_region.current_region.name}/${var.vpc_name}/${var.environment_name}/pennsieve-go-api/terraform.tfstate"
     region  = "us-east-1"
     profile = var.aws_account
   }
