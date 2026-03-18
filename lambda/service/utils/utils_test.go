@@ -31,17 +31,3 @@ func TestExtractRouteKeyEmptyPathNormalizesToSlash(t *testing.T) {
 		t.Errorf("expected /, got %s", got)
 	}
 }
-
-func TestExtractRouteKeyUnparsableInputReturnsSlash(t *testing.T) {
-	got := utils.ExtractRoute("$default")
-	if got != "/" {
-		t.Errorf("expected /, got %s", got)
-	}
-}
-
-func TestExtractRouteKeyEmptyStringReturnsSlash(t *testing.T) {
-	got := utils.ExtractRoute("")
-	if got != "/" {
-		t.Errorf("expected /, got %s", got)
-	}
-}

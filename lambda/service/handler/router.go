@@ -54,16 +54,7 @@ func (r *LambdaRouter) PUT(routeKey string, handler RouterHandlerFunc) {
 
 func (r *LambdaRouter) Start(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	log.Println(request)
-
-	var routeKey string
-	if request.RouteKey == "$default" {
-		routeKey = request.RawPath
-		if routeKey == "" {
-			routeKey = "/"
-		}
-	} else {
-		routeKey = utils.ExtractRoute(request.RouteKey)
-	}
+	routeKey := utils.ExtractRoute(request.RouteKey)
 
 	switch request.RequestContext.HTTP.Method {
 	case http.MethodPost:
