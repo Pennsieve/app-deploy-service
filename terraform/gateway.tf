@@ -74,6 +74,12 @@ resource "aws_apigatewayv2_integration" "app_deploy_service_integration" {
   integration_uri    = aws_lambda_function.service_lambda.invoke_arn
 }
 
+resource "aws_apigatewayv2_route" "app_deploy_service_default_route" {
+  api_id    = aws_apigatewayv2_api.app_deploy_service_api.id
+  route_key = "$default"
+  target    = "integrations/${aws_apigatewayv2_integration.app_deploy_service_integration.id}"
+}
+
 resource "aws_lambda_permission" "app_deploy_service_lambda_permission" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
