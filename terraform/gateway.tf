@@ -66,6 +66,13 @@ resource "aws_apigatewayv2_stage" "app_deploy_service_gateway_stage" {
   }
 }
 
+resource "aws_apigatewayv2_integration" "app_deploy_service_integration" {
+  api_id             = aws_apigatewayv2_api.app_deploy_service_api.id
+  integration_type   = "AWS_PROXY"
+  connection_type    = "INTERNET"
+  integration_method = "POST"
+  integration_uri    = aws_lambda_function.service_lambda.invoke_arn
+}
 
 resource "aws_lambda_permission" "app_deploy_service_lambda_permission" {
   statement_id  = "AllowExecutionFromAPIGateway"

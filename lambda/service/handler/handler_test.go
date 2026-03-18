@@ -30,8 +30,8 @@ func stubHandler(_ context.Context, _ events.APIGatewayV2HTTPRequest) (events.AP
 
 func newTestRouter() Router {
 	router := NewLambdaRouter()
-	router.POST("/", stubHandler)
-	router.GET("/", stubHandler)
+	router.POST("", stubHandler)
+	router.GET("", stubHandler)
 	router.GET("/{id}", stubHandler)
 	router.GET("/{id}/deployments", stubHandler)
 	router.GET("/{id}/deployments/{deploymentId}", stubHandler)
@@ -70,12 +70,9 @@ func TestRouteMatching(t *testing.T) {
 		rawPath  string
 		params   map[string]string
 	}{
-		// root routes: /applications/ (with trailing slash)
-		{"POST root with slash", "POST", "POST /", "/", nil},
-		{"GET root with slash", "GET", "GET /", "/", nil},
-		// root routes: /applications (without trailing slash) - normalized to "/"
-		{"POST root without slash", "POST", "POST ", "", nil},
-		{"GET root without slash", "GET", "GET ", "", nil},
+		// root routes (updated from "/" to "")
+		{"POST root", "POST", "POST ", "", nil},
+		{"GET root", "GET", "GET ", "", nil},
 
 		// application routes
 		{"GET app by id", "GET", "GET /{id}", "/123", map[string]string{"id": "123"}},
@@ -110,47 +107,6 @@ func TestRouteMatching(t *testing.T) {
 	}
 }
 
-func TestDefaultRouteFallThrough(t *testing.T) {
-	router := newTestRouter()
-
-	tests := []struct {
-		name    string
-		method  string
-		rawPath string
-	}{
-		{"GET root", "GET", "/"},
-		{"POST root", "POST", "/"},
-		{"GET app by id", "GET", "/abc-123"},
-		{"DELETE app by id", "DELETE", "/abc-123"},
-		{"PUT app by id", "PUT", "/abc-123"},
-		{"GET deployments", "GET", "/abc/deployments"},
-		{"GET deployment by id", "GET", "/abc/deployments/def"},
-		{"POST deploy", "POST", "/deploy"},
-		{"POST store", "POST", "/store"},
-		{"GET store", "GET", "/store"},
-		{"GET store authorize", "GET", "/store/authorize"},
-		{"GET store permissions", "GET", "/store/abc/permissions"},
-		{"PUT store permissions", "PUT", "/store/abc/permissions"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			request := newRequest(tt.method, "$default", tt.rawPath, nil)
-			resp, err := router.Start(context.Background(), request)
-			assert.NoError(t, err)
-			assert.Equal(t, http.StatusOK, resp.StatusCode, "fall-through route should match and return OK")
-			assert.Equal(t, "ok", resp.Body)
-		})
-	}
-}
-
-func TestDefaultRouteUnknownPathReturnsNotFound(t *testing.T) {
-	router := newTestRouter()
-	request := newRequest("GET", "$default", "/totally/unknown/path", nil)
-	resp, _ := router.Start(context.Background(), request)
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-}
-
 func TestUnknownRoutePerMethod(t *testing.T) {
 	router := newTestRouter()
 
@@ -171,6 +127,27 @@ func TestUnknownRoutePerMethod(t *testing.T) {
 			resp, _ := router.Start(context.Background(), request)
 			assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 			assert.Equal(t, ErrUnsupportedRoute.Error(), resp.Body)
+		})
+	}
+}
+
+func TestOldRootRouteNoLongerMatches(t *testing.T) {
+	router := newTestRouter()
+
+	tests := []struct {
+		name     string
+		method   string
+		routeKey string
+	}{
+		{"POST old root /", "POST", "POST /"},
+		{"GET old root /", "GET", "GET /"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := newRequest(tt.method, tt.routeKey, "/", nil)
+			resp, _ := router.Start(context.Background(), request)
+			assert.Equal(t, http.StatusNotFound, resp.StatusCode, "old '/' route should no longer match")
 		})
 	}
 }
