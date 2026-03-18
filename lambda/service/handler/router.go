@@ -54,18 +54,45 @@ func (r *LambdaRouter) PUT(routeKey string, handler RouterHandlerFunc) {
 
 func (r *LambdaRouter) Start(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	log.Println(request)
-	routeKey := utils.ExtractRoute(request.RouteKey)
 
-	var routes map[string]RouterHandlerFunc
+	var routeKey string
+	if request.RouteKey == "$default" {
+		routeKey = request.RawPath
+		if routeKey == "" {
+			routeKey = "/"
+		}
+	} else {
+		routeKey = utils.ExtractRoute(request.RouteKey)
+	}
+
 	switch request.RequestContext.HTTP.Method {
 	case http.MethodPost:
-		routes = r.postRoutes
+		f, ok := r.postRoutes[routeKey]
+		if ok {
+			return f(ctx, request)
+		} else {
+			return handleError()
+		}
 	case http.MethodGet:
-		routes = r.getRoutes
+		f, ok := r.getRoutes[routeKey]
+		if ok {
+			return f(ctx, request)
+		} else {
+			return handleError()
+		}
 	case http.MethodDelete:
-		routes = r.deleteRoutes
+		f, ok := r.deleteRoutes[routeKey]
+		if ok {
+			return f(ctx, request)
+		} else {
+			return handleError()
+		}
 	case http.MethodPut:
-		routes = r.putRoutes
+		if f, ok := r.putRoutes[routeKey]; ok {
+			return f(ctx, request)
+		} else {
+			return handleError()
+		}
 	default:
 		log.Println(ErrUnsupportedPath.Error())
 		return events.APIGatewayV2HTTPResponse{
@@ -73,39 +100,6 @@ func (r *LambdaRouter) Start(ctx context.Context, request events.APIGatewayV2HTT
 			Body:       ErrUnsupportedPath.Error(),
 		}, nil
 	}
-
-	if f, ok := routes[routeKey]; ok {
-		return f(ctx, request)
-	}
-
-	if routeKey == "$default" {
-		return r.matchByPath(ctx, request, routes)
-	}
-
-	return handleError()
-}
-
-func (r *LambdaRouter) matchByPath(ctx context.Context, request events.APIGatewayV2HTTPRequest, routes map[string]RouterHandlerFunc) (events.APIGatewayV2HTTPResponse, error) {
-	path := request.RawPath
-	patterns := make([]string, 0, len(routes))
-	for p := range routes {
-		patterns = append(patterns, p)
-	}
-
-	matched, params, ok := utils.MatchRoute(path, patterns)
-	if !ok {
-		return handleError()
-	}
-
-	if request.PathParameters == nil {
-		request.PathParameters = params
-	} else {
-		for k, v := range params {
-			request.PathParameters[k] = v
-		}
-	}
-
-	return routes[matched](ctx, request)
 }
 
 func handleError() (events.APIGatewayV2HTTPResponse, error) {
