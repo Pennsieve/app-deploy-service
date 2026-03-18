@@ -107,7 +107,7 @@ components:
                 type: string
 x-amazon-apigateway-importexport-version: "1.0"
 paths:
-  /$default:
+  $default:
     x-amazon-apigateway-any-method:
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
