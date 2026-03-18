@@ -113,7 +113,7 @@ paths:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       security:
         - token_workspace_auth: []
-  /:
+  /v1:
     post:
       summary: Create application
       description: Create a new application
