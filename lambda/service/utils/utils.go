@@ -7,5 +7,12 @@ import (
 func ExtractRoute(requestRouteKey string) string {
 	r := regexp.MustCompile(`(?P<method>) (?P<pathKey>.*)`)
 	routeKeyParts := r.FindStringSubmatch(requestRouteKey)
-	return routeKeyParts[r.SubexpIndex("pathKey")]
+	if len(routeKeyParts) == 0 {
+		return "/"
+	}
+	pathKey := routeKeyParts[r.SubexpIndex("pathKey")]
+	if pathKey == "" {
+		return "/"
+	}
+	return pathKey
 }
