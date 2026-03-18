@@ -110,6 +110,47 @@ func TestRouteMatching(t *testing.T) {
 	}
 }
 
+func TestDefaultRouteFallThrough(t *testing.T) {
+	router := newTestRouter()
+
+	tests := []struct {
+		name    string
+		method  string
+		rawPath string
+	}{
+		{"GET root", "GET", "/"},
+		{"POST root", "POST", "/"},
+		{"GET app by id", "GET", "/abc-123"},
+		{"DELETE app by id", "DELETE", "/abc-123"},
+		{"PUT app by id", "PUT", "/abc-123"},
+		{"GET deployments", "GET", "/abc/deployments"},
+		{"GET deployment by id", "GET", "/abc/deployments/def"},
+		{"POST deploy", "POST", "/deploy"},
+		{"POST store", "POST", "/store"},
+		{"GET store", "GET", "/store"},
+		{"GET store authorize", "GET", "/store/authorize"},
+		{"GET store permissions", "GET", "/store/abc/permissions"},
+		{"PUT store permissions", "PUT", "/store/abc/permissions"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := newRequest(tt.method, "$default", tt.rawPath, nil)
+			resp, err := router.Start(context.Background(), request)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusOK, resp.StatusCode, "fall-through route should match and return OK")
+			assert.Equal(t, "ok", resp.Body)
+		})
+	}
+}
+
+func TestDefaultRouteUnknownPathReturnsNotFound(t *testing.T) {
+	router := newTestRouter()
+	request := newRequest("GET", "$default", "/totally/unknown/path", nil)
+	resp, _ := router.Start(context.Background(), request)
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
 func TestUnknownRoutePerMethod(t *testing.T) {
 	router := newTestRouter()
 
