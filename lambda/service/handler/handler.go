@@ -29,8 +29,8 @@ func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	router := NewLambdaRouter()
 	// register routes based on their supported methods
-	router.POST("", PostApplicationsHandler)
-	router.GET("", GetApplicationsHandler)
+	router.POST("/", PostApplicationsHandler)
+	router.GET("/", GetApplicationsHandler)
 	router.GET("/{id}", GetApplicationHandler)
 	router.GET("/{id}/deployments", GetDeploymentsHandler)
 	router.GET("/{id}/deployments/{deploymentId}", GetDeploymentHandler)

@@ -17,3 +17,17 @@ func TestExtractRouteKey(t *testing.T) {
 		t.Errorf("expected %s, got %s", expected, got)
 	}
 }
+
+func TestExtractRouteKeyWithSlash(t *testing.T) {
+	got := utils.ExtractRoute("GET /")
+	if got != "/" {
+		t.Errorf("expected /, got %s", got)
+	}
+}
+
+func TestExtractRouteKeyEmptyPathNormalizesToSlash(t *testing.T) {
+	got := utils.ExtractRoute("GET ")
+	if got != "/" {
+		t.Errorf("expected /, got %s", got)
+	}
+}
