@@ -105,9 +105,17 @@ components:
             properties:
               message:
                 type: string
+x-amazon-apigateway-importexport-version: "1.0"
 paths:
-  /:
+  $default:
+    x-amazon-apigateway-any-method:
+      x-amazon-apigateway-integration:
+        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
+      security:
+        - token_workspace_auth: []
+  /v1:
     post:
+      deprecated: true
       summary: Create application
       description: Create a new application
       x-amazon-apigateway-integration:
@@ -125,6 +133,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/Error'
     get:
+      deprecated: true
       summary: List applications
       description: Get a list of applications
       parameters:
@@ -150,6 +159,7 @@ paths:
           $ref: '#/components/responses/Error'
   /{id}:
     get:
+      deprecated: true
       summary: Get application
       description: Get a specific application by ID
       x-amazon-apigateway-integration:
@@ -176,6 +186,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/Error'
     put:
+      deprecated: true
       summary: Update application
       description: Update an existing application
       x-amazon-apigateway-integration:
@@ -202,6 +213,7 @@ paths:
         '5XX':
           $ref: '#/components/responses/Error'
     delete:
+      deprecated: true
       summary: Delete application
       description: Delete an application by ID
       x-amazon-apigateway-integration:
@@ -229,6 +241,7 @@ paths:
           $ref: '#/components/responses/Error'
   /{id}/deployments:
     get:
+      deprecated: true
       summary: List deployments
       description: Get the deployment history for an application
       x-amazon-apigateway-integration:
@@ -262,6 +275,7 @@ paths:
           $ref: '#/components/responses/Error'
   /{id}/deployments/{deploymentId}:
     get:
+      deprecated: true
       summary: Get deployment
       description: Get the details for a specific application deployment
       x-amazon-apigateway-integration:
@@ -301,6 +315,7 @@ paths:
           $ref: '#/components/responses/Error'
   /deploy:
     post:
+      deprecated: true
       summary: Deploy application
       description: Trigger a deployment for an application
       x-amazon-apigateway-integration:

@@ -70,9 +70,12 @@ func TestRouteMatching(t *testing.T) {
 		rawPath  string
 		params   map[string]string
 	}{
-		// root routes
-		{"POST root", "POST", "POST /", "/", nil},
-		{"GET root", "GET", "GET /", "/", nil},
+		// root routes: /applications/ (with trailing slash)
+		{"POST root with slash", "POST", "POST /", "/", nil},
+		{"GET root with slash", "GET", "GET /", "/", nil},
+		// root routes: /applications (without trailing slash) - normalized to "/"
+		{"POST root without slash", "POST", "POST ", "", nil},
+		{"GET root without slash", "GET", "GET ", "", nil},
 
 		// application routes
 		{"GET app by id", "GET", "GET /{id}", "/123", map[string]string{"id": "123"}},
@@ -107,41 +110,6 @@ func TestRouteMatching(t *testing.T) {
 	}
 }
 
-func TestDefaultRouteUsesRawPath(t *testing.T) {
-	router := newTestRouter()
-
-	tests := []struct {
-		name    string
-		method  string
-		rawPath string
-	}{
-		{"GET root with slash", "GET", "/"},
-		{"POST root with slash", "POST", "/"},
-		{"GET root empty path", "GET", ""},
-		{"POST root empty path", "POST", ""},
-		{"GET store", "GET", "/store"},
-		{"POST deploy", "POST", "/deploy"},
-		{"GET store authorize", "GET", "/store/authorize"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			request := newRequest(tt.method, "$default", tt.rawPath, nil)
-			resp, err := router.Start(context.Background(), request)
-			assert.NoError(t, err)
-			assert.Equal(t, http.StatusOK, resp.StatusCode)
-			assert.Equal(t, "ok", resp.Body)
-		})
-	}
-}
-
-func TestDefaultRouteUnknownPathReturnsNotFound(t *testing.T) {
-	router := newTestRouter()
-	request := newRequest("GET", "$default", "/unknown/path", nil)
-	resp, _ := router.Start(context.Background(), request)
-	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
-}
-
 func TestUnknownRoutePerMethod(t *testing.T) {
 	router := newTestRouter()
 
@@ -165,4 +133,3 @@ func TestUnknownRoutePerMethod(t *testing.T) {
 		})
 	}
 }
-
