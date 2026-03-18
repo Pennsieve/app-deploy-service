@@ -107,12 +107,6 @@ components:
                 type: string
 x-amazon-apigateway-importexport-version: "1.0"
 paths:
-  $default:
-    x-amazon-apigateway-any-method:
-      x-amazon-apigateway-integration:
-        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
-      security:
-        - token_workspace_auth: []
   /v1:
     post:
       deprecated: true
