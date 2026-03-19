@@ -113,6 +113,21 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
   }
 
   statement {
+    sid    = "ContentSyncS3Permissions"
+    effect = "Allow"
+
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+    ]
+
+    resources = [
+      aws_s3_bucket.content_sync_bucket.arn,
+      "${aws_s3_bucket.content_sync_bucket.arn}/*",
+    ]
+  }
+
+  statement {
     sid    = "LambdaAccessToDynamoDB"
     effect = "Allow"
 

@@ -18,7 +18,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/google/uuid"
-	"github.com/pennsieve/app-deploy-service/service/github"
 	"github.com/pennsieve/app-deploy-service/service/mappers"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
@@ -214,26 +213,7 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		}, nil
 	}
 
-	var repoConfig *models.PennsieveConfig
-	var readme string
-	configBytes, err := github.FetchFileFromRepo(sourceUrlValue, "pennsieve.json", "")
-	if err != nil {
-		log.Printf("warning: failed to fetch pennsieve.json: %v", err)
-	} else if configBytes != nil {
-		var cfg models.PennsieveConfig
-		if err := json.Unmarshal(configBytes, &cfg); err != nil {
-			log.Printf("warning: failed to parse pennsieve.json: %v", err)
-		} else {
-			repoConfig = &cfg
-		}
-	}
-
-	readmeBytes, err := github.FetchFileFromRepo(sourceUrlValue, "README.md", "")
-	if err != nil {
-		log.Printf("warning: failed to fetch README.md: %v", err)
-	} else if readmeBytes != nil {
-		readme = string(readmeBytes)
-	}
+	syncRepoContent(ctx, sourceUrlValue, "")
 
 	store_applications := store_dynamodb.Application{
 		Uuid:             applicationUuid,
@@ -260,12 +240,6 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		Params:           application.Params,
 		CommandArguments: application.CommandArguments,
 		Status:           "registering",
-		Readme: readme,
-	}
-	if repoConfig != nil {
-		store_applications.ExecutionTargets = repoConfig.ExecutionTargets
-		store_applications.DefaultCPU = repoConfig.DefaultCPU
-		store_applications.DefaultMemory = repoConfig.DefaultMemory
 	}
 	err = statusManager.NewApplication(ctx, store_applications)
 	if err != nil {

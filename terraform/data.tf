@@ -65,6 +65,11 @@ data "terraform_remote_state" "account_service" {
   }
 }
 
+# Import GitHub Token
+data "aws_ssm_parameter" "github_token" {
+  name = "/${var.environment_name}/app-deploy-service/github-token"
+}
+
 # IMPORT FARGATE CLUSTER DATA
 data "terraform_remote_state" "fargate" {
   backend = "s3"

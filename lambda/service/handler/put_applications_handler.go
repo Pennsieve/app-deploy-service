@@ -10,7 +10,6 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/pennsieve/app-deploy-service/service/github"
 	"github.com/pennsieve/app-deploy-service/service/mappers"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
@@ -59,26 +58,7 @@ func PutApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTP
 	// update properties of the application
 	application.Params = updateRequest.Params
 
-	configBytes, err := github.FetchFileFromRepo(application.SourceUrl, "pennsieve.json", "")
-	if err != nil {
-		log.Printf("warning: failed to fetch pennsieve.json: %v", err)
-	} else if configBytes != nil {
-		var cfg models.PennsieveConfig
-		if err := json.Unmarshal(configBytes, &cfg); err != nil {
-			log.Printf("warning: failed to parse pennsieve.json: %v", err)
-		} else {
-			application.ExecutionTargets = cfg.ExecutionTargets
-			application.DefaultCPU = cfg.DefaultCPU
-			application.DefaultMemory = cfg.DefaultMemory
-		}
-	}
-
-	readmeBytes, err := github.FetchFileFromRepo(application.SourceUrl, "README.md", "")
-	if err != nil {
-		log.Printf("warning: failed to fetch README.md: %v", err)
-	} else if readmeBytes != nil {
-		application.Readme = string(readmeBytes)
-	}
+	syncRepoContent(ctx, application.SourceUrl, "")
 
 	// store the application
 	err = dynamoStore.Insert(ctx, application)

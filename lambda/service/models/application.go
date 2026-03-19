@@ -20,8 +20,6 @@ type Application struct {
 	CommandArguments         interface{}          `json:"commandArguments,omitempty"`
 	Deployments              []Deployment         `json:"deployments"`
 	Status                   string               `json:"status"`
-	Readme                   string               `json:"readme,omitempty"`
-	RepoConfig               *PennsieveConfig     `json:"repoConfig,omitempty"`
 }
 
 type AppStoreDeployment struct {
