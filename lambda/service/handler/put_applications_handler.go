@@ -58,8 +58,6 @@ func PutApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTP
 	// update properties of the application
 	application.Params = updateRequest.Params
 
-	syncRepoContent(ctx, application.SourceUrl, "")
-
 	// store the application
 	err = dynamoStore.Insert(ctx, application)
 	if err != nil {

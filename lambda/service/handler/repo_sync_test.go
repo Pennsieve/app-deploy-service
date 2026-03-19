@@ -50,5 +50,5 @@ func TestBuildNamespace(t *testing.T) {
 func TestSyncRepoContent_NoBucket(t *testing.T) {
 	t.Setenv("CONTENT_SYNC_BUCKET", "")
 	// should not panic when bucket is not set
-	syncRepoContent(t.Context(), "https://github.com/org/repo", "main")
+	syncRepoContent(t.Context(), "https://github.com/org/repo", "main", "")
 }

@@ -213,8 +213,6 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 		}, nil
 	}
 
-	syncRepoContent(ctx, sourceUrlValue, "")
-
 	store_applications := store_dynamodb.Application{
 		Uuid:             applicationUuid,
 		Name:             nameValue,

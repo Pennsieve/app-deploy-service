@@ -33,9 +33,9 @@ func (a *contentFetcherAdapter) GetContent(url string, filePath string, tag stri
 	}, nil
 }
 
-func newGitHubClient() github.GitHubApi {
+func newGitHubClient(token string) github.GitHubApi {
 	client := github.NewGitHubApiClient(logger, "", "", github.GitHubApiUrl, 0)
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+	if token != "" {
 		client = client.WithAccessToken(token)
 	}
 	return client
@@ -53,7 +53,7 @@ func buildNamespace(sourceUrl string, tag string) string {
 	return tag
 }
 
-func syncRepoContent(ctx context.Context, sourceUrl string, tag string) {
+func syncRepoContent(ctx context.Context, sourceUrl string, tag string, authToken string) {
 	if tag == "" {
 		tag = "main"
 	}
@@ -64,7 +64,7 @@ func syncRepoContent(ctx context.Context, sourceUrl string, tag string) {
 		return
 	}
 
-	ghClient := newGitHubClient()
+	ghClient := newGitHubClient(authToken)
 	fetcher := &contentFetcherAdapter{client: ghClient}
 
 	cfg, err := awsconfig.LoadDefaultConfig(ctx)

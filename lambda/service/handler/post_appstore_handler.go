@@ -152,6 +152,8 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}, nil
 	}
 
+	syncRepoContent(ctx, application.Source.Url, application.Source.Tag, application.Source.AuthToken)
+
 	// StatusManager uses the version store for status updates (keyed by versionUuid)
 	statusManager := NewAppStoreStatusManager(handlerName, versionStore, versionUuid).
 		WithDeployment(deploymentsStore, deploymentId)
