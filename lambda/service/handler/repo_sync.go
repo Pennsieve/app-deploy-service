@@ -1,20 +1,16 @@
 package handler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log"
-	"mime"
 	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	github "github.com/pennsieve/github-client/pkg/github"
+	ghsync "github.com/pennsieve/github-client/pkg/github/sync"
 )
 
 var syncFiles = []string{"pennsieve.json", "README.md"}
@@ -25,6 +21,24 @@ func newGitHubClient(token string) github.GitHubApi {
 		client = client.WithAccessToken(token)
 	}
 	return client
+}
+
+type gitHubContentFetcher struct {
+	client github.GitHubApi
+}
+
+func (f *gitHubContentFetcher) GetContent(url, filePath, tag string) (*ghsync.ContentResponse, error) {
+	resp, err := f.client.GetContent(url, filePath, tag)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return nil, nil
+	}
+	return &ghsync.ContentResponse{
+		Content:  resp.Content,
+		Encoding: resp.Encoding,
+	}, nil
 }
 
 func buildNamespace(sourceUrl string, tag string) string {
@@ -51,6 +65,7 @@ func syncRepoContent(ctx context.Context, sourceUrl string, tag string, authToke
 	}
 
 	ghClient := newGitHubClient(authToken)
+	fetcher := &gitHubContentFetcher{client: ghClient}
 
 	cfg, err := awsconfig.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -58,50 +73,21 @@ func syncRepoContent(ctx context.Context, sourceUrl string, tag string, authToke
 		return
 	}
 	s3Client := s3.NewFromConfig(cfg)
+	dest := ghsync.NewS3Destination(s3Client, bucket)
 
 	namespace := buildNamespace(sourceUrl, tag)
-	var wg sync.WaitGroup
 
-	for _, file := range syncFiles {
-		wg.Add(1)
-		go func(filePath string) {
-			defer wg.Done()
-
-			content, err := ghClient.GetFileContent(sourceUrl, filePath, tag)
-			if err != nil {
-				log.Printf("warning: failed to fetch %s: %v", filePath, err)
-				return
-			}
-			if content == nil {
-				log.Printf("warning: %s not found in repo", filePath)
-				return
-			}
-
-			key := fmt.Sprintf("%s/%s", namespace, filePath)
-			contentType := detectContentType(filePath)
-
-			_, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
-				Bucket:      aws.String(bucket),
-				Key:         aws.String(key),
-				Body:        bytes.NewReader(content),
-				ContentType: aws.String(contentType),
-			})
-			if err != nil {
-				log.Printf("warning: failed to sync %s to S3: %v", filePath, err)
-				return
-			}
-
-			logger.Info(fmt.Sprintf("synced %s to s3://%s/%s", filePath, bucket, key))
-		}(file)
+	config := ghsync.Config{
+		RepoUrl:   sourceUrl,
+		Tag:       tag,
+		Namespace: namespace,
+		Files:     syncFiles,
 	}
 
-	wg.Wait()
-}
-
-func detectContentType(filePath string) string {
-	ext := filepath.Ext(filePath)
-	if ct := mime.TypeByExtension(ext); ct != "" {
-		return ct
+	results := ghsync.SyncContent(ctx, logger, fetcher, config, dest)
+	for _, r := range results {
+		if r.Error != nil {
+			log.Printf("warning: sync failed for %s: %v", r.File, r.Error)
+		}
 	}
-	return "application/octet-stream"
 }

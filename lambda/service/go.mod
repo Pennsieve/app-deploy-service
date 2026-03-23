@@ -13,7 +13,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.1
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.56.9
 	github.com/google/uuid v1.3.0
-	github.com/pennsieve/github-client v0.0.0-20260319205353-8d2afa95b88f
+	github.com/pennsieve/github-client v0.0.0-20260323195721-a832599c53f1
 	github.com/pennsieve/pennsieve-go-core v1.13.7
 	github.com/pusher/pusher-http-go/v5 v5.1.1
 	github.com/stretchr/testify v1.11.1
