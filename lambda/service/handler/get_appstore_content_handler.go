@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	ghsync "github.com/pennsieve/github-client/pkg/github/sync"
+	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
 
 func GetAppStoreContentHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -52,6 +53,15 @@ func GetAppStoreContentHandler(ctx context.Context, request events.APIGatewayV2H
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusNotFound,
 			Body:       handlerError(handlerName, ErrAppNotFound),
+		}, nil
+	}
+
+	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
+	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, os.Getenv(appAccessTableNameKey))
+	if !CanAccessApp(ctx, claims, app, appAccessStore) {
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusForbidden,
+			Body:       handlerError(handlerName, ErrNotPermitted),
 		}, nil
 	}
 
