@@ -125,6 +125,24 @@ func (m *mockDestination) Read(ctx context.Context, key string) ([]byte, string,
 	return nil, "", nil
 }
 
+func TestGetSyncFiles_Default(t *testing.T) {
+	t.Setenv("CONTENT_SYNC_FILES", "")
+	files := getSyncFiles()
+	assert.Equal(t, defaultSyncFiles, files)
+}
+
+func TestGetSyncFiles_FromEnv(t *testing.T) {
+	t.Setenv("CONTENT_SYNC_FILES", "pennsieve.json,README.md,CHANGELOG.md")
+	files := getSyncFiles()
+	assert.Equal(t, []string{"pennsieve.json", "README.md", "CHANGELOG.md"}, files)
+}
+
+func TestGetSyncFiles_SingleFile(t *testing.T) {
+	t.Setenv("CONTENT_SYNC_FILES", "pennsieve.json")
+	files := getSyncFiles()
+	assert.Equal(t, []string{"pennsieve.json"}, files)
+}
+
 func TestSyncContent_Integration(t *testing.T) {
 	encoded := base64.StdEncoding.EncodeToString([]byte(`{"name":"test-app"}`))
 	readmeEncoded := base64.StdEncoding.EncodeToString([]byte("# Test App"))

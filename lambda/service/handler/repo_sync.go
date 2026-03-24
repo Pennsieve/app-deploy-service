@@ -13,7 +13,14 @@ import (
 	ghsync "github.com/pennsieve/github-client/pkg/github/sync"
 )
 
-var syncFiles = []string{"pennsieve.json", "README.md"}
+var defaultSyncFiles = []string{"pennsieve.json", "README.md"}
+
+func getSyncFiles() []string {
+	if v := os.Getenv("CONTENT_SYNC_FILES"); v != "" {
+		return strings.Split(v, ",")
+	}
+	return defaultSyncFiles
+}
 
 func newGitHubClient(token string) github.GitHubApi {
 	client := github.NewGitHubApiClient(logger, "", "", github.GitHubApiUrl, 0)
@@ -81,7 +88,7 @@ func syncRepoContent(ctx context.Context, sourceUrl string, tag string, authToke
 		RepoUrl:   sourceUrl,
 		Tag:       tag,
 		Namespace: namespace,
-		Files:     syncFiles,
+		Files:     getSyncFiles(),
 	}
 
 	results := ghsync.SyncContent(ctx, logger, fetcher, config, dest)
