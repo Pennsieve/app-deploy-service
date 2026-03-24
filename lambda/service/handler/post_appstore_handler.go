@@ -64,7 +64,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	}
 
 	var userId string
-	if request.RequestContext.Authorizer.Lambda != nil {
+	if request.RequestContext.Authorizer != nil && request.RequestContext.Authorizer.Lambda != nil {
 		claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
 		if !authorizer.HasOrgRole(claims, role.Viewer) {
 			log.Printf("user not permitted to add to appstore with claims: %+v", claims)
