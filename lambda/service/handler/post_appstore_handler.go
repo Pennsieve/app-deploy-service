@@ -63,15 +63,21 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}, nil
 	}
 
-	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		log.Printf("user not permitted to add to appstore with claims: %+v", claims)
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, ErrNotPermitted),
-		}, nil
+	var userId string
+	if request.RequestContext.Authorizer.Lambda != nil {
+		claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
+		if !authorizer.HasOrgRole(claims, role.Viewer) {
+			log.Printf("user not permitted to add to appstore with claims: %+v", claims)
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusUnauthorized,
+				Body:       handlerError(handlerName, ErrNotPermitted),
+			}, nil
+		}
+		userId = claims.UserClaim.NodeId
+	} else {
+		log.Println("direct invocation detected, skipping authorization")
+		userId = "system"
 	}
-	userId := claims.UserClaim.NodeId
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	appStoreStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, applicationsTable)
