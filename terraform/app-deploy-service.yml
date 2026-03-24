@@ -379,6 +379,52 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '5XX':
           $ref: '#/components/responses/Error'
+  /store/{id}/content:
+    get:
+      summary: Get app store content
+      description: Get content for an app store application
+      x-amazon-apigateway-integration:
+        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
+      operationId: getAppStoreContent
+      security:
+        - token_auth: []
+      tags:
+        - App Store
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The app store application ID
+        - in: query
+          name: file
+          required: true
+          schema:
+            type: string
+          description: The file path to retrieve
+        - in: query
+          name: tag
+          required: false
+          schema:
+            type: string
+          description: The branch or tag to retrieve content from (defaults to main)
+      responses:
+        '200':
+          description: App store content
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '4XX':
+          $ref: '#/components/responses/Unauthorized'
+        '5XX':
+          $ref: '#/components/responses/Error'
   /store/{id}/permissions:
     get:
       summary: Get app permissions
