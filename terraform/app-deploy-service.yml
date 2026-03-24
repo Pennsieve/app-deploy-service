@@ -397,9 +397,28 @@ paths:
           schema:
             type: string
           description: The app store application ID
+        - in: query
+          name: file
+          required: true
+          schema:
+            type: string
+          description: The file path to retrieve
+        - in: query
+          name: tag
+          required: false
+          schema:
+            type: string
+          description: The branch or tag to retrieve content from (defaults to main)
       responses:
         '200':
           description: App store content
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
         '4XX':
