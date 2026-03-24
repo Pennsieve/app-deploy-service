@@ -36,6 +36,7 @@ resource "aws_lambda_function" "service_lambda" {
       DEPLOYMENTS_TABLE                = aws_dynamodb_table.deployments_table.name,
       APP_ACCESS_TABLE                 = aws_dynamodb_table.app_access_table.name,
       ACCOUNTS_TABLE                   = data.terraform_remote_state.account_service.outputs.accounts_table_name
+      CONTENT_SYNC_BUCKET              = aws_s3_bucket.content_sync_bucket.id
     }
   }
 }
