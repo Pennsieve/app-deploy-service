@@ -14,14 +14,6 @@ import (
 	ghsync "github.com/pennsieve/github-client/pkg/github/sync"
 )
 
-type contentAppLookup interface {
-	GetById(ctx context.Context, uuid string) (*store_dynamodb.AppStoreApplication, error)
-}
-
-type contentReader interface {
-	Read(ctx context.Context, key string) ([]byte, string, error)
-}
-
 func GetAppStoreContentHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "GetAppStoreContentHandler"
 
@@ -45,33 +37,8 @@ func GetAppStoreContentHandler(ctx context.Context, request events.APIGatewayV2H
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
 	appStore := store_dynamodb.NewAppStoreDatabaseStore(dynamoDBClient, os.Getenv(appstoreApplicationsTableNameKey))
 
-	bucket := os.Getenv("CONTENT_SYNC_BUCKET")
-	if bucket == "" {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrConfig),
-		}, nil
-	}
-
-	s3Client := s3.NewFromConfig(cfg)
-	dest := ghsync.NewS3Destination(s3Client, bucket)
-
-	return getAppStoreContent(ctx, request, appStore, dest)
-}
-
-func getAppStoreContent(ctx context.Context, request events.APIGatewayV2HTTPRequest, appStore contentAppLookup, dest contentReader) (events.APIGatewayV2HTTPResponse, error) {
-	handlerName := "GetAppStoreContentHandler"
-
 	appId := request.PathParameters["id"]
-	file := request.QueryStringParameters["file"]
 	tag := request.QueryStringParameters["tag"]
-
-	if file == "" {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusBadRequest,
-			Body:       handlerError(handlerName, ErrMissingParams),
-		}, nil
-	}
 
 	app, err := appStore.GetById(ctx, appId)
 	if err != nil {
@@ -92,8 +59,19 @@ func getAppStoreContent(ctx context.Context, request events.APIGatewayV2HTTPRequ
 		tag = "main"
 	}
 
+	bucket := os.Getenv("CONTENT_SYNC_BUCKET")
+	if bucket == "" {
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrConfig),
+		}, nil
+	}
+
 	namespace := buildNamespace(app.SourceUrl, tag)
 	key := namespace + "/" + file
+
+	s3Client := s3.NewFromConfig(cfg)
+	dest := ghsync.NewS3Destination(s3Client, bucket)
 
 	data, contentType, err := dest.Read(ctx, key)
 	if err != nil {
