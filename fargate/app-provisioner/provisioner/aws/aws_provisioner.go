@@ -90,8 +90,14 @@ func (p *AWSProvisioner) Create(ctx context.Context) error {
 	}
 
 	if !p.BackendExists {
-		// create s3 backend bucket
-		return fmt.Errorf("expected tfstate-%s to exist", p.AccountId)
+		bucketName := fmt.Sprintf("tfstate-%s", p.AccountId)
+		log.Printf("creating s3 backend bucket %s ...", bucketName)
+		_, err := client.CreateBucket(ctx, &s3.CreateBucketInput{
+			Bucket: aws.String(bucketName),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create backend bucket %s: %w", bucketName, err)
+		}
 	}
 
 	// create infrastructure
