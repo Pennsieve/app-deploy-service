@@ -354,9 +354,86 @@ paths:
         - token_auth: []
       tags:
         - App Store
+      parameters:
+        - in: query
+          name: sourceUrl
+          required: false
+          schema:
+            type: string
+          description: Filter applications by source URL
       responses:
         '200':
           description: List of app store applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    uuid:
+                      type: string
+                    sourceUrl:
+                      type: string
+                    sourceType:
+                      type: string
+                    isPrivate:
+                      type: boolean
+                    visibility:
+                      type: string
+                    ownerId:
+                      type: string
+                    createdAt:
+                      type: string
+                    versions:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          uuid:
+                            type: string
+                          applicationId:
+                            type: string
+                          version:
+                            type: string
+                          releaseId:
+                            type: integer
+                          destinationUrl:
+                            type: string
+                          createdAt:
+                            type: string
+                          status:
+                            type: string
+                          deployments:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                deploymentId:
+                                  type: string
+                                applicationId:
+                                  type: string
+                                releaseId:
+                                  type: integer
+                                initiatedAt:
+                                  type: string
+                                  format: date-time
+                                lastStatus:
+                                  type: string
+                                desiredStatus:
+                                  type: string
+                                taskArn:
+                                  type: string
+                                sourceUrl:
+                                  type: string
+                                tag:
+                                  type: string
+                                updatedAt:
+                                  type: string
+                                  format: date-time
+                                createdAt:
+                                  type: string
+                                  format: date-time
         '4XX':
           $ref: '#/components/responses/Unauthorized'
         '5XX':
@@ -364,7 +441,7 @@ paths:
   /store/authorize:
     get:
       summary: Authorize app store
-      description: Get app store authorization
+      description: Checks whether a user is authorized to pull a specific appstore image and returns the ECR image URL
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: getAppStoreAuthorize
@@ -372,9 +449,63 @@ paths:
         - token_auth: []
       tags:
         - App Store
+      parameters:
+        - in: query
+          name: sourceUrl
+          required: true
+          schema:
+            type: string
+          description: The git repository URL identifying the application
+        - in: query
+          name: version
+          required: true
+          schema:
+            type: string
+          description: The specific version tag (e.g. v1.0.7)
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+          description: The ID of the user requesting access
       responses:
         '200':
-          description: Authorization result
+          description: User is authorized to pull the image
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorized:
+                    type: boolean
+                  imageUrl:
+                    type: string
+                  message:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: User does not have access to this application
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorized:
+                    type: boolean
+                  message:
+                    type: string
+        '404':
+          description: Application or version not found, or version not yet deployed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authorized:
+                    type: boolean
+                  message:
+                    type: string
         '4XX':
           $ref: '#/components/responses/Unauthorized'
         '5XX':
@@ -382,7 +513,7 @@ paths:
   /store/{id}/content:
     get:
       summary: Get app store content
-      description: Get content for an app store application
+      description: Retrieves a file from the synced content of an app store application. The content is read from S3 using the app's source URL and the specified tag as a namespace.
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: getAppStoreContent
@@ -411,7 +542,7 @@ paths:
           description: The branch or tag to retrieve content from (defaults to main)
       responses:
         '200':
-          description: App store content
+          description: The requested file content. Content-Type header is set based on the file type.
           content:
             '*/*':
               schema:
@@ -419,6 +550,8 @@ paths:
                 format: binary
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '4XX':
