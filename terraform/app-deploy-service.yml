@@ -462,12 +462,6 @@ paths:
           schema:
             type: string
           description: The specific version tag (e.g. v1.0.7)
-        - in: query
-          name: userId
-          required: true
-          schema:
-            type: string
-          description: The ID of the user requesting access
       responses:
         '200':
           description: User is authorized to pull the image
