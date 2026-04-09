@@ -10,10 +10,13 @@ data "terraform_remote_state" "api_gateway" {
 }
 
 locals {
-  cors_allowed_origins = [
-    "https://app.pennsieve.io",
-    "https://app.pennsieve.net",
-  ]
+  cors_allowed_origins = concat(
+    [
+      "https://app.pennsieve.io",
+      "https://app.pennsieve.net",
+    ],
+    var.environment_name != "prod" ? ["http://localhost:3000"] : []
+  )
 }
 
 resource "aws_apigatewayv2_api" "app_deploy_service_api" {
