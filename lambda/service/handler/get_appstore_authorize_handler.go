@@ -23,18 +23,14 @@ import (
 // Query parameters:
 //   - sourceUrl: the git repository URL identifying the application
 //   - version: the specific version tag (e.g., "v1.0.7")
-//   - userId: the ID of the user requesting access
-//
-// TODO: Add actual permission model (per-user/per-org access control).
 func GetAppStoreAuthorizeHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "GetAppStoreAuthorizeHandler"
 
 	sourceUrl := request.QueryStringParameters["sourceUrl"]
 	version := request.QueryStringParameters["version"]
-	userId := request.QueryStringParameters["userId"]
 
-	if sourceUrl == "" || version == "" || userId == "" {
-		log.Printf("%s: missing required query parameters: sourceUrl=%q, version=%q, userId=%q", handlerName, sourceUrl, version, userId)
+	if sourceUrl == "" || version == "" {
+		log.Printf("%s: missing required query parameters: sourceUrl=%q, version=%q", handlerName, sourceUrl, version)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusBadRequest,
 			Body:       handlerError(handlerName, ErrMissingParams),
@@ -129,8 +125,8 @@ func GetAppStoreAuthorizeHandler(ctx context.Context, request events.APIGatewayV
 		}, nil
 	}
 
-	log.Printf("%s: authorizing user %s for image %s (source: %s, version: %s)",
-		handlerName, userId, ver.DestinationUrl, sourceUrl, version)
+	log.Printf("%s: authorizing image %s (source: %s, version: %s)",
+		handlerName, ver.DestinationUrl, sourceUrl, version)
 
 	resp := models.AuthorizeImageResponse{
 		Authorized: true,
