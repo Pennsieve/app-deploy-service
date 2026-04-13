@@ -105,6 +105,223 @@ components:
             properties:
               message:
                 type: string
+  schemas:
+    DeploymentSource:
+      type: object
+      properties:
+        type:
+          type: string
+          description: The source type (e.g. git provider identifier)
+        url:
+          type: string
+          description: The source repository URL
+        tag:
+          type: string
+          description: The source tag or branch
+        isPrivate:
+          type: boolean
+          description: Whether the source repository is private
+        authToken:
+          type: string
+          description: Auth token used to access a private source repository
+    DeploymentRelease:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: The release identifier from the source provider
+    AppStoreDeployment:
+      type: object
+      required:
+        - source
+        - release
+      properties:
+        source:
+          $ref: '#/components/schemas/DeploymentSource'
+        release:
+          $ref: '#/components/schemas/DeploymentRelease'
+    DeployApplicationResponse:
+      type: object
+      properties:
+        deploymentId:
+          type: string
+          description: The identifier of the triggered deployment
+    Deployment:
+      type: object
+      properties:
+        deploymentId:
+          type: string
+        applicationId:
+          type: string
+        releaseId:
+          type: integer
+        initiatedAt:
+          type: string
+          format: date-time
+        lastStatus:
+          type: string
+        desiredStatus:
+          type: string
+        taskArn:
+          type: string
+        sourceUrl:
+          type: string
+        tag:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        stoppedAt:
+          type: string
+          format: date-time
+          nullable: true
+        stopCode:
+          type: string
+        stoppedReason:
+          type: string
+        errored:
+          type: boolean
+    AppStoreVersion:
+      type: object
+      properties:
+        uuid:
+          type: string
+        applicationId:
+          type: string
+        version:
+          type: string
+        releaseId:
+          type: integer
+        destinationUrl:
+          type: string
+        createdAt:
+          type: string
+        status:
+          type: string
+        deployments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Deployment'
+    AppStoreApplication:
+      type: object
+      properties:
+        uuid:
+          type: string
+        sourceUrl:
+          type: string
+        sourceType:
+          type: string
+        isPrivate:
+          type: boolean
+        visibility:
+          type: string
+        ownerId:
+          type: string
+        createdAt:
+          type: string
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppStoreVersion'
+    AuthorizeImageResponse:
+      type: object
+      properties:
+        authorized:
+          type: boolean
+        imageUrl:
+          type: string
+        message:
+          type: string
+    AuthorizeImageDeniedResponse:
+      type: object
+      properties:
+        authorized:
+          type: boolean
+        message:
+          type: string
+    AppAccess:
+      type: object
+      properties:
+        entityId:
+          type: string
+        appId:
+          type: string
+        entityType:
+          type: string
+          description: The type of entity (e.g. user, team, workspace)
+        entityRawId:
+          type: string
+        appUuid:
+          type: string
+        accessType:
+          type: string
+        organizationId:
+          type: string
+          nullable: true
+        grantedAt:
+          type: string
+          format: date-time
+        grantedBy:
+          type: string
+    AppPermissions:
+      type: object
+      properties:
+        visibility:
+          type: string
+          enum:
+            - public
+            - private
+          description: The visibility of the application
+        ownerId:
+          type: string
+          description: The owner of the application
+        access:
+          type: array
+          description: The list of granted accesses
+          items:
+            $ref: '#/components/schemas/AppAccess'
+    PermissionEntity:
+      type: object
+      properties:
+        entityId:
+          type: string
+        organizationId:
+          type: string
+    SetPermissionsRequest:
+      type: object
+      required:
+        - visibility
+      properties:
+        visibility:
+          type: string
+          enum:
+            - public
+            - private
+          description: The visibility to set for the application
+        users:
+          type: array
+          description: User entities to grant access to
+          items:
+            $ref: '#/components/schemas/PermissionEntity'
+        teams:
+          type: array
+          description: Team entities to grant access to
+          items:
+            $ref: '#/components/schemas/PermissionEntity'
+        workspaces:
+          type: array
+          description: Workspace entities to grant access to
+          items:
+            $ref: '#/components/schemas/PermissionEntity'
 x-amazon-apigateway-importexport-version: "1.0"
 paths:
   /v1:
@@ -328,8 +545,8 @@ paths:
           $ref: '#/components/responses/Error'
   /store:
     post:
-      summary: Create app store entry
-      description: Create a new app store application
+      summary: Create a new app store application
+      description: Create a new app store application and trigger an initial deployment for the supplied source/release.
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: postAppStore
@@ -337,9 +554,25 @@ paths:
         - token_auth: []
       tags:
         - App Store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppStoreDeployment'
       responses:
-        '201':
-          description: App store entry created
+        '202':
+          description: App store entry created and deployment accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeployApplicationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '4XX':
           $ref: '#/components/responses/Unauthorized'
         '5XX':
@@ -369,71 +602,11 @@ paths:
               schema:
                 type: array
                 items:
-                  type: object
-                  properties:
-                    uuid:
-                      type: string
-                    sourceUrl:
-                      type: string
-                    sourceType:
-                      type: string
-                    isPrivate:
-                      type: boolean
-                    visibility:
-                      type: string
-                    ownerId:
-                      type: string
-                    createdAt:
-                      type: string
-                    versions:
-                      type: array
-                      items:
-                        type: object
-                        properties:
-                          uuid:
-                            type: string
-                          applicationId:
-                            type: string
-                          version:
-                            type: string
-                          releaseId:
-                            type: integer
-                          destinationUrl:
-                            type: string
-                          createdAt:
-                            type: string
-                          status:
-                            type: string
-                          deployments:
-                            type: array
-                            items:
-                              type: object
-                              properties:
-                                deploymentId:
-                                  type: string
-                                applicationId:
-                                  type: string
-                                releaseId:
-                                  type: integer
-                                initiatedAt:
-                                  type: string
-                                  format: date-time
-                                lastStatus:
-                                  type: string
-                                desiredStatus:
-                                  type: string
-                                taskArn:
-                                  type: string
-                                sourceUrl:
-                                  type: string
-                                tag:
-                                  type: string
-                                updatedAt:
-                                  type: string
-                                  format: date-time
-                                createdAt:
-                                  type: string
-                                  format: date-time
+                  $ref: '#/components/schemas/AppStoreApplication'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '4XX':
           $ref: '#/components/responses/Unauthorized'
         '5XX':
@@ -468,14 +641,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  authorized:
-                    type: boolean
-                  imageUrl:
-                    type: string
-                  message:
-                    type: string
+                $ref: '#/components/schemas/AuthorizeImageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -483,23 +649,15 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  authorized:
-                    type: boolean
-                  message:
-                    type: string
+                $ref: '#/components/schemas/AuthorizeImageDeniedResponse'
         '404':
           description: Application or version not found, or version not yet deployed
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  authorized:
-                    type: boolean
-                  message:
-                    type: string
+                $ref: '#/components/schemas/AuthorizeImageDeniedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '4XX':
           $ref: '#/components/responses/Unauthorized'
         '5XX':
@@ -544,6 +702,8 @@ paths:
                 format: binary
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -573,6 +733,14 @@ paths:
       responses:
         '200':
           description: App permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppPermissions'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '4XX':
@@ -581,7 +749,7 @@ paths:
           $ref: '#/components/responses/Error'
     put:
       summary: Update app permissions
-      description: Update permissions for an app store application
+      description: Update visibility and granted accesses for an app store application
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: putAppPermissions
@@ -596,9 +764,25 @@ paths:
           schema:
             type: string
           description: The app store application ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetPermissionsRequest'
       responses:
         '200':
-          description: Permissions updated
+          description: The updated app permissions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppPermissions'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '4XX':
