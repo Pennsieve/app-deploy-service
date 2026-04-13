@@ -38,6 +38,7 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, appAccessTable)
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
+	log.Printf("%s: caller org=%s user=%s", handlerName, claims.OrgClaim.NodeId, claims.UserClaim.NodeId)
 
 	// Get all apps (or filter by sourceUrl if provided)
 	queryParams := request.QueryStringParameters
