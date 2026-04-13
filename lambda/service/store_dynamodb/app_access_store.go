@@ -138,9 +138,19 @@ func (r *AppAccessDatabaseStore) ReplaceByApp(ctx context.Context, appUuid strin
 		return fmt.Errorf("error fetching existing access entries: %w", err)
 	}
 
+	newKeys := make(map[string]struct{}, len(newEntries))
+	for _, entry := range newEntries {
+		newKeys[entry.EntityId+"|"+entry.AppId] = struct{}{}
+	}
+
 	var writeRequests []types.WriteRequest
 
 	for _, entry := range existing {
+		// Skip delete when the same primary key is being re-put; DynamoDB
+		// rejects BatchWriteItem if a key appears more than once.
+		if _, ok := newKeys[entry.EntityId+"|"+entry.AppId]; ok {
+			continue
+		}
 		entityIdAv, err := attributevalue.Marshal(entry.EntityId)
 		if err != nil {
 			return fmt.Errorf("error marshaling entityId for delete: %w", err)

@@ -354,6 +354,76 @@ func TestAppAccessDatabaseStore_ReplaceByApp_NoExistingNoNew(t *testing.T) {
 	assert.Nil(t, mock.BatchWriteItemInput)
 }
 
+func TestAppAccessDatabaseStore_ReplaceByApp_SkipsDeleteForReputKey(t *testing.T) {
+	// Regression: BatchWriteItem fails with "Provided list of item keys contains
+	// duplicates" when the same (entityId, appId) is both deleted and put in
+	// one batch. The owner row pre-inserted by PostAppStoreHandler collides
+	// with the owner entry that PutAppPermissionsHandler re-adds.
+	existing := AppAccess{
+		EntityId:    "user#system",
+		AppId:       "app#some-uuid",
+		EntityType:  "user",
+		EntityRawId: "system",
+		AppUuid:     "some-uuid",
+		AccessType:  "owner",
+		GrantedAt:   "2026-01-01",
+		GrantedBy:   "system",
+	}
+	item, err := attributevalue.MarshalMap(existing)
+	require.NoError(t, err)
+
+	mock := &ArgCaptureAppAccessTableAPI{
+		QueryOutput: &dynamodb.QueryOutput{
+			Items: []map[string]types.AttributeValue{item},
+			Count: 1,
+		},
+	}
+	store := NewAppAccessDatabaseStore(mock, "test-table")
+
+	newEntries := []AppAccess{
+		// Same primary key as the existing row — must not also issue a delete.
+		{
+			EntityId:    "user#system",
+			AppId:       "app#some-uuid",
+			EntityType:  "user",
+			EntityRawId: "system",
+			AppUuid:     "some-uuid",
+			AccessType:  "owner",
+			GrantedAt:   "2026-02-02",
+			GrantedBy:   "N:user:caller",
+		},
+		{
+			EntityId:       "workspace#N:org:org1",
+			AppId:          "app#some-uuid",
+			EntityType:     "workspace",
+			EntityRawId:    "N:org:org1",
+			AppUuid:        "some-uuid",
+			AccessType:     "workspace",
+			OrganizationId: "N:org:org1",
+			GrantedAt:      "2026-02-02",
+			GrantedBy:      "N:user:caller",
+		},
+	}
+
+	err = store.ReplaceByApp(context.Background(), "some-uuid", newEntries)
+	require.NoError(t, err)
+
+	require.NotNil(t, mock.BatchWriteItemInput)
+	requests := mock.BatchWriteItemInput.RequestItems["test-table"]
+
+	var deleteCount, putCount int
+	for _, req := range requests {
+		if req.DeleteRequest != nil {
+			deleteCount++
+		}
+		if req.PutRequest != nil {
+			putCount++
+		}
+	}
+	assert.Equal(t, 0, deleteCount, "should not delete a key that is being re-put")
+	assert.Equal(t, 2, putCount)
+}
+
 func TestAppAccessDatabaseStore_ReplaceByApp_WithWorkspace(t *testing.T) {
 	mock := &ArgCaptureAppAccessTableAPI{
 		QueryOutput: &dynamodb.QueryOutput{
