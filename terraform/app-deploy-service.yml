@@ -232,6 +232,35 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AppStoreVersion'
+    AppStoreApplicationDetail:
+      type: object
+      properties:
+        uuid:
+          type: string
+        sourceUrl:
+          type: string
+        sourceType:
+          type: string
+        isPrivate:
+          type: boolean
+        visibility:
+          type: string
+        ownerId:
+          type: string
+        createdAt:
+          type: string
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppStoreVersion'
+        assets:
+          type: object
+          additionalProperties:
+            type: string
+          description: >
+            Map of asset filename to content string. Includes files like
+            pennsieve.json and README.md when they exist in the synced
+            repository content.
     AuthorizeImageResponse:
       type: object
       properties:
@@ -609,6 +638,51 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '4XX':
           $ref: '#/components/responses/Unauthorized'
+        '5XX':
+          $ref: '#/components/responses/Error'
+  /store/{id}:
+    get:
+      summary: Get app store application
+      description: >
+        Get a single app store application by ID, including its versions,
+        deployment history, and repository assets (e.g. pennsieve.json,
+        README.md) when available.
+      x-amazon-apigateway-integration:
+        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
+      operationId: getAppStoreApplication
+      security:
+        - token_auth: []
+      tags:
+        - App Store
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The app store application UUID
+        - in: query
+          name: tag
+          required: false
+          schema:
+            type: string
+          description: The branch or tag to retrieve assets from (defaults to main)
+      responses:
+        '200':
+          description: The app store application with versions, deployments, and assets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppStoreApplicationDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '5XX':
           $ref: '#/components/responses/Error'
   /store/authorize:
