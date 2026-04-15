@@ -667,7 +667,10 @@ paths:
           required: false
           schema:
             type: string
-          description: The branch or tag to retrieve assets from (defaults to main)
+          description: >
+            The branch or tag to retrieve assets from. When omitted, defaults
+            to the most recently created version's tag, falling back to "main"
+            if the application has no versions.
       responses:
         '200':
           description: The app store application with versions, deployments, and assets
