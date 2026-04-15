@@ -93,7 +93,10 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 		tag = latestVersionTag(application.Versions)
 	}
 
-	assets := fetchAssets(ctx, cfg, app.SourceUrl, tag)
+	assets := map[string]string{}
+	if tag != "" {
+		assets = fetchAssets(ctx, cfg, app.SourceUrl, tag)
+	}
 
 	detail := models.AppStoreApplicationDetail{
 		Uuid:       application.Uuid,
@@ -123,7 +126,8 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 }
 
 // latestVersionTag returns the Version tag of the most recently created version,
-// or "main" if there are no versions.
+// or an empty string if there are no versions with a tag. Assets are only synced
+// for release tags, so there is no meaningful default when no release exists.
 func latestVersionTag(versions []models.AppStoreVersion) string {
 	latest := ""
 	latestCreatedAt := ""
@@ -135,9 +139,6 @@ func latestVersionTag(versions []models.AppStoreVersion) string {
 			latestCreatedAt = v.CreatedAt
 			latest = v.Version
 		}
-	}
-	if latest == "" {
-		return "main"
 	}
 	return latest
 }

@@ -69,8 +69,8 @@ func TestFetchAssets_CustomSyncFiles(t *testing.T) {
 }
 
 func TestLatestVersionTag_NoVersions(t *testing.T) {
-	assert.Equal(t, "main", latestVersionTag(nil))
-	assert.Equal(t, "main", latestVersionTag([]models.AppStoreVersion{}))
+	assert.Equal(t, "", latestVersionTag(nil))
+	assert.Equal(t, "", latestVersionTag([]models.AppStoreVersion{}))
 }
 
 func TestLatestVersionTag_PicksMostRecentCreatedAt(t *testing.T) {
@@ -90,12 +90,12 @@ func TestLatestVersionTag_SkipsEmptyVersionString(t *testing.T) {
 	assert.Equal(t, "v1.0.0", latestVersionTag(versions))
 }
 
-func TestLatestVersionTag_AllEmptyVersionsFallsBackToMain(t *testing.T) {
+func TestLatestVersionTag_AllEmptyVersionsReturnsEmpty(t *testing.T) {
 	versions := []models.AppStoreVersion{
 		{Version: "", CreatedAt: "2026-04-01"},
 		{Version: "", CreatedAt: "2026-01-01"},
 	}
-	assert.Equal(t, "main", latestVersionTag(versions))
+	assert.Equal(t, "", latestVersionTag(versions))
 }
 
 func TestLatestVersionTag_SingleVersion(t *testing.T) {
