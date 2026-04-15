@@ -5,6 +5,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -65,4 +66,41 @@ func TestFetchAssets_CustomSyncFiles(t *testing.T) {
 
 	assets := fetchAssets(t.Context(), aws.Config{}, "https://github.com/org/repo", "v1.0.0")
 	assert.Empty(t, assets)
+}
+
+func TestLatestVersionTag_NoVersions(t *testing.T) {
+	assert.Equal(t, "main", latestVersionTag(nil))
+	assert.Equal(t, "main", latestVersionTag([]models.AppStoreVersion{}))
+}
+
+func TestLatestVersionTag_PicksMostRecentCreatedAt(t *testing.T) {
+	versions := []models.AppStoreVersion{
+		{Version: "v1.0.0", CreatedAt: "2026-01-01"},
+		{Version: "v2.0.0", CreatedAt: "2026-03-15"},
+		{Version: "v1.5.0", CreatedAt: "2026-02-10"},
+	}
+	assert.Equal(t, "v2.0.0", latestVersionTag(versions))
+}
+
+func TestLatestVersionTag_SkipsEmptyVersionString(t *testing.T) {
+	versions := []models.AppStoreVersion{
+		{Version: "", CreatedAt: "2026-04-01"},
+		{Version: "v1.0.0", CreatedAt: "2026-01-01"},
+	}
+	assert.Equal(t, "v1.0.0", latestVersionTag(versions))
+}
+
+func TestLatestVersionTag_AllEmptyVersionsFallsBackToMain(t *testing.T) {
+	versions := []models.AppStoreVersion{
+		{Version: "", CreatedAt: "2026-04-01"},
+		{Version: "", CreatedAt: "2026-01-01"},
+	}
+	assert.Equal(t, "main", latestVersionTag(versions))
+}
+
+func TestLatestVersionTag_SingleVersion(t *testing.T) {
+	versions := []models.AppStoreVersion{
+		{Version: "v0.1.0", CreatedAt: "2026-02-01"},
+	}
+	assert.Equal(t, "v0.1.0", latestVersionTag(versions))
 }

@@ -90,7 +90,7 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 
 	tag := request.QueryStringParameters["tag"]
 	if tag == "" {
-		tag = "main"
+		tag = latestVersionTag(application.Versions)
 	}
 
 	assets := fetchAssets(ctx, cfg, app.SourceUrl, tag)
@@ -120,6 +120,26 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 		StatusCode: http.StatusOK,
 		Body:       string(m),
 	}, nil
+}
+
+// latestVersionTag returns the Version tag of the most recently created version,
+// or "main" if there are no versions.
+func latestVersionTag(versions []models.AppStoreVersion) string {
+	latest := ""
+	latestCreatedAt := ""
+	for _, v := range versions {
+		if v.Version == "" {
+			continue
+		}
+		if v.CreatedAt > latestCreatedAt {
+			latestCreatedAt = v.CreatedAt
+			latest = v.Version
+		}
+	}
+	if latest == "" {
+		return "main"
+	}
+	return latest
 }
 
 func fetchAssets(ctx context.Context, cfg aws.Config, sourceUrl string, tag string) map[string]string {
