@@ -40,7 +40,6 @@ func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	// AppStore routes
 	router.POST("/store", PostAppStoreHandler)
-	router.POST("/applications/store", PostAppStoreHandler) // internal invocation (temporary)
 	router.GET("/store", GetAppstoreApplicationsHandler)
 	router.GET("/store/authorize", GetAppStoreAuthorizeHandler)
 
