@@ -76,7 +76,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		userId = claims.UserClaim.NodeId
 	} else {
 		log.Println("direct invocation detected, skipping authorization")
-		userId = "system"
+		userId = application.Source.Owner
 	}
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)

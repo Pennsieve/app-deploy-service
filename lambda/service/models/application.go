@@ -1,25 +1,25 @@
 package models
 
 type Application struct {
-	Uuid                     string               `json:"uuid"`
-	ApplicationId            string               `json:"applicationId"`
-	ApplicationContainerName string               `json:"applicationContainerName"`
-	Name                     string               `json:"name"`
-	Description              string               `json:"description"`
-	RuntimeConfig            RuntimeConfig        `json:"runtimeConfig"`
-	Account                  Account              `json:"account"`
-	ComputeNode              ComputeNode          `json:"computeNode"`
-	Source                   Source               `json:"source"`
-	Destination              Destination          `json:"destination"`
-	ApplicationType          string               `json:"applicationType"`
-	Env                      string               `json:"environment"`
-	OrganizationId           string               `json:"organizationId"`
-	UserId                   string               `json:"userId"`
-	CreatedAt                string               `json:"createdAt"`
-	Params                   interface{}          `json:"params,omitempty"`
-	CommandArguments         interface{}          `json:"commandArguments,omitempty"`
-	Deployments              []Deployment         `json:"deployments"`
-	Status                   string               `json:"status"`
+	Uuid                     string        `json:"uuid"`
+	ApplicationId            string        `json:"applicationId"`
+	ApplicationContainerName string        `json:"applicationContainerName"`
+	Name                     string        `json:"name"`
+	Description              string        `json:"description"`
+	RuntimeConfig            RuntimeConfig `json:"runtimeConfig"`
+	Account                  Account       `json:"account"`
+	ComputeNode              ComputeNode   `json:"computeNode"`
+	Source                   Source        `json:"source"`
+	Destination              Destination   `json:"destination"`
+	ApplicationType          string        `json:"applicationType"`
+	Env                      string        `json:"environment"`
+	OrganizationId           string        `json:"organizationId"`
+	UserId                   string        `json:"userId"`
+	CreatedAt                string        `json:"createdAt"`
+	Params                   interface{}   `json:"params,omitempty"`
+	CommandArguments         interface{}   `json:"commandArguments,omitempty"`
+	Deployments              []Deployment  `json:"deployments"`
+	Status                   string        `json:"status"`
 }
 
 type AppStoreDeployment struct {
@@ -44,6 +44,7 @@ type DeploymentSource struct {
 	Tag        string `json:"tag"`
 	IsPrivate  bool   `json:"isPrivate,omitempty"`
 	AuthToken  string `json:"authToken,omitempty"`
+	Owner      string `json:"owner,omitempty"`
 }
 
 type Source struct {
@@ -136,6 +137,18 @@ type AppStoreVersion struct {
 	CreatedAt      string       `json:"createdAt"`
 	Status         string       `json:"status"`
 	Deployments    []Deployment `json:"deployments"`
+}
+
+type AppStoreApplicationDetail struct {
+	Uuid       string            `json:"uuid"`
+	SourceUrl  string            `json:"sourceUrl"`
+	SourceType string            `json:"sourceType"`
+	IsPrivate  bool              `json:"isPrivate"`
+	Visibility string            `json:"visibility"`
+	OwnerId    string            `json:"ownerId"`
+	CreatedAt  string            `json:"createdAt"`
+	Versions   []AppStoreVersion `json:"versions"`
+	Assets     map[string]string `json:"assets"`
 }
 
 // AuthorizeImageResponse is returned by the authorization endpoint.
