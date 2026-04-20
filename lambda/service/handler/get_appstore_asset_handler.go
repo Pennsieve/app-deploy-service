@@ -15,8 +15,8 @@ import (
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
 
-func GetAppStoreContentHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	handlerName := "GetAppStoreContentHandler"
+func GetAppStoreAssetHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	handlerName := "GetAppStoreAssetHandler"
 
 	file := request.QueryStringParameters["file"]
 	if file == "" {
