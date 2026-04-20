@@ -128,15 +128,15 @@ type PermissionEntity struct {
 }
 
 // AppStoreVersion is the API model for a specific version of an appstore application.
+// DestinationUrl is intentionally omitted; it is only exposed via the registry endpoint.
 type AppStoreVersion struct {
-	Uuid           string       `json:"uuid"`
-	ApplicationId  string       `json:"applicationId"`
-	Version        string       `json:"version"`
-	ReleaseId      int          `json:"releaseId"`
-	DestinationUrl string       `json:"destinationUrl"`
-	CreatedAt      string       `json:"createdAt"`
-	Status         string       `json:"status"`
-	Deployments    []Deployment `json:"deployments"`
+	Uuid          string       `json:"uuid"`
+	ApplicationId string       `json:"applicationId"`
+	Version       string       `json:"version"`
+	ReleaseId     int          `json:"releaseId"`
+	CreatedAt     string       `json:"createdAt"`
+	Status        string       `json:"status"`
+	Deployments   []Deployment `json:"deployments"`
 }
 
 type AppStoreApplicationDetail struct {

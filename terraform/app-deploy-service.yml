@@ -199,8 +199,6 @@ components:
           type: string
         releaseId:
           type: integer
-        destinationUrl:
-          type: string
         createdAt:
           type: string
         status:

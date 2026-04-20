@@ -106,13 +106,12 @@ func AppStoreAppsToModels(apps []store_dynamodb.AppStoreApplication) []models.Ap
 
 func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVersion {
 	return models.AppStoreVersion{
-		Uuid:           v.Uuid,
-		ApplicationId:  v.ApplicationId,
-		Version:        v.Version,
-		ReleaseId:      v.ReleaseId,
-		DestinationUrl: v.DestinationUrl,
-		CreatedAt:      v.CreatedAt,
-		Status:         v.Status,
+		Uuid:          v.Uuid,
+		ApplicationId: v.ApplicationId,
+		Version:       v.Version,
+		ReleaseId:     v.ReleaseId,
+		CreatedAt:     v.CreatedAt,
+		Status:        v.Status,
 	}
 }
 
