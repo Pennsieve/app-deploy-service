@@ -259,7 +259,7 @@ components:
             type: string
           description: >
             Map of asset filename to content string. Includes files like
-            pennsieve.json and README.md when they exist in the synced
+            application.json and README.md when they exist in the synced
             repository content.
     RegistryImageResponse:
       type: object
@@ -645,7 +645,7 @@ paths:
       summary: Get app store application
       description: >
         Get a single app store application by ID, including its versions,
-        deployment history, and repository assets (e.g. pennsieve.json,
+        deployment history, and repository assets (e.g. application.json,
         README.md) when available.
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'

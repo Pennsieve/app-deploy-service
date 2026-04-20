@@ -132,15 +132,15 @@ func TestGetSyncFiles_Default(t *testing.T) {
 }
 
 func TestGetSyncFiles_FromEnv(t *testing.T) {
-	t.Setenv("CONTENT_SYNC_FILES", "pennsieve.json,README.md,CHANGELOG.md")
+	t.Setenv("CONTENT_SYNC_FILES", "application.json,README.md,CHANGELOG.md")
 	files := getSyncFiles()
-	assert.Equal(t, []string{"pennsieve.json", "README.md", "CHANGELOG.md"}, files)
+	assert.Equal(t, []string{"application.json", "README.md", "CHANGELOG.md"}, files)
 }
 
 func TestGetSyncFiles_SingleFile(t *testing.T) {
-	t.Setenv("CONTENT_SYNC_FILES", "pennsieve.json")
+	t.Setenv("CONTENT_SYNC_FILES", "application.json")
 	files := getSyncFiles()
-	assert.Equal(t, []string{"pennsieve.json"}, files)
+	assert.Equal(t, []string{"application.json"}, files)
 }
 
 func TestSyncContent_Integration(t *testing.T) {
@@ -149,7 +149,7 @@ func TestSyncContent_Integration(t *testing.T) {
 
 	mock := &mockGitHubApi{
 		contentMap: map[string]*github.GitHubContentResponse{
-			"https://github.com/org/repo/pennsieve.json/v1.0.0": {
+			"https://github.com/org/repo/application.json/v1.0.0": {
 				Content:  encoded,
 				Encoding: "base64",
 			},
@@ -166,7 +166,7 @@ func TestSyncContent_Integration(t *testing.T) {
 		RepoUrl:   "https://github.com/org/repo",
 		Tag:       "v1.0.0",
 		Namespace: "org/repo/v1.0.0",
-		Files:     []string{"pennsieve.json", "README.md"},
+		Files:     []string{"application.json", "README.md"},
 	}
 
 	results := ghsync.SyncContent(t.Context(), logger, fetcher, config, dest)
@@ -174,6 +174,6 @@ func TestSyncContent_Integration(t *testing.T) {
 		assert.NoError(t, r.Error)
 	}
 
-	assert.Equal(t, []byte(`{"name":"test-app"}`), dest.written["org/repo/v1.0.0/pennsieve.json"])
+	assert.Equal(t, []byte(`{"name":"test-app"}`), dest.written["org/repo/v1.0.0/application.json"])
 	assert.Equal(t, []byte("# Test App"), dest.written["org/repo/v1.0.0/README.md"])
 }

@@ -53,7 +53,7 @@ func TestFetchAssets_NoBucket(t *testing.T) {
 
 func TestFetchAssets_WithBucketNoS3(t *testing.T) {
 	t.Setenv("CONTENT_SYNC_BUCKET", "test-bucket")
-	t.Setenv("CONTENT_SYNC_FILES", "pennsieve.json,README.md")
+	t.Setenv("CONTENT_SYNC_FILES", "application.json,README.md")
 
 	assets := fetchAssets(t.Context(), aws.Config{}, "https://github.com/org/repo", "main")
 	// S3 calls will fail, so no assets returned
