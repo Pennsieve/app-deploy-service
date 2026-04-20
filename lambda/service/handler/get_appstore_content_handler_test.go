@@ -24,7 +24,7 @@ func TestGetAppStoreContentHandler_MissingBucket(t *testing.T) {
 
 	request := events.APIGatewayV2HTTPRequest{
 		PathParameters:        map[string]string{"id": "some-uuid"},
-		QueryStringParameters: map[string]string{"file": "pennsieve.json"},
+		QueryStringParameters: map[string]string{"file": "application.json"},
 	}
 
 	resp, err := GetAppStoreContentHandler(t.Context(), request)

@@ -15,16 +15,17 @@ import (
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
 
-// GetAppStoreAuthorizeHandler checks whether a user is authorized to pull
-// a specific appstore image and returns the ECR image URL.
+// GetAppStoreRegistryHandler resolves an appstore image URL for an authorized
+// caller. Acts as the registry lookup endpoint; will be fronted by a docker
+// proxy in a future iteration.
 // This endpoint is called by Account B's Workflow Manager during cross-account
 // ECR pull workflows.
 //
 // Query parameters:
 //   - sourceUrl: the git repository URL identifying the application
 //   - version: the specific version tag (e.g., "v1.0.7")
-func GetAppStoreAuthorizeHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	handlerName := "GetAppStoreAuthorizeHandler"
+func GetAppStoreRegistryHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	handlerName := "GetAppStoreRegistryHandler"
 
 	sourceUrl := request.QueryStringParameters["sourceUrl"]
 	version := request.QueryStringParameters["version"]
@@ -63,7 +64,7 @@ func GetAppStoreAuthorizeHandler(ctx context.Context, request events.APIGatewayV
 	}
 
 	if len(apps) == 0 {
-		resp := models.AuthorizeImageResponse{
+		resp := models.RegistryImageResponse{
 			Authorized: false,
 			Message:    "application not found in app store",
 		}
@@ -85,7 +86,7 @@ func GetAppStoreAuthorizeHandler(ctx context.Context, request events.APIGatewayV
 	}
 
 	if len(versions) == 0 {
-		resp := models.AuthorizeImageResponse{
+		resp := models.RegistryImageResponse{
 			Authorized: false,
 			Message:    "version not found for this application",
 		}
@@ -98,7 +99,7 @@ func GetAppStoreAuthorizeHandler(ctx context.Context, request events.APIGatewayV
 
 	ver := versions[0]
 	if ver.DestinationUrl == "" || ver.Status != "deployed" {
-		resp := models.AuthorizeImageResponse{
+		resp := models.RegistryImageResponse{
 			Authorized: false,
 			Message:    "version is not yet deployed",
 		}
@@ -114,7 +115,7 @@ func GetAppStoreAuthorizeHandler(ctx context.Context, request events.APIGatewayV
 	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, appAccessTable)
 
 	if !CanAccessApp(ctx, claims, &apps[0], appAccessStore) {
-		resp := models.AuthorizeImageResponse{
+		resp := models.RegistryImageResponse{
 			Authorized: false,
 			Message:    "user does not have access to this application",
 		}
@@ -128,7 +129,7 @@ func GetAppStoreAuthorizeHandler(ctx context.Context, request events.APIGatewayV
 	log.Printf("%s: authorizing image %s (source: %s, version: %s)",
 		handlerName, ver.DestinationUrl, sourceUrl, version)
 
-	resp := models.AuthorizeImageResponse{
+	resp := models.RegistryImageResponse{
 		Authorized: true,
 		ImageUrl:   ver.DestinationUrl,
 	}

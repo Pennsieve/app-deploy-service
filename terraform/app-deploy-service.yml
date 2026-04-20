@@ -259,9 +259,9 @@ components:
             type: string
           description: >
             Map of asset filename to content string. Includes files like
-            pennsieve.json and README.md when they exist in the synced
+            application.json and README.md when they exist in the synced
             repository content.
-    AuthorizeImageResponse:
+    RegistryImageResponse:
       type: object
       properties:
         authorized:
@@ -270,7 +270,7 @@ components:
           type: string
         message:
           type: string
-    AuthorizeImageDeniedResponse:
+    RegistryImageDeniedResponse:
       type: object
       properties:
         authorized:
@@ -645,7 +645,7 @@ paths:
       summary: Get app store application
       description: >
         Get a single app store application by ID, including its versions,
-        deployment history, and repository assets (e.g. pennsieve.json,
+        deployment history, and repository assets (e.g. application.json,
         README.md) when available.
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
@@ -689,13 +689,13 @@ paths:
           $ref: '#/components/responses/NotFound'
         '5XX':
           $ref: '#/components/responses/Error'
-  /store/authorize:
+  /store/registry:
     get:
-      summary: Authorize app store
-      description: Checks whether a user is authorized to pull a specific appstore image and returns the ECR image URL
+      summary: App store registry lookup
+      description: Resolves the image URL for an appstore application version for an authorized caller.
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
-      operationId: getAppStoreAuthorize
+      operationId: getAppStoreRegistry
       security:
         - token_auth: []
       tags:
@@ -719,7 +719,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthorizeImageResponse'
+                $ref: '#/components/schemas/RegistryImageResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -727,13 +727,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthorizeImageDeniedResponse'
+                $ref: '#/components/schemas/RegistryImageDeniedResponse'
         '404':
           description: Application or version not found, or version not yet deployed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthorizeImageDeniedResponse'
+                $ref: '#/components/schemas/RegistryImageDeniedResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '4XX':

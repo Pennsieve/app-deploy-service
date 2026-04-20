@@ -40,7 +40,7 @@ func newTestRouter() Router {
 	router.POST("/deploy", stubHandler)
 	router.POST("/store", stubHandler)
 	router.GET("/store", stubHandler)
-	router.GET("/store/authorize", stubHandler)
+	router.GET("/store/registry", stubHandler)
 	router.GET("/store/{id}", stubHandler)
 	router.GET("/store/{id}/permissions", stubHandler)
 	router.PUT("/store/{id}/permissions", stubHandler)
@@ -93,7 +93,7 @@ func TestRouteMatching(t *testing.T) {
 		// appstore routes
 		{"POST store", "POST", "POST /store", "/store", nil},
 		{"GET store", "GET", "GET /store", "/store", nil},
-		{"GET store authorize", "GET", "GET /store/authorize", "/store/authorize", nil},
+		{"GET store registry", "GET", "GET /store/registry", "/store/registry", nil},
 
 		// appstore application detail route
 		{"GET store app by id", "GET", "GET /store/{id}", "/store/123", map[string]string{"id": "123"}},

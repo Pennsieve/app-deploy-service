@@ -151,8 +151,8 @@ type AppStoreApplicationDetail struct {
 	Assets     map[string]string `json:"assets"`
 }
 
-// AuthorizeImageResponse is returned by the authorization endpoint.
-type AuthorizeImageResponse struct {
+// RegistryImageResponse is returned by the registry endpoint.
+type RegistryImageResponse struct {
 	Authorized bool   `json:"authorized"`
 	ImageUrl   string `json:"imageUrl,omitempty"`
 	Message    string `json:"message,omitempty"`
