@@ -46,8 +46,8 @@ func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTT
 	// AppStore application detail route
 	router.GET("/store/{id}", GetAppstoreApplicationHandler)
 
-	// AppStore content routes
-	router.GET("/store/{id}/content", GetAppStoreContentHandler)
+	// AppStore asset routes
+	router.GET("/store/{id}/asset", GetAppStoreAssetHandler)
 
 	// AppStore permission routes
 	router.GET("/store/{id}/permissions", GetAppPermissionsHandler)

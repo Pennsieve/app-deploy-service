@@ -736,13 +736,13 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '5XX':
           $ref: '#/components/responses/Error'
-  /store/{id}/content:
+  /store/{id}/asset:
     get:
-      summary: Get app store content
-      description: Retrieves a file from the synced content of an app store application. The content is read from S3 using the app's source URL and the specified tag as a namespace.
+      summary: Get app store application asset
+      description: Retrieves a file from the synced content of an app store application. The asset is read from S3 using the app's source URL and the specified tag as a namespace.
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
-      operationId: getAppStoreContent
+      operationId: getAppStoreAsset
       security:
         - token_auth: []
       tags:
