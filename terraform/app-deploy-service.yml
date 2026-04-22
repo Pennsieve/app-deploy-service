@@ -224,6 +224,11 @@ components:
           type: string
         createdAt:
           type: string
+        latestVersionTag:
+          type: string
+          description: >
+            Tag of the most recently created version for this application.
+            Omitted when the application has no tagged versions.
         versions:
           type: array
           items:
@@ -245,6 +250,11 @@ components:
           type: string
         createdAt:
           type: string
+        latestVersionTag:
+          type: string
+          description: >
+            Tag of the most recently created version for this application.
+            Omitted when the application has no tagged versions.
         versions:
           type: array
           items:

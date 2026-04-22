@@ -87,14 +87,15 @@ type AppStoreRegistrationResponse struct {
 // AppStoreApplication is the API model for an appstore application.
 // One per unique sourceUrl. Versions are nested.
 type AppStoreApplication struct {
-	Uuid       string            `json:"uuid"`
-	SourceUrl  string            `json:"sourceUrl"`
-	SourceType string            `json:"sourceType"`
-	IsPrivate  bool              `json:"isPrivate"`
-	Visibility string            `json:"visibility"`
-	OwnerId    string            `json:"ownerId"`
-	CreatedAt  string            `json:"createdAt"`
-	Versions   []AppStoreVersion `json:"versions"`
+	Uuid             string            `json:"uuid"`
+	SourceUrl        string            `json:"sourceUrl"`
+	SourceType       string            `json:"sourceType"`
+	IsPrivate        bool              `json:"isPrivate"`
+	Visibility       string            `json:"visibility"`
+	OwnerId          string            `json:"ownerId"`
+	CreatedAt        string            `json:"createdAt"`
+	LatestVersionTag string            `json:"latestVersionTag,omitempty"`
+	Versions         []AppStoreVersion `json:"versions"`
 }
 
 type AppAccess struct {

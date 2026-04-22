@@ -85,6 +85,7 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 		}
 
 		applications[i].Versions = versions
+		applications[i].LatestVersionTag = latestVersionTag(versions)
 	}
 
 	m, err := json.Marshal(applications)
