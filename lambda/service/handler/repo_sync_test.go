@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"sync"
 	"testing"
 
 	github "github.com/pennsieve/github-client/pkg/github"
@@ -113,10 +114,13 @@ func TestGitHubContentFetcher_GetContent_Error(t *testing.T) {
 }
 
 type mockDestination struct {
+	mu      sync.Mutex
 	written map[string][]byte
 }
 
 func (m *mockDestination) Write(ctx context.Context, key string, data []byte, contentType string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.written[key] = data
 	return nil
 }
