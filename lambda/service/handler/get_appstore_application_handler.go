@@ -88,9 +88,10 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 		application.Versions = versions
 	}
 
+	latestTag := latestVersionTag(application.Versions)
 	tag := request.QueryStringParameters["tag"]
 	if tag == "" {
-		tag = latestVersionTag(application.Versions)
+		tag = latestTag
 	}
 
 	assets := map[string]string{}
@@ -99,15 +100,16 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 	}
 
 	detail := models.AppStoreApplicationDetail{
-		Uuid:       application.Uuid,
-		SourceUrl:  application.SourceUrl,
-		SourceType: application.SourceType,
-		IsPrivate:  application.IsPrivate,
-		Visibility: application.Visibility,
-		OwnerId:    application.OwnerId,
-		CreatedAt:  application.CreatedAt,
-		Versions:   application.Versions,
-		Assets:     assets,
+		Uuid:             application.Uuid,
+		SourceUrl:        application.SourceUrl,
+		SourceType:       application.SourceType,
+		IsPrivate:        application.IsPrivate,
+		Visibility:       application.Visibility,
+		OwnerId:          application.OwnerId,
+		CreatedAt:        application.CreatedAt,
+		LatestVersionTag: latestTag,
+		Versions:         application.Versions,
+		Assets:           assets,
 	}
 
 	m, err := json.Marshal(detail)

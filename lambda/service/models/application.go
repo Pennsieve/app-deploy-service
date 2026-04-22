@@ -140,15 +140,16 @@ type AppStoreVersion struct {
 }
 
 type AppStoreApplicationDetail struct {
-	Uuid       string            `json:"uuid"`
-	SourceUrl  string            `json:"sourceUrl"`
-	SourceType string            `json:"sourceType"`
-	IsPrivate  bool              `json:"isPrivate"`
-	Visibility string            `json:"visibility"`
-	OwnerId    string            `json:"ownerId"`
-	CreatedAt  string            `json:"createdAt"`
-	Versions   []AppStoreVersion `json:"versions"`
-	Assets     map[string]string `json:"assets"`
+	Uuid             string            `json:"uuid"`
+	SourceUrl        string            `json:"sourceUrl"`
+	SourceType       string            `json:"sourceType"`
+	IsPrivate        bool              `json:"isPrivate"`
+	Visibility       string            `json:"visibility"`
+	OwnerId          string            `json:"ownerId"`
+	CreatedAt        string            `json:"createdAt"`
+	LatestVersionTag string            `json:"latestVersionTag,omitempty"`
+	Versions         []AppStoreVersion `json:"versions"`
+	Assets           map[string]string `json:"assets"`
 }
 
 // RegistryImageResponse is returned by the registry endpoint.
