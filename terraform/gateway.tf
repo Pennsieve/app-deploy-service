@@ -20,9 +20,9 @@ locals {
 }
 
 resource "aws_apigatewayv2_api" "app_deploy_service_api" {
-  name          = "${var.environment_name}-${var.service_name}-api-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
+  name          = "Applications API"
   protocol_type = "HTTP"
-  description   = "API for the App Deploy Service"
+  description   = "This is the serverless Applications API"
   cors_configuration {
     allow_origins     = local.cors_allowed_origins
     allow_methods     = ["OPTIONS", "GET", "POST", "PUT", "DELETE"]
