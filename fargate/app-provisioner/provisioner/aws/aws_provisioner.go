@@ -2,6 +2,7 @@ package provisioner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os/exec"
@@ -12,10 +13,17 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/utils"
 )
+
+type s3BackendAPI interface {
+	HeadBucket(ctx context.Context, params *s3.HeadBucketInput, optFns ...func(*s3.Options)) (*s3.HeadBucketOutput, error)
+	CreateBucket(ctx context.Context, params *s3.CreateBucketInput, optFns ...func(*s3.Options)) (*s3.CreateBucketOutput, error)
+	PutBucketVersioning(ctx context.Context, params *s3.PutBucketVersioningInput, optFns ...func(*s3.Options)) (*s3.PutBucketVersioningOutput, error)
+}
 
 type AWSProvisioner struct {
 	Config              aws.Config
@@ -73,26 +81,15 @@ func (p *AWSProvisioner) Create(ctx context.Context) error {
 		return err
 	}
 
-	// check for backend bucket
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.Credentials = credentials.NewStaticCredentialsProvider(creds.AccessKeyID, creds.SecretAccessKey, creds.SessionToken)
 	})
-	resp, err := client.ListBuckets(ctx, &s3.ListBucketsInput{})
-	if err != nil {
+
+	bucket := fmt.Sprintf("tfstate-%s", p.AccountId)
+	if err := ensureBackendBucket(ctx, client, bucket, cfg.Region); err != nil {
 		return err
 	}
-
-	for _, b := range resp.Buckets {
-		if *b.Name == fmt.Sprintf("tfstate-%s", p.AccountId) {
-			p.BackendExists = true
-			break
-		}
-	}
-
-	if !p.BackendExists {
-		// create s3 backend bucket
-		return fmt.Errorf("expected tfstate-%s to exist", p.AccountId)
-	}
+	p.BackendExists = true
 
 	// create infrastructure
 	runOnGPUStr := strconv.FormatBool(p.RunOnGPU)
@@ -140,6 +137,46 @@ func (p *AWSProvisioner) CreatePublicRepository(ctx context.Context) error {
 	}
 	fmt.Println(string(out))
 
+	return nil
+}
+
+func ensureBackendBucket(ctx context.Context, client s3BackendAPI, bucket, region string) error {
+	_, err := client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(bucket)})
+	if err == nil {
+		return nil
+	}
+
+	var notFound *s3types.NotFound
+	var noSuchBucket *s3types.NoSuchBucket
+	if !errors.As(err, &notFound) && !errors.As(err, &noSuchBucket) {
+		return fmt.Errorf("checking backend bucket %s: %w", bucket, err)
+	}
+
+	log.Printf("backend bucket %s not found, creating ...", bucket)
+
+	createInput := &s3.CreateBucketInput{Bucket: aws.String(bucket)}
+	if region != "" && region != "us-east-1" {
+		createInput.CreateBucketConfiguration = &s3types.CreateBucketConfiguration{
+			LocationConstraint: s3types.BucketLocationConstraint(region),
+		}
+	}
+	if _, err := client.CreateBucket(ctx, createInput); err != nil {
+		var alreadyOwned *s3types.BucketAlreadyOwnedByYou
+		if !errors.As(err, &alreadyOwned) {
+			return fmt.Errorf("creating backend bucket %s: %w", bucket, err)
+		}
+	}
+
+	if _, err := client.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{
+		Bucket: aws.String(bucket),
+		VersioningConfiguration: &s3types.VersioningConfiguration{
+			Status: s3types.BucketVersioningStatusEnabled,
+		},
+	}); err != nil {
+		return fmt.Errorf("enabling versioning on %s: %w", bucket, err)
+	}
+
+	log.Printf("backend bucket %s ready", bucket)
 	return nil
 }
 
