@@ -55,7 +55,12 @@ func TestBuildNamespace(t *testing.T) {
 
 func TestSyncRepoContent_NoBucket(t *testing.T) {
 	t.Setenv("CONTENT_SYNC_BUCKET", "")
-	syncRepoContent(t.Context(), "https://github.com/org/repo", "main", "")
+	syncRepoContent(t.Context(), "https://github.com/org/repo", "main", "token")
+}
+
+func TestSyncRepoContent_DefaultTag(t *testing.T) {
+	t.Setenv("CONTENT_SYNC_BUCKET", "")
+	syncRepoContent(t.Context(), "https://github.com/org/repo", "", "")
 }
 
 type mockGitHubApi struct {
