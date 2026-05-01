@@ -42,6 +42,7 @@ func newTestRouter() Router {
 	router.GET("/store", stubHandler)
 	router.GET("/store/registry", stubHandler)
 	router.GET("/store/{id}", stubHandler)
+	router.PATCH("/store/{id}", stubHandler)
 	router.GET("/store/{id}/permissions", stubHandler)
 	router.PUT("/store/{id}/permissions", stubHandler)
 	return router
@@ -55,7 +56,7 @@ func TestUnknownRouteReturnsNotFound(t *testing.T) {
 }
 
 func TestUnsupportedMethodReturnsUnprocessableEntity(t *testing.T) {
-	request := newRequest("PATCH", "PATCH /", "/", nil)
+	request := newRequest("OPTIONS", "OPTIONS /", "/", nil)
 	resp, _ := AppDeployServiceHandler(context.Background(), request)
 	assert.Equal(t, http.StatusUnprocessableEntity, resp.StatusCode)
 	assert.Equal(t, ErrUnsupportedPath.Error(), resp.Body)
@@ -97,6 +98,7 @@ func TestRouteMatching(t *testing.T) {
 
 		// appstore application detail route
 		{"GET store app by id", "GET", "GET /store/{id}", "/store/123", map[string]string{"id": "123"}},
+		{"PATCH store app by id", "PATCH", "PATCH /store/{id}", "/store/123", map[string]string{"id": "123"}},
 
 		// appstore permission routes
 		{"GET store permissions", "GET", "GET /store/{id}/permissions", "/store/123/permissions", map[string]string{"id": "123"}},
@@ -126,6 +128,7 @@ func TestUnknownRoutePerMethod(t *testing.T) {
 		{"POST unknown", "POST", "POST /nonexistent"},
 		{"DELETE unknown", "DELETE", "DELETE /nonexistent"},
 		{"PUT unknown", "PUT", "PUT /nonexistent"},
+		{"PATCH unknown", "PATCH", "PATCH /nonexistent"},
 	}
 
 	for _, tt := range tests {

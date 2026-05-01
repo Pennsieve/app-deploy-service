@@ -14,3 +14,9 @@ const applicationIdTag = "ApplicationId"
 
 // Special identifier for appstore deployments (used for workspace and compute node)
 const appstoreIdentifier = "APP_STORE"
+
+// AppStore application lifecycle statuses.
+const (
+	AppStoreStatusActive   = "active"
+	AppStoreStatusArchived = "archived"
+)

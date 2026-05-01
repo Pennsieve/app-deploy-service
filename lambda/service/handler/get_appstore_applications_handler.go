@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -56,8 +57,18 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 		}, nil
 	}
 
+	includeArchived := false
+	if v, found := queryParams["includeArchived"]; found {
+		if parsed, parseErr := strconv.ParseBool(v); parseErr == nil {
+			includeArchived = parsed
+		}
+	}
+
 	var filteredApps []store_dynamodb.AppStoreApplication
 	for _, app := range dynamoApps {
+		if !includeArchived && app.Status == AppStoreStatusArchived {
+			continue
+		}
 		if CanAccessApp(ctx, claims, &app, appAccessStore) {
 			filteredApps = append(filteredApps, app)
 		}

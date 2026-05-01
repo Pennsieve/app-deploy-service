@@ -224,6 +224,10 @@ components:
           type: string
         createdAt:
           type: string
+        status:
+          type: string
+          enum: [active, archived]
+          description: Lifecycle status of the application. Defaults to "active".
         latestVersionTag:
           type: string
           description: >
@@ -250,6 +254,10 @@ components:
           type: string
         createdAt:
           type: string
+        status:
+          type: string
+          enum: [active, archived]
+          description: Lifecycle status of the application. Defaults to "active".
         latestVersionTag:
           type: string
           description: >
@@ -267,6 +275,15 @@ components:
             Map of asset filename to content string. Includes files like
             application.json and README.md when they exist in the synced
             repository content.
+    PatchAppStoreApplicationRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, archived]
+          description: New lifecycle status for the application.
+      required:
+        - status
     RegistryImageResponse:
       type: object
       properties:
@@ -635,6 +652,15 @@ paths:
           schema:
             type: string
           description: Filter applications by source URL
+        - in: query
+          name: includeArchived
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: >
+            When false (default), archived applications are excluded from the
+            response. Set to true to include archived applications.
       responses:
         '200':
           description: List of app store applications
@@ -691,6 +717,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AppStoreApplicationDetail'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '5XX':
+          $ref: '#/components/responses/Error'
+    patch:
+      summary: Update app store application
+      description: >
+        Partially update an app store application. Currently supports changing
+        the lifecycle status (e.g. to "archived"). Only the application owner
+        may perform this operation.
+      x-amazon-apigateway-integration:
+        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
+      operationId: patchAppStoreApplication
+      security:
+        - token_auth: []
+      tags:
+        - App Store
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The app store application UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchAppStoreApplicationRequest'
+      responses:
+        '200':
+          description: The updated app store application
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppStoreApplication'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

@@ -27,6 +27,7 @@ type AppStoreDBStore interface {
 	GetById(context.Context, string) (*AppStoreApplication, error)
 	Insert(context.Context, AppStoreApplication) error
 	UpdateVisibility(context.Context, string, string) error
+	UpdateStatus(context.Context, string, string) error
 }
 
 type AppStoreDatabaseStore struct {
@@ -130,6 +131,31 @@ func (r *AppStoreDatabaseStore) UpdateVisibility(ctx context.Context, uuid strin
 	})
 	if err != nil {
 		return fmt.Errorf("error updating visibility: %w", err)
+	}
+	return nil
+}
+
+func (r *AppStoreDatabaseStore) UpdateStatus(ctx context.Context, uuid string, status string) error {
+	uuidAv, err := attributevalue.Marshal(uuid)
+	if err != nil {
+		return fmt.Errorf("error marshaling uuid: %w", err)
+	}
+
+	update := expression.Set(expression.Name("status"), expression.Value(status))
+	expr, err := expression.NewBuilder().WithUpdate(update).Build()
+	if err != nil {
+		return fmt.Errorf("error building update expression: %w", err)
+	}
+
+	_, err = r.api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(r.TableName),
+		Key:                       map[string]dynamodbTypes.AttributeValue{"uuid": uuidAv},
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+	})
+	if err != nil {
+		return fmt.Errorf("error updating status: %w", err)
 	}
 	return nil
 }

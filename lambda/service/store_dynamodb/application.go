@@ -66,6 +66,7 @@ type AppStoreApplication struct {
 	Visibility string `dynamodbav:"visibility"`
 	OwnerId    string `dynamodbav:"ownerId"`
 	CreatedAt  string `dynamodbav:"createdAt"`
+	Status     string `dynamodbav:"status,omitempty"`
 }
 
 type AppAccess struct {
