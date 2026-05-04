@@ -619,10 +619,16 @@ paths:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: getAppStoreApplications
       security:
-        - token_auth: []
+        - token_workspace_auth: []
       tags:
         - App Store
       parameters:
+        - in: query
+          name: organization_id
+          schema:
+            type: string
+          required: true
+          description: The organization ID.
         - in: query
           name: sourceUrl
           required: false
