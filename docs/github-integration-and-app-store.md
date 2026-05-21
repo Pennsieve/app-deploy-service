@@ -2,62 +2,106 @@
 
 This guide walks you through connecting your GitHub account to Pennsieve and publishing an application to the Pennsieve App Store every time you cut a new GitHub release.
 
-It is split into three parts:
+It is split into four parts:
 
 1. [Linking your GitHub account to Pennsieve](#1-linking-your-github-account-to-pennsieve)
-2. [Publishing a repository to the App Store on each GitHub release](#2-publishing-a-repository-to-the-app-store-on-each-github-release)
-3. [How application permissions work (in plain English)](#3-how-application-permissions-work-in-plain-english)
+2. [Choosing which repositories Pennsieve tracks](#2-choosing-which-repositories-pennsieve-tracks)
+3. [Publishing a repository to the App Store on each GitHub release](#3-publishing-a-repository-to-the-app-store-on-each-github-release)
+4. [How application permissions work (in plain English)](#4-how-application-permissions-work-in-plain-english)
 
 ---
 
 ## 1. Linking your GitHub account to Pennsieve
 
-Before Pennsieve can read your repositories or react to your releases, you need to tell GitHub that Pennsieve is allowed to act on your behalf. We do this once, through the **Pennsieve GitHub App**.
+Before Pennsieve can read your repositories or react to your releases, you need to tell GitHub that Pennsieve is allowed to act on your behalf. We do this once, through the **Pennsieve GitHub Application**.
 
-### What you'll end up with
+### Where to find it in the app
 
-- Your GitHub username, avatar, and a secure access token stored against your Pennsieve user profile.
-- The **Pennsieve GitHub App** installed on the repositories you want to share with Pennsieve.
+1. Sign in to Pennsieve.
+2. From the left navigation, open **My Workspace → Settings**.
+3. Click **Integrations**. You'll see a card for each available integration (ORCID, GitHub, API Keys).
+4. On the **GitHub** card, click **Connect GitHub**.
 
-### Step-by-step
+   *(URL: `/my-workspace/settings/integrations/github`)*
 
-1. **Sign in to Pennsieve** at the usual web app.
-2. Open **Settings → Integrations → GitHub** (or whichever screen your workspace uses to manage integrations).
-3. Click **Connect GitHub Account**.
-   - You'll be redirected to GitHub.
-   - GitHub will ask you to sign in (if you aren't already) and to approve the Pennsieve GitHub App.
-4. **Choose which repositories Pennsieve can see.** GitHub will give you two options:
+### What happens when you click Connect
+
+Pennsieve opens a popup window to GitHub. From there:
+
+1. GitHub asks you to sign in (if you aren't already).
+2. GitHub asks you to install and authorize the **Pennsieve GitHub Application**.
+3. GitHub asks you which repositories Pennsieve should be allowed to see:
    - **All repositories** — Pennsieve can see every repo you own, now and in the future.
-   - **Only select repositories** — pick the specific repos you want to publish to Pennsieve. *This is the recommended option.*
-5. Click **Install & Authorize**.
-6. GitHub sends you back to Pennsieve. Behind the scenes, Pennsieve:
-   - Exchanges the short-lived code GitHub returned for a long-lived access token.
-   - Looks up your GitHub profile (login, URL, avatar).
-   - Stores the access token and the GitHub **installation ID** against your Pennsieve user.
-7. You should now see your GitHub avatar and username on the integrations screen, with a **Connected** badge.
+   - **Only select repositories** — pick the specific repos you want to share with Pennsieve. *This is the recommended option.*
+4. Click **Install & Authorize**.
+5. The popup closes itself, and the GitHub card on the Integrations page now shows your GitHub username and a **Connected** badge.
+
+Behind the scenes Pennsieve has:
+
+- Exchanged the short-lived code GitHub returned for a long-lived access token.
+- Looked up your GitHub profile (login, URL, avatar).
+- Stored the access token and the GitHub **installation ID** against your Pennsieve user.
+
+### Updating which repos Pennsieve sees
+
+After you've connected, the GitHub integration card shows two buttons:
+
+- **Manage GitHub** — opens the GitHub integration detail page on Pennsieve.
+- **Update Integration** — re-opens the GitHub App install screen so you can add or remove repositories that Pennsieve can access. Use this any time you create a new repo that you want Pennsieve to track.
 
 ### Disconnecting
 
-To remove the connection, click **Disconnect GitHub** on the same integrations screen. This:
+To remove the connection, open the GitHub detail page (**Manage GitHub**) and click the **delete** (trash) icon next to your GitHub username. A confirmation dialog explains what disconnecting does:
 
-- Removes the Pennsieve GitHub App from your selected repositories on the GitHub side.
-- Deletes your stored GitHub profile and access token on the Pennsieve side.
+- Pennsieve will no longer track GitHub repositories in your account.
+- GitHub releases will no longer result in Pennsieve GitHub publications.
+- You can no longer create Applications and Workflows on Pennsieve.
 
-You can re-link at any time by repeating the steps above.
+You can re-link any time by repeating the connect flow.
 
 ### Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| "Repository not found" when publishing | The Pennsieve GitHub App is not installed on the repo. | Go to **GitHub → Settings → Applications → Pennsieve** and add the missing repo. |
-| "Connect" button keeps re-prompting | A previous installation was deleted on GitHub but not on Pennsieve. | Click **Disconnect GitHub** and connect again. |
-| You see someone else's GitHub profile | You signed in to a different GitHub account in your browser. | Sign out of GitHub, then click **Connect GitHub Account** again. |
+| The repo you want to publish isn't listed under **My Code** | The Pennsieve GitHub Application isn't installed on the repo. | Click **Update Integration** on the GitHub card and add the repo, or do it on GitHub at **Settings → Applications → Pennsieve**. |
+| You see someone else's GitHub profile after connecting | You were signed in to the wrong GitHub account in your browser. | Click **delete** on the GitHub detail page to disconnect, sign out of GitHub, then reconnect. |
+| The popup never sends you back | A browser popup blocker stopped it. | Allow popups for the Pennsieve domain and click **Connect GitHub** again. |
 
 ---
 
-## 2. Publishing a repository to the App Store on each GitHub release
+## 2. Choosing which repositories Pennsieve tracks
 
-Once your account is linked, you can opt **any repository** the Pennsieve GitHub App can see into the App Store. From then on, **every GitHub release** you publish on that repository becomes a new version of your app in the Pennsieve App Store.
+Once your GitHub account is linked, Pennsieve shows the repos the Pennsieve GitHub Application has access to under **My Workspace → My Code** (URL: `/my-workspace/code`).
+
+The **My Code** page lists each repository with:
+
+- The repo name and a link out to GitHub.
+- A **Private** badge if it's private on GitHub.
+- The primary **language** of the repo (e.g. `Python`, `Go`).
+- A **Publishing Settings** box showing whether each destination is **On** or **Off** for that repo:
+  - **Discover** — generate a citable DOI and a public landing page for each release.
+  - **App Store** — register each release as a new version of an application in the Pennsieve App Store.
+
+Use the **refresh** icon at the top of the list to pull the latest set of repos from GitHub (e.g. after you've added a new repo to the GitHub App installation).
+
+### Turning on publishing for a repository
+
+1. On the repo's row, click the **settings** (gear) icon inside the **Publishing Settings** box.
+2. The **Publishing Settings** dialog opens.
+3. Tick the destinations you want:
+   - **Pennsieve Discover** — publish each release as an archived, citable dataset with a DOI and landing page.
+   - **App Store** — publish each release as a new version of an app in the Pennsieve App Store.
+4. Click **Save Settings**.
+
+> **Status note:** the **App Store** option is currently labeled **Coming Soon** in the publishing dialog and is disabled — once it ships, the rest of the flow described in the next section runs automatically.
+
+From this point forward, every release you publish on GitHub for this repo will produce a Pennsieve publication in the destinations you ticked.
+
+---
+
+## 3. Publishing a repository to the App Store on each GitHub release
+
+Once App Store is turned on for a repo, the developer workflow is just normal GitHub — there's nothing to push from inside Pennsieve.
 
 ### How it works at a glance
 
@@ -68,64 +112,53 @@ You publish a GitHub release  ─►  GitHub notifies Pennsieve  ─►  Pennsie
                                                                   shows up in the catalog
 ```
 
-### One-time setup for a repository
-
-1. In Pennsieve, go to **App Store → Add Application** (or **Publish Repository**).
-2. Select the repository from the list of repos the Pennsieve GitHub App has access to.
-   - If the repo you want isn't there, jump to **GitHub → Settings → Applications → Pennsieve** and add it to the installation, then refresh.
-3. Choose whether the application should be **public** or **private** in the App Store.
-   - This is a default for new versions. You can change it later — see the [permissions section](#3-how-application-permissions-work-in-plain-english).
-4. Click **Enable**.
-
-That's it. Your repository is now wired up.
-
 ### Required files in your repository
 
-So Pennsieve has something to show in the App Store, your repository needs to contain these files at the root (on the tag you're releasing):
+For Pennsieve to display and run the app, your repository must contain these files at the root on the tag being released:
 
 | File | Purpose |
 |---|---|
-| `application.json` | App metadata — name, description, command, inputs, outputs, etc. |
-| `README.md` | Long-form description rendered on the App Store detail page. |
+| `application.json` | App metadata — name, description, command, inputs, outputs, language/runtime, etc. |
+| `README.md` | Long-form description shown on the App Store detail page. |
 
-These are pulled automatically from the tag whenever a release is published.
+These are pulled automatically from the release tag.
+
+The `application.json` file is also where you declare the runtime / language the app expects (e.g. `python`, `r`, `julia`, container base image). This is the field the App Store and Workflow Manager use to choose how to execute your app.
 
 ### Cutting a new release
-
-Once setup is done, the developer workflow is just normal GitHub:
 
 1. Tag your commit (e.g. `v1.0.7`).
 2. On GitHub, click **Releases → Draft a new release**, select the tag, fill in release notes, and click **Publish release**.
 3. Pennsieve picks up the release automatically:
    - A new **version** entry is created for your app in the App Store, starting in `registering` state.
    - A background job clones the release tag, builds it, and pushes it to Pennsieve's container registry.
-   - When the build succeeds, the version status flips to `deployed` and becomes runnable from the App Store.
-4. You can watch progress in **App Store → \[your app\] → Versions**. The status will move through:
+   - When the build succeeds, the version status flips to `deployed` and is runnable from the App Store.
+4. You can watch progress under **App Store → \[your app\] → Versions**. Statuses move through:
    - `registering` → `building` → `deployed` (success), or
    - `failed` (with a reason — usually a missing `application.json` or a build error).
 
 ### Private repositories
 
-Private repos work exactly the same way. When the App Store needs to clone or read a private repo, it uses the access token Pennsieve stored when you linked your GitHub account, so make sure that account is the one that has access to the repo. If you lose access on GitHub (e.g. you leave the org that owns the repo), Pennsieve will no longer be able to build new releases.
+Private repos work exactly the same way. Pennsieve uses the access token stored when you linked your GitHub account, so the linked account must have access to the repo. If you lose access on GitHub (e.g. you leave the org that owns the repo), Pennsieve will no longer be able to build new releases.
 
 ### Updating a release
 
-Pennsieve treats each release tag as immutable. If you need to ship a fix, **cut a new release with a new tag** (e.g. `v1.0.8`) rather than re-using `v1.0.7`. Re-tagging the same name in GitHub is not a supported way to update an existing App Store version.
+Pennsieve treats each release tag as immutable. To ship a fix, **cut a new release with a new tag** (e.g. `v1.0.8`). Re-tagging the same name on GitHub is not a supported way to update an existing App Store version.
 
-### Removing a repository from the App Store
+### Turning off App Store publishing
 
-Open the application in the App Store and click **Remove from App Store**. Existing versions are kept for users who already have them, but no new releases will be ingested. To stop Pennsieve from seeing the repo entirely, remove it from the Pennsieve GitHub App installation on the GitHub side.
+Open the repo's **Publishing Settings** dialog from **My Code**, untick **App Store**, and save. New releases will no longer be ingested. Existing versions remain in the App Store for users who already have them.
 
 ---
 
-## 3. How application permissions work (in plain English)
+## 4. How application permissions work (in plain English)
 
 Permissions on an App Store application answer two questions:
 
 1. **Who can *see* this app in the App Store?**
 2. **Who can *change* this app's settings, sharing, or remove it?**
 
-Pennsieve's model is intentionally simple. Here are the concepts:
+Pennsieve's model is intentionally simple. Here are the concepts.
 
 ### Who's involved
 
@@ -142,7 +175,7 @@ Every app is either **public** or **private**.
 | **Public** | Everyone with a Pennsieve account. Think of this as listing your app in an open marketplace. |
 | **Private** | Only the owner, plus the specific users, teams, and workspaces the owner has shared it with. |
 
-You set this once when you publish the app and can change it any time from the app's settings page.
+You set this once when you publish the app and can change it any time from the app's permissions page.
 
 ### A useful analogy
 
@@ -155,12 +188,12 @@ Think of a published app like a **document in a shared drive**:
 
 ### What can each role do?
 
-| Action | Owner | Shared user/team/workspace member | Anyone else |
+| Action | Owner | Shared user / team / workspace member | Anyone else |
 |---|---|---|---|
-| See the app in the App Store catalog | ✓ | ✓ (private apps) / ✓ (public apps) | ✓ public only |
-| Run/use the app | ✓ | ✓ | ✓ public only |
+| See the app in the App Store catalog | ✓ | ✓ | ✓ public only |
+| Run / use the app | ✓ | ✓ | ✓ public only |
 | Change the visibility (public ↔ private) | ✓ | ✗ | ✗ |
-| Share with more users/teams | ✓ | ✗ | ✗ |
+| Share with more users / teams | ✓ | ✗ | ✗ |
 | Remove the app from the App Store | ✓ | ✗ | ✗ |
 | Publish new versions (via GitHub releases) | ✓ (whoever owns the linked GitHub account) | ✗ | ✗ |
 
@@ -190,12 +223,16 @@ A user is considered to have access if **any one** of these is true: they're the
 
 ### Changing your mind later
 
-All of the above is editable. Open the app in the App Store, go to **Permissions**, change visibility or edit the share list, and save. Existing users keep working until the next time their permissions are checked.
+All of the above is editable. Open the app in the App Store, go to **Permissions**, change visibility or edit the share list, and save.
 
 ---
 
-## Appendix — How this is wired up under the hood (for the curious)
+## Appendix — Where things live
 
-- **GitHub account linking** is handled by `github-service`. The browser-side OAuth flow returns a short-lived `code` and `installation_id`. Pennsieve exchanges them for an access token and stores them on the user's profile.
-- **App Store publishing** is handled by `app-deploy-service`. When a release event arrives, `POST /store` records the new application (if first time) and a new version row, then kicks off a Fargate task that clones the tag, builds the container, and pushes it to the Pennsieve registry.
-- **Authorization** for everything App Store-related (catalog, registry, permissions) goes through the `CanAccessApp` check: public apps are open, otherwise the user must be the owner, or be listed individually, via a team, or via their workspace.
+| Concept | In the web app | Behind the scenes |
+|---|---|---|
+| Connect / disconnect GitHub | **My Workspace → Settings → Integrations → GitHub** | `github-service` (`POST /accounts/github/register`, `DELETE /accounts/github/user`) |
+| Add / remove repos the App can see | **Update Integration** button on the GitHub card → GitHub install screen | GitHub App installation; Pennsieve stores only the installation ID |
+| See tracked repos & toggle publishing | **My Workspace → My Code** | `codeReposModule/fetchMyRepos` |
+| App Store catalog, versions, permissions | **App Store** | `app-deploy-service` (`POST /store`, `GET /store/...`, `PUT /store/{id}/permissions`) |
+| Authorization rule | — | `CanAccessApp` in `app-deploy-service`: public ⇒ open; otherwise owner, user share, team share, or workspace share |
