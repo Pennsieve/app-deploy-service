@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/pennsieve/app-deploy-service/service/mappers"
+	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
@@ -66,7 +67,7 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 
 	var filteredApps []store_dynamodb.AppStoreApplication
 	for _, app := range dynamoApps {
-		if !includeArchived && app.Status == AppStoreStatusArchived {
+		if !includeArchived && app.Status == models.AppStoreStatusArchived {
 			continue
 		}
 		if CanAccessApp(ctx, claims, &app, appAccessStore) {

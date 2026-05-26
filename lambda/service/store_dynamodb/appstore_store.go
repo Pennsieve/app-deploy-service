@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	dynamodbTypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/pennsieve/app-deploy-service/service/models"
 )
 
 // AppStoreTableAPI is a narrow interface containing only the DynamoDB client methods used by AppStoreDatabaseStore.
@@ -27,7 +28,7 @@ type AppStoreDBStore interface {
 	GetById(context.Context, string) (*AppStoreApplication, error)
 	Insert(context.Context, AppStoreApplication) error
 	UpdateVisibility(context.Context, string, string) error
-	UpdateStatus(context.Context, string, string) error
+	UpdateStatus(context.Context, string, models.AppStoreStatus) error
 }
 
 type AppStoreDatabaseStore struct {
@@ -135,7 +136,7 @@ func (r *AppStoreDatabaseStore) UpdateVisibility(ctx context.Context, uuid strin
 	return nil
 }
 
-func (r *AppStoreDatabaseStore) UpdateStatus(ctx context.Context, uuid string, status string) error {
+func (r *AppStoreDatabaseStore) UpdateStatus(ctx context.Context, uuid string, status models.AppStoreStatus) error {
 	uuidAv, err := attributevalue.Marshal(uuid)
 	if err != nil {
 		return fmt.Errorf("error marshaling uuid: %w", err)

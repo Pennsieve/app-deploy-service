@@ -112,7 +112,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			Visibility: visibility,
 			OwnerId:    userId,
 			CreatedAt:  time.Now().UTC().String(),
-			Status:     AppStoreStatusActive,
+			Status:     models.AppStoreStatusActive,
 		}
 		if err := appStoreStore.Insert(ctx, appRecord); err != nil {
 			log.Println("error inserting appstore application: ", err.Error())

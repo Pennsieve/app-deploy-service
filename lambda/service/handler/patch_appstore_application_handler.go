@@ -14,7 +14,6 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
-	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 )
 
 func PatchAppstoreApplicationHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -29,25 +28,12 @@ func PatchAppstoreApplicationHandler(ctx context.Context, request events.APIGate
 	}
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, ErrNotPermitted),
-		}, nil
-	}
 
 	var req models.PatchAppStoreApplicationRequest
 	if err := json.Unmarshal([]byte(request.Body), &req); err != nil {
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusBadRequest,
-			Body:       handlerError(handlerName, ErrUnmarshaling),
-		}, nil
-	}
-
-	if req.Status != AppStoreStatusActive && req.Status != AppStoreStatusArchived {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusBadRequest,
-			Body:       handlerError(handlerName, ErrInvalidStatus),
+			Body:       handlerError(handlerName, err),
 		}, nil
 	}
 

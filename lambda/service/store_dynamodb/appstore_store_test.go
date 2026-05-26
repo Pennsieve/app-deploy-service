@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
+	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -314,7 +315,7 @@ func TestAppStoreApplication_StatusRoundTrip(t *testing.T) {
 	var roundTripped AppStoreApplication
 	err = attributevalue.UnmarshalMap(item, &roundTripped)
 	require.NoError(t, err)
-	assert.Equal(t, "archived", roundTripped.Status)
+	assert.Equal(t, models.AppStoreStatusArchived, roundTripped.Status)
 }
 
 func TestAppStoreApplication_VisibilityAndOwnerFields(t *testing.T) {

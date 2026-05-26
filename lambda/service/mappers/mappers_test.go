@@ -3,6 +3,7 @@ package mappers
 import (
 	"testing"
 
+	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +16,7 @@ func TestAppStoreAppToModel_DefaultsStatusToActive(t *testing.T) {
 	}
 
 	result := AppStoreAppToModel(app)
-	assert.Equal(t, "active", result.Status)
+	assert.Equal(t, models.AppStoreStatusActive, result.Status)
 }
 
 func TestAppStoreAppToModel_PreservesArchivedStatus(t *testing.T) {
@@ -26,5 +27,5 @@ func TestAppStoreAppToModel_PreservesArchivedStatus(t *testing.T) {
 	}
 
 	result := AppStoreAppToModel(app)
-	assert.Equal(t, "archived", result.Status)
+	assert.Equal(t, models.AppStoreStatusArchived, result.Status)
 }

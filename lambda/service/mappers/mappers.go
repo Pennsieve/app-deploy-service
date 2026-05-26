@@ -65,7 +65,7 @@ func DynamoDBApplicationToJsonApplication(dynamoApplications []store_dynamodb.Ap
 func AppStoreAppToModel(a store_dynamodb.AppStoreApplication) models.AppStoreApplication {
 	status := a.Status
 	if status == "" {
-		status = "active"
+		status = models.AppStoreStatusActive
 	}
 	return models.AppStoreApplication{
 		Uuid:       a.Uuid,
