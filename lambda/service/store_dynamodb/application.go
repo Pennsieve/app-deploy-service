@@ -3,6 +3,7 @@ package store_dynamodb
 import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/pennsieve/app-deploy-service/service/models"
 )
 
 type Application struct {
@@ -62,10 +63,11 @@ type AppStoreApplication struct {
 	Uuid       string `dynamodbav:"uuid"`
 	SourceUrl  string `dynamodbav:"sourceUrl"`
 	SourceType string `dynamodbav:"sourceType"`
-	IsPrivate  bool   `dynamodbav:"isPrivate"`
-	Visibility string `dynamodbav:"visibility"`
-	OwnerId    string `dynamodbav:"ownerId"`
-	CreatedAt  string `dynamodbav:"createdAt"`
+	IsPrivate  bool                  `dynamodbav:"isPrivate"`
+	Visibility string                `dynamodbav:"visibility"`
+	OwnerId    string                `dynamodbav:"ownerId"`
+	CreatedAt  string                `dynamodbav:"createdAt"`
+	Status     models.AppStoreStatus `dynamodbav:"status,omitempty"`
 }
 
 type AppAccess struct {

@@ -94,6 +94,7 @@ type AppStoreApplication struct {
 	Visibility       string            `json:"visibility"`
 	OwnerId          string            `json:"ownerId"`
 	CreatedAt        string            `json:"createdAt"`
+	Status           AppStoreStatus    `json:"status"`
 	LatestVersionTag string            `json:"latestVersionTag,omitempty"`
 	Versions         []AppStoreVersion `json:"versions"`
 }
@@ -114,6 +115,10 @@ type AppPermissions struct {
 	Visibility string      `json:"visibility"`
 	OwnerId    string      `json:"ownerId"`
 	Access     []AppAccess `json:"access"`
+}
+
+type PatchAppStoreApplicationRequest struct {
+	Status AppStoreStatus `json:"status"`
 }
 
 type SetPermissionsRequest struct {
@@ -148,6 +153,7 @@ type AppStoreApplicationDetail struct {
 	Visibility       string            `json:"visibility"`
 	OwnerId          string            `json:"ownerId"`
 	CreatedAt        string            `json:"createdAt"`
+	Status           AppStoreStatus    `json:"status"`
 	LatestVersionTag string            `json:"latestVersionTag,omitempty"`
 	Versions         []AppStoreVersion `json:"versions"`
 	Assets           map[string]string `json:"assets"`

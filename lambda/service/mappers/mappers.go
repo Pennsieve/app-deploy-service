@@ -63,6 +63,10 @@ func DynamoDBApplicationToJsonApplication(dynamoApplications []store_dynamodb.Ap
 }
 
 func AppStoreAppToModel(a store_dynamodb.AppStoreApplication) models.AppStoreApplication {
+	status := a.Status
+	if status == "" {
+		status = models.AppStoreStatusActive
+	}
 	return models.AppStoreApplication{
 		Uuid:       a.Uuid,
 		SourceUrl:  a.SourceUrl,
@@ -71,6 +75,7 @@ func AppStoreAppToModel(a store_dynamodb.AppStoreApplication) models.AppStoreApp
 		Visibility: a.Visibility,
 		OwnerId:    a.OwnerId,
 		CreatedAt:  a.CreatedAt,
+		Status:     status,
 	}
 }
 

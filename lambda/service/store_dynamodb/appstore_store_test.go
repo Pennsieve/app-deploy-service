@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
+	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -271,6 +272,50 @@ func TestAppStoreDatabaseStore_UpdateVisibility(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, mock.UpdateItemInput)
 	assert.Equal(t, tableName, aws.ToString(mock.UpdateItemInput.TableName))
+}
+
+func TestAppStoreDatabaseStore_UpdateStatus(t *testing.T) {
+	mock := &ArgCaptureAppStoreTableAPI{}
+	tableName := "test-table"
+	store := NewAppStoreDatabaseStore(mock, tableName)
+
+	err := store.UpdateStatus(context.Background(), "test-uuid", "archived")
+	require.NoError(t, err)
+	require.NotNil(t, mock.UpdateItemInput)
+	assert.Equal(t, tableName, aws.ToString(mock.UpdateItemInput.TableName))
+
+	keyAv, ok := mock.UpdateItemInput.Key["uuid"].(*types.AttributeValueMemberS)
+	require.True(t, ok)
+	assert.Equal(t, "test-uuid", keyAv.Value)
+
+	var foundStatusValue bool
+	for _, v := range mock.UpdateItemInput.ExpressionAttributeValues {
+		if s, ok := v.(*types.AttributeValueMemberS); ok && s.Value == "archived" {
+			foundStatusValue = true
+			break
+		}
+	}
+	assert.True(t, foundStatusValue, "expected ExpressionAttributeValues to contain archived status")
+}
+
+func TestAppStoreApplication_StatusRoundTrip(t *testing.T) {
+	original := AppStoreApplication{
+		Uuid:       "test-uuid",
+		SourceUrl:  "https://github.com/test/repo",
+		SourceType: "github",
+		Visibility: "public",
+		OwnerId:    "N:user:owner-123",
+		CreatedAt:  "2026-01-01",
+		Status:     "archived",
+	}
+
+	item, err := attributevalue.MarshalMap(original)
+	require.NoError(t, err)
+
+	var roundTripped AppStoreApplication
+	err = attributevalue.UnmarshalMap(item, &roundTripped)
+	require.NoError(t, err)
+	assert.Equal(t, models.AppStoreStatusArchived, roundTripped.Status)
 }
 
 func TestAppStoreApplication_VisibilityAndOwnerFields(t *testing.T) {

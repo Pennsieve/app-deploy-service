@@ -107,6 +107,7 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 		Visibility:       application.Visibility,
 		OwnerId:          application.OwnerId,
 		CreatedAt:        application.CreatedAt,
+		Status:           application.Status,
 		LatestVersionTag: latestTag,
 		Versions:         application.Versions,
 		Assets:           assets,
