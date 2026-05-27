@@ -25,7 +25,7 @@ resource "aws_apigatewayv2_api" "app_deploy_service_api" {
   description   = "This is the serverless Applications API"
   cors_configuration {
     allow_origins     = local.cors_allowed_origins
-    allow_methods     = ["OPTIONS", "GET", "POST", "PUT", "DELETE"]
+    allow_methods     = ["OPTIONS", "GET", "POST", "PUT", "DELETE", "PATCH"]
     allow_headers     = ["*"]
     allow_credentials = true
     expose_headers    = ["*"]
