@@ -75,6 +75,19 @@ func GetAppStoreRegistryHandler(ctx context.Context, request events.APIGatewayV2
 		}, nil
 	}
 
+	// check if app has been archived
+	if apps[0].Status == models.AppStoreStatusArchived {
+		resp := models.RegistryImageResponse{
+			Authorized: false,
+			Message:    "application has been archived",
+		}
+		m, _ := json.Marshal(resp)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusUnprocessableEntity,
+			Body:       string(m),
+		}, nil
+	}
+
 	// Look up the specific version
 	versions, err := versionStore.GetByApplicationIdAndVersion(ctx, apps[0].Uuid, version)
 	if err != nil {
