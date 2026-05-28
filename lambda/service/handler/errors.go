@@ -25,6 +25,7 @@ var ErrMissingParams = errors.New("missing required query parameters")
 var ErrAppNotFound = errors.New("application not found")
 var ErrInvalidVisibility = errors.New("visibility must be 'public' or 'private'")
 var ErrNotOwner = errors.New("only the app owner can manage permissions")
+var ErrPublishingToAppStore = errors.New("cannot publish to app store")
 
 func handlerError(handlerName string, errorMessage error) string {
 	log.Printf("%s: %s", handlerName, errorMessage.Error())

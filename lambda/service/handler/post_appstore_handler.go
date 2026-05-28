@@ -98,6 +98,15 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	if len(existingApps) > 0 {
 		applicationId = existingApps[0].Uuid
 		log.Printf("application %s already exists for sourceUrl %s", applicationId, application.Source.Url)
+
+		if existingApps[0].Status == models.AppStoreStatusArchived {
+			log.Printf("application %s for sourceUrl %s is in status %s, cannot publish to AppStore",
+				applicationId, application.Source.Url, existingApps[0].Status)
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusUnprocessableEntity,
+				Body:       handlerError(handlerName, ErrPublishingToAppStore),
+			}, nil
+		}
 	} else {
 		applicationId = uuid.NewString()
 		visibility := "public"
