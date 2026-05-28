@@ -76,6 +76,15 @@ components:
             properties:
               message:
                 type: string
+    UnprocessableEntity:
+      description: Unprocessable Entity
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
     BadRequest:
       description: Bad Request
       content:
@@ -625,6 +634,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '4XX':
           $ref: '#/components/responses/Unauthorized'
         '5XX':
