@@ -17,3 +17,11 @@ output "applications_table_name" {
 output "applications_table_arn" {
   value = aws_dynamodb_table.applications_table.arn
 }
+
+output "appstore_applications_table_name" {
+  value = aws_dynamodb_table.appstore_applications_table.name
+}
+
+output "appstore_applications_table_arn" {
+  value = aws_dynamodb_table.appstore_applications_table.arn
+}
