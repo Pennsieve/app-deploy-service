@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
@@ -142,9 +143,16 @@ func GetAppStoreRegistryHandler(ctx context.Context, request events.APIGatewayV2
 	log.Printf("%s: authorizing image %s (source: %s, version: %s)",
 		handlerName, ver.DestinationUrl, sourceUrl, version)
 
+	// Prefer the SOCI-enabled image (digest of the "<tag>-soci" manifest) when one
+	// exists, so Fargate lazy-loads the image instead of full-pulling it. Returns
+	// the original URL unchanged when no SOCI index is present. Same-account
+	// lookup (this handler runs in the appstore ECR's account).
+	ecrClient := ecr.NewFromConfig(cfg)
+	imageUrl := resolveAppStoreImageURL(ctx, ecrClient, ver.DestinationUrl)
+
 	resp := models.RegistryImageResponse{
 		Authorized: true,
-		ImageUrl:   ver.DestinationUrl,
+		ImageUrl:   imageUrl,
 	}
 	m, err := json.Marshal(resp)
 	if err != nil {

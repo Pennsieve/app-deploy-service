@@ -158,6 +158,21 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
 
   }
 
+  statement {
+    sid    = "AppStoreRegistryECRRead"
+    effect = "Allow"
+
+    # The registry endpoint (GetAppStoreRegistryHandler) reads image manifests to
+    # resolve the SOCI-enabled image (<tag>-soci) so Fargate lazy-loads it.
+    actions = [
+      "ecr:BatchGetImage",
+    ]
+
+    resources = [
+      "arn:aws:ecr:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:repository/*"
+    ]
+  }
+
 }
 
 # Status Lambda
