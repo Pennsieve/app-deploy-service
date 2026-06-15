@@ -99,9 +99,9 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		applicationId = existingApps[0].Uuid
 		log.Printf("application %s already exists for sourceUrl %s", applicationId, application.Source.Url)
 
+		newVisibility := application.Source.IsPrivate
 		currentGithubVisibility := existingApps[0].IsPrivate
-		if currentGithubVisibility != application.Source.IsPrivate {
-			newVisibility := application.Source.IsPrivate
+		if currentGithubVisibility != newVisibility {
 			log.Printf("updating visibility for application %s from %v to %v", applicationId, currentGithubVisibility, newVisibility)
 			if err := appStoreStore.UpdateGithubVisibility(ctx, applicationId, newVisibility); err != nil {
 				log.Println("error updating isPrivate: ", err.Error())

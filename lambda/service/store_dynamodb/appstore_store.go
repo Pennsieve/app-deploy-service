@@ -29,7 +29,7 @@ type AppStoreDBStore interface {
 	Insert(context.Context, AppStoreApplication) error
 	UpdateVisibility(context.Context, string, string) error
 	UpdateStatus(context.Context, string, models.AppStoreStatus) error
-	UpdateGithubVisibility(ctx context.Context, uuid string, isPrivate bool) error1nd
+	UpdateGithubVisibility(ctx context.Context, uuid string, isPrivate bool) error
 }
 
 type AppStoreDatabaseStore struct {
