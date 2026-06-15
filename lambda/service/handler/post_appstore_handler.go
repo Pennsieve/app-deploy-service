@@ -99,6 +99,18 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		applicationId = existingApps[0].Uuid
 		log.Printf("application %s already exists for sourceUrl %s", applicationId, application.Source.Url)
 
+		currentGithubVisibility := existingApps[0].IsPrivate
+		if currentGithubVisibility != application.Source.IsPrivate {
+			newVisibility := application.Source.IsPrivate
+			log.Printf("updating visibility for application %s from %v to %v", applicationId, currentGithubVisibility, newVisibility)
+			if err := appStoreStore.UpdateGithubVisibility(ctx, applicationId, newVisibility); err != nil {
+				log.Println("error updating isPrivate: ", err.Error())
+				return events.APIGatewayV2HTTPResponse{
+					StatusCode: http.StatusInternalServerError,
+					Body:       handlerError(handlerName, ErrPublishingToAppStore),
+				}, nil
+			}
+		}
 		if existingApps[0].Status == models.AppStoreStatusArchived {
 			log.Printf("application %s for sourceUrl %s is in status %s, cannot publish to AppStore",
 				applicationId, application.Source.Url, existingApps[0].Status)
