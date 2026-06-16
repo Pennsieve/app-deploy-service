@@ -293,6 +293,13 @@ components:
           description: New lifecycle status for the application.
       required:
         - status
+    AppStoreSync:
+      type: object
+      required:
+        - source
+      properties:
+        source:
+          $ref: '#/components/schemas/DeploymentSource'
     RegistryImageResponse:
       type: object
       properties:
@@ -608,6 +615,7 @@ paths:
     post:
       summary: Create a new app store application
       description: Create a new app store application and trigger an initial deployment for the supplied source/release.
+      x-internal: true
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: postAppStore
@@ -829,6 +837,42 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '4XX':
           $ref: '#/components/responses/Unauthorized'
+        '5XX':
+          $ref: '#/components/responses/Error'
+  /store/sync:
+    post:
+      summary: Sync application details
+      description: >
+        Syncs details (e.g. GitHub visibility) of an application.
+      x-internal: true
+      x-amazon-apigateway-integration:
+        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
+      operationId: postAppStoreSync
+      security:
+        - token_auth: []
+      tags:
+        - App Store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppStoreSync'
+      responses:
+        '200':
+          description: The updated app store application
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppStoreApplication'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '5XX':
           $ref: '#/components/responses/Error'
   /store/{id}/asset:

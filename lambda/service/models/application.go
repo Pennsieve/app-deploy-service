@@ -121,6 +121,10 @@ type PatchAppStoreApplicationRequest struct {
 	Status AppStoreStatus `json:"status"`
 }
 
+type AppStoreSync struct {
+	Source DeploymentSource `json:"source"`
+}
+
 type SetPermissionsRequest struct {
 	Visibility string             `json:"visibility"`
 	Users      []PermissionEntity `json:"users,omitempty"`

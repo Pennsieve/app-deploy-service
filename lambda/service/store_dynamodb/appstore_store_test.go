@@ -2,6 +2,8 @@ package store_dynamodb
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -58,6 +60,31 @@ func (m *ArgCaptureAppStoreTableAPI) GetItem(_ context.Context, params *dynamodb
 func (m *ArgCaptureAppStoreTableAPI) UpdateItem(_ context.Context, params *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
 	m.UpdateItemInput = params
 	return &dynamodb.UpdateItemOutput{}, nil
+}
+
+// ErrorAppStoreTableAPI returns configured errors to exercise store error paths.
+type ErrorAppStoreTableAPI struct {
+	updateErr error
+}
+
+func (m *ErrorAppStoreTableAPI) PutItem(_ context.Context, _ *dynamodb.PutItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
+	return &dynamodb.PutItemOutput{}, nil
+}
+
+func (m *ErrorAppStoreTableAPI) Query(_ context.Context, _ *dynamodb.QueryInput, _ ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+	return &dynamodb.QueryOutput{}, nil
+}
+
+func (m *ErrorAppStoreTableAPI) Scan(_ context.Context, _ *dynamodb.ScanInput, _ ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error) {
+	return &dynamodb.ScanOutput{}, nil
+}
+
+func (m *ErrorAppStoreTableAPI) GetItem(_ context.Context, _ *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	return &dynamodb.GetItemOutput{}, nil
+}
+
+func (m *ErrorAppStoreTableAPI) UpdateItem(_ context.Context, _ *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
+	return nil, m.updateErr
 }
 
 func TestAppStoreDatabaseStore_Insert(t *testing.T) {
@@ -272,6 +299,43 @@ func TestAppStoreDatabaseStore_UpdateVisibility(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, mock.UpdateItemInput)
 	assert.Equal(t, tableName, aws.ToString(mock.UpdateItemInput.TableName))
+}
+
+func TestAppStoreDatabaseStore_UpdateGithubVisibility(t *testing.T) {
+	for _, isPrivate := range []bool{true, false} {
+		t.Run(fmt.Sprintf("isPrivate=%v", isPrivate), func(t *testing.T) {
+			mock := &ArgCaptureAppStoreTableAPI{}
+			tableName := "test-table"
+			store := NewAppStoreDatabaseStore(mock, tableName)
+
+			err := store.UpdateGithubVisibility(context.Background(), "test-uuid", isPrivate)
+			require.NoError(t, err)
+			require.NotNil(t, mock.UpdateItemInput)
+			assert.Equal(t, tableName, aws.ToString(mock.UpdateItemInput.TableName))
+
+			keyAv, ok := mock.UpdateItemInput.Key["uuid"].(*types.AttributeValueMemberS)
+			require.True(t, ok)
+			assert.Equal(t, "test-uuid", keyAv.Value)
+
+			var foundIsPrivateValue bool
+			for _, v := range mock.UpdateItemInput.ExpressionAttributeValues {
+				if b, ok := v.(*types.AttributeValueMemberBOOL); ok && b.Value == isPrivate {
+					foundIsPrivateValue = true
+					break
+				}
+			}
+			assert.True(t, foundIsPrivateValue, "expected ExpressionAttributeValues to contain isPrivate=%v", isPrivate)
+		})
+	}
+}
+
+func TestAppStoreDatabaseStore_UpdateGithubVisibility_Error(t *testing.T) {
+	mock := &ErrorAppStoreTableAPI{updateErr: errors.New("dynamo boom")}
+	store := NewAppStoreDatabaseStore(mock, "test-table")
+
+	err := store.UpdateGithubVisibility(context.Background(), "test-uuid", true)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "error updating isPrivate")
 }
 
 func TestAppStoreDatabaseStore_UpdateStatus(t *testing.T) {
