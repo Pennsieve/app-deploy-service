@@ -615,6 +615,7 @@ paths:
     post:
       summary: Create a new app store application
       description: Create a new app store application and trigger an initial deployment for the supplied source/release.
+      x-internal: true
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: postAppStore
@@ -842,7 +843,8 @@ paths:
     post:
       summary: Sync application details
       description: >
-        Syncs details (e.g. GitHub visibility) of an application. 
+        Syncs details (e.g. GitHub visibility) of an application.
+      x-internal: true
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: postAppStoreSync
