@@ -24,7 +24,7 @@ func TestGetAppStoreAssetHandler_MissingBucket(t *testing.T) {
 
 	request := events.APIGatewayV2HTTPRequest{
 		PathParameters:        map[string]string{"id": "some-uuid"},
-		QueryStringParameters: map[string]string{"file": "application.json"},
+		QueryStringParameters: map[string]string{"file": "app.yml"},
 	}
 
 	resp, err := GetAppStoreAssetHandler(t.Context(), request)
