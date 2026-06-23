@@ -118,12 +118,12 @@ For Pennsieve to display and run the app, your repository must contain these fil
 
 | File | Purpose |
 |---|---|
-| `application.json` | App metadata — name, description, command, inputs, outputs, language/runtime, etc. |
+| `app.yml` | App metadata — name, description, command, inputs, outputs, language/runtime, etc. |
 | `README.md` | Long-form description shown on the App Store detail page. |
 
 These are pulled automatically from the release tag.
 
-The `application.json` file is also where you declare the runtime / language the app expects (e.g. `python`, `r`, `julia`, container base image). This is the field the App Store and Workflow Manager use to choose how to execute your app.
+The `app.yml` file is also where you declare the runtime / language the app expects (e.g. `python`, `r`, `julia`, container base image). This is the field the App Store and Workflow Manager use to choose how to execute your app.
 
 ### Cutting a new release
 
@@ -135,7 +135,7 @@ The `application.json` file is also where you declare the runtime / language the
    - When the build succeeds, the version status flips to `deployed` and is runnable from the App Store.
 4. You can watch progress under **App Store → \[your app\] → Versions**. Statuses move through:
    - `registering` → `building` → `deployed` (success), or
-   - `failed` (with a reason — usually a missing `application.json` or a build error).
+   - `failed` (with a reason — usually a missing `app.yml` or a build error).
 
 ### Private repositories
 
