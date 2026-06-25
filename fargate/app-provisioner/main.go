@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -38,6 +39,7 @@ func main() {
 	storageId := os.Getenv("COMPUTE_NODE_EFS_ID")
 	computeNodeUuid := os.Getenv("COMPUTE_NODE_UUID")
 	runOnGPU := os.Getenv("RUN_ON_GPU") == "true"
+	buildStorageGiB := parseBuildStorageGiB(os.Getenv("APP_STORAGE"))
 
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 	accountsTable := os.Getenv("ACCOUNTS_TABLE")
@@ -127,7 +129,7 @@ func main() {
 
 		ecsClient := ecs.NewFromConfig(cfg)
 		authToken := os.Getenv("AUTH_TOKEN")
-		err := AddToAppstore(ctx, applicationUuid, appStoreDeploymentId, sourceUrl, tag, authToken, appProvisioner, ecsClient, appStoreStatusManager, versionStore)
+		err := AddToAppstore(ctx, applicationUuid, appStoreDeploymentId, sourceUrl, tag, authToken, buildStorageGiB, appProvisioner, ecsClient, appStoreStatusManager, versionStore)
 		if err != nil {
 			appStoreStatusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
@@ -173,7 +175,7 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, authToken string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager, versionStore store_dynamodb.AppStoreVersionDBStore) error {
+func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, authToken string, buildStorageGiB int32, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager, versionStore store_dynamodb.AppStoreVersionDBStore) error {
 	// Get the pre-existing private ECR URL from environment variable
 	ecrRepoUrl := os.Getenv("APPSTORE_PRIVATE_ECR_URL")
 	if ecrRepoUrl == "" {
@@ -197,7 +199,7 @@ func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId str
 	// Build and push
 	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", sourceUrl, tag, destinationUrl)
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
-	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, authToken, applicationsTable, appProvisioner, ecsClient); err != nil {
+	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, authToken, applicationsTable, buildStorageGiB, appProvisioner, ecsClient); err != nil {
 		return err
 	}
 
@@ -371,7 +373,7 @@ func PublicDeploy(ctx context.Context, applicationUuid string, deploymentId stri
 	return nil
 }
 
-func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, authToken string, applicationsTable string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, authToken string, applicationsTable string, buildStorageGiB int32, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
 	creds, err := appProvisioner.GetProvisionerCreds(ctx)
 	if err != nil {
 		return fmt.Errorf("error retrieving credentials: %w", err)
@@ -456,6 +458,15 @@ func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId str
 		})
 	}
 
+	// Override the build task's ephemeral storage for apps that need more space
+	// than Fargate's default (e.g. GPU apps with large dependencies).
+	if buildStorageGiB > 0 {
+		log.Printf("overriding build ephemeral storage to %d GiB", buildStorageGiB)
+		runTaskIn.Overrides.EphemeralStorage = &types.EphemeralStorage{
+			SizeInGiB: buildStorageGiB,
+		}
+	}
+
 	taskRunner := runner.NewECSTaskRunner(ecsClient, runTaskIn)
 	runTaskOut, err := taskRunner.Run(ctx)
 	if err != nil {
@@ -465,4 +476,18 @@ func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId str
 		return fmt.Errorf("error: run failures: %w", err)
 	}
 	return nil
+}
+
+// parseBuildStorageGiB parses the APP_STORAGE env var (ephemeral storage in
+// GiB) for the build task. It returns 0 (no override) when unset or invalid.
+func parseBuildStorageGiB(v string) int32 {
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		log.Printf("warning: invalid APP_STORAGE value %q, ignoring", v)
+		return 0
+	}
+	return int32(n)
 }

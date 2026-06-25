@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -182,6 +183,10 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 
 	syncRepoContent(ctx, application.Source.Url, application.Source.Tag, application.Source.AuthToken)
 
+	// Derive build-time ephemeral storage from app.yml (e.g. GPU apps pull large
+	// dependencies that exhaust Fargate's default 20 GiB). 0 means no override.
+	buildStorage := detectBuildStorageGiB(ctx, cfg, application.Source.Url, application.Source.Tag)
+
 	// StatusManager uses the version store for status updates (keyed by versionUuid)
 	statusManager := NewAppStoreStatusManager(handlerName, versionStore, versionUuid).
 		WithDeployment(deploymentsStore, deploymentId)
@@ -247,6 +252,77 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	authTokenKey := "AUTH_TOKEN"
 	authTokenValue := application.Source.AuthToken
 
+	environment := []types.KeyValuePair{
+		{
+			Name:  aws.String(applicationUuidKey),
+			Value: aws.String(versionUuid),
+		},
+		{
+			Name:  aws.String(deploymentIdKey),
+			Value: aws.String(deploymentId),
+		},
+		{
+			Name:  &envKey,
+			Value: &envValue,
+		},
+		{
+			Name:  &actionKey,
+			Value: &actionValue,
+		},
+		{
+			Name:  &sourceTypeKey,
+			Value: &sourceTypeValue,
+		},
+		{
+			Name:  &sourceUrlKey,
+			Value: &sourceUrlValue,
+		},
+		{
+			Name:  &sourceTagKey,
+			Value: &sourceTagValue,
+		},
+		{
+			Name:  &deployerTaskDefnKey,
+			Value: &deployerTaskDefnValue,
+		},
+		{
+			Name:  &subetsIdKey,
+			Value: &subetsIdValue,
+		},
+		{
+			Name:  &clusterKey,
+			Value: &clusterValue,
+		},
+		{
+			Name:  &securityGroupKey,
+			Value: &securityGroupValue,
+		},
+		{
+			Name:  &deployertaskDefnContainerKey,
+			Value: &deployertaskDefnContainerValue,
+		},
+		{
+			Name:  aws.String(deploymentsTableNameKey),
+			Value: aws.String(deploymentsTable),
+		},
+		{
+			// Fargate uses APPLICATIONS_TABLE to update the version record
+			Name:  aws.String(applicationsTableNameKey),
+			Value: aws.String(versionsTable),
+		},
+		{
+			Name:  &authTokenKey,
+			Value: &authTokenValue,
+		},
+	}
+
+	if buildStorage > 0 {
+		environment = append(environment, types.KeyValuePair{
+			Name:  aws.String("APP_STORAGE"),
+			Value: aws.String(strconv.Itoa(int(buildStorage))),
+		})
+	}
+
 	runTaskIn := &ecs.RunTaskInput{
 		TaskDefinition: aws.String(TaskDefinitionArn),
 		Cluster:        aws.String(cluster),
@@ -260,70 +336,8 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		Overrides: &types.TaskOverride{
 			ContainerOverrides: []types.ContainerOverride{
 				{
-					Name: &TaskDefContainerName,
-					Environment: []types.KeyValuePair{
-						{
-							Name:  aws.String(applicationUuidKey),
-							Value: aws.String(versionUuid),
-						},
-						{
-							Name:  aws.String(deploymentIdKey),
-							Value: aws.String(deploymentId),
-						},
-						{
-							Name:  &envKey,
-							Value: &envValue,
-						},
-						{
-							Name:  &actionKey,
-							Value: &actionValue,
-						},
-						{
-							Name:  &sourceTypeKey,
-							Value: &sourceTypeValue,
-						},
-						{
-							Name:  &sourceUrlKey,
-							Value: &sourceUrlValue,
-						},
-						{
-							Name:  &sourceTagKey,
-							Value: &sourceTagValue,
-						},
-						{
-							Name:  &deployerTaskDefnKey,
-							Value: &deployerTaskDefnValue,
-						},
-						{
-							Name:  &subetsIdKey,
-							Value: &subetsIdValue,
-						},
-						{
-							Name:  &clusterKey,
-							Value: &clusterValue,
-						},
-						{
-							Name:  &securityGroupKey,
-							Value: &securityGroupValue,
-						},
-						{
-							Name:  &deployertaskDefnContainerKey,
-							Value: &deployertaskDefnContainerValue,
-						},
-						{
-							Name:  aws.String(deploymentsTableNameKey),
-							Value: aws.String(deploymentsTable),
-						},
-						{
-							// Fargate uses APPLICATIONS_TABLE to update the version record
-							Name:  aws.String(applicationsTableNameKey),
-							Value: aws.String(versionsTable),
-						},
-						{
-							Name:  &authTokenKey,
-							Value: &authTokenValue,
-						},
-					},
+					Name:        &TaskDefContainerName,
+					Environment: environment,
 				},
 			},
 		},
