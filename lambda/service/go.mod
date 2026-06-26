@@ -18,6 +18,7 @@ require (
 	github.com/pennsieve/pennsieve-go-core v1.13.7
 	github.com/pusher/pusher-http-go/v5 v5.1.1
 	github.com/stretchr/testify v1.11.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -48,5 +49,4 @@ require (
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
