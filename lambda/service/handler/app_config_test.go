@@ -4,9 +4,9 @@ import "testing"
 
 const gpuAppYAML = `schemaVersion: 1.0.0
 application:
-  id: maestro
-  name: maestro
-  description: maestro
+  id: gpu-app
+  name: gpu-app
+  description: gpu-app
   version: 1.0.1
   type: processor
   maintainers:
