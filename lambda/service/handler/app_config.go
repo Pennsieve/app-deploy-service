@@ -22,8 +22,7 @@ const (
 )
 
 // appConfig is a partial view of app.yml, limited to the fields that affect how
-// the image is built. app.yml may be authored as YAML or JSON; yaml.v3 parses
-// both.
+// the image is built. app.yml is authored as YAML.
 type appConfig struct {
 	Runtime struct {
 		ComputeTypes []string `yaml:"computeTypes"`

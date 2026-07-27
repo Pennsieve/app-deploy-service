@@ -2,30 +2,53 @@ package handler
 
 import "testing"
 
-const gpuAppJSON = `{
-  "schemaVersion": "1.0.0",
-  "application": { "id": "nifti-brain-segmenter" },
-  "runtime": {
-    "cpu": 4096,
-    "memory": 16384,
-    "computeTypes": ["gpu", "standard"],
-    "timeoutSeconds": 3600
-  }
-}`
-
-const standardAppJSON = `{
-  "application": { "id": "csv-parser" },
-  "runtime": { "cpu": 2048, "memory": 4096, "computeTypes": ["standard"] }
-}`
-
-const gpuAppYAML = `application:
-  id: nifti-brain-segmenter
+const gpuAppYAML = `schemaVersion: 1.0.0
+application:
+  id: gpu-app
+  name: gpu-app
+  description: gpu-app
+  version: 1.0.1
+  type: processor
+  maintainers:
+    - name: edmore
+  tags:
+    - pytorch
+    - gpu
+    - demo
 runtime:
-  cpu: 4096
-  memory: 16384
+  cpu: 1024
+  memory: 2048
   computeTypes:
     - gpu
+  timeoutSeconds: 300
+parameters: []
+commandArguments: []
+inputs:
+  - name: package_file
+    description: Pipeline package file.
+    mediaTypes:
+      - application/octet-stream
+    cardinality: one
+    required: true
+outputs:
+  - name: package_file
+    description: Pipeline package file.
+    mediaTypes:
+      - application/octet-stream
+`
+
+const standardAppYAML = `application:
+  id: csv-parser
+runtime:
+  cpu: 2048
+  memory: 4096
+  computeTypes:
     - standard
+`
+
+const gpuFlowStyleYAML = `application: {id: nifti-brain-segmenter}
+runtime:
+  computeTypes: [gpu, standard]
 `
 
 const noRuntimeYAML = `application:
@@ -38,9 +61,9 @@ func TestBuildStorageGiB(t *testing.T) {
 		data string
 		want int32
 	}{
-		{"gpu json", gpuAppJSON, gpuBuildStorageGiB},
-		{"standard json", standardAppJSON, 0},
 		{"gpu yaml", gpuAppYAML, gpuBuildStorageGiB},
+		{"standard yaml", standardAppYAML, 0},
+		{"gpu flow-style yaml", gpuFlowStyleYAML, gpuBuildStorageGiB},
 		{"no runtime", noRuntimeYAML, 0},
 		{"empty", "", 0},
 	}
