@@ -97,6 +97,17 @@ type AppStoreApplication struct {
 	Status           AppStoreStatus    `json:"status"`
 	LatestVersionTag string            `json:"latestVersionTag,omitempty"`
 	Versions         []AppStoreVersion `json:"versions"`
+	Params           []AppParameter    `json:"params,omitempty"`
+}
+
+// AppParameter is a processor parameter declaration parsed from the app's
+// app.yml. A parameter with no defaultValue is treated as required.
+type AppParameter struct {
+	Name         string   `json:"name"`
+	Type         string   `json:"type,omitempty"`
+	Description  string   `json:"description,omitempty"`
+	DefaultValue string   `json:"defaultValue,omitempty"`
+	ValidValues  []string `json:"validValues,omitempty"`
 }
 
 type AppAccess struct {

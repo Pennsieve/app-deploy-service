@@ -60,14 +60,29 @@ func (i Application) GetKey() map[string]types.AttributeValue {
 // AppStoreApplication represents an application in the appstore.
 // One record per unique sourceUrl (the git repository).
 type AppStoreApplication struct {
-	Uuid       string `dynamodbav:"uuid"`
-	SourceUrl  string `dynamodbav:"sourceUrl"`
-	SourceType string `dynamodbav:"sourceType"`
+	Uuid       string                `dynamodbav:"uuid"`
+	SourceUrl  string                `dynamodbav:"sourceUrl"`
+	SourceType string                `dynamodbav:"sourceType"`
 	IsPrivate  bool                  `dynamodbav:"isPrivate"`
 	Visibility string                `dynamodbav:"visibility"`
 	OwnerId    string                `dynamodbav:"ownerId"`
 	CreatedAt  string                `dynamodbav:"createdAt"`
 	Status     models.AppStoreStatus `dynamodbav:"status,omitempty"`
+	// Params are the processor parameter declarations parsed from the app's
+	// app.yml at publish time. app.yml is the source of truth; downstream
+	// services (e.g. workflow-service) read these as parameter defaults.
+	Params []AppParameter `dynamodbav:"params,omitempty"`
+}
+
+// AppParameter is a single processor parameter declaration from app.yml. A
+// parameter with no DefaultValue is treated as required by consumers. The
+// attribute names must stay stable — consumers read them by these keys.
+type AppParameter struct {
+	Name         string   `dynamodbav:"name"`
+	Type         string   `dynamodbav:"type,omitempty"`
+	Description  string   `dynamodbav:"description,omitempty"`
+	DefaultValue string   `dynamodbav:"defaultValue,omitempty"`
+	ValidValues  []string `dynamodbav:"validValues,omitempty"`
 }
 
 type AppAccess struct {

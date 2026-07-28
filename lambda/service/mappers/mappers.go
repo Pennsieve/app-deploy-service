@@ -76,7 +76,25 @@ func AppStoreAppToModel(a store_dynamodb.AppStoreApplication) models.AppStoreApp
 		OwnerId:    a.OwnerId,
 		CreatedAt:  a.CreatedAt,
 		Status:     status,
+		Params:     AppParametersToModels(a.Params),
 	}
+}
+
+func AppParametersToModels(params []store_dynamodb.AppParameter) []models.AppParameter {
+	if len(params) == 0 {
+		return nil
+	}
+	result := make([]models.AppParameter, 0, len(params))
+	for _, p := range params {
+		result = append(result, models.AppParameter{
+			Name:         p.Name,
+			Type:         p.Type,
+			Description:  p.Description,
+			DefaultValue: p.DefaultValue,
+			ValidValues:  p.ValidValues,
+		})
+	}
+	return result
 }
 
 func AppAccessToModel(a store_dynamodb.AppAccess) models.AppAccess {

@@ -1,6 +1,11 @@
 package handler
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+
+	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
+)
 
 const gpuAppYAML = `schemaVersion: 1.0.0
 application:
@@ -84,6 +89,91 @@ func TestBuildStorageGiB(t *testing.T) {
 func TestParseAppConfigMalformed(t *testing.T) {
 	if _, err := parseAppConfig([]byte("runtime: [oops")); err == nil {
 		t.Fatal("expected error for malformed app.yml, got nil")
+	}
+}
+
+const paramsAppYAML = `schemaVersion: 1.0.0
+application:
+  id: spike-detector
+  name: Spike Detector
+  type: processor
+runtime:
+  cpu: 4096
+  memory: 16384
+  computeTypes:
+    - standard
+parameters:
+  - name: threshold
+    type: number
+    description: detection threshold
+    defaultValue: "0.5"
+    validValues:
+      - "0.1"
+      - "0.5"
+      - "0.9"
+  - name: channel
+    type: string
+    description: channel to analyze
+commandArguments: []
+`
+
+func TestAppParameters(t *testing.T) {
+	tests := []struct {
+		name string
+		data string
+		want []store_dynamodb.AppParameter
+	}{
+		{
+			name: "populated parameters",
+			data: paramsAppYAML,
+			want: []store_dynamodb.AppParameter{
+				{
+					Name:         "threshold",
+					Type:         "number",
+					Description:  "detection threshold",
+					DefaultValue: "0.5",
+					ValidValues:  []string{"0.1", "0.5", "0.9"},
+				},
+				{
+					Name:        "channel",
+					Type:        "string",
+					Description: "channel to analyze",
+				},
+			},
+		},
+		{"empty parameters list", gpuAppYAML, nil},
+		{"no parameters key", standardAppYAML, nil},
+		{"empty document", "", nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := parseAppConfig([]byte(tt.data))
+			if err != nil {
+				t.Fatalf("parseAppConfig: %v", err)
+			}
+			got := appParameters(c)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("appParameters = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAppParametersSkipsUnnamed(t *testing.T) {
+	const yaml = `parameters:
+  - name: ""
+    type: string
+  - name: keep
+    type: string
+`
+	c, err := parseAppConfig([]byte(yaml))
+	if err != nil {
+		t.Fatalf("parseAppConfig: %v", err)
+	}
+	got := appParameters(c)
+	if len(got) != 1 || got[0].Name != "keep" {
+		t.Errorf("appParameters = %+v, want single 'keep' entry", got)
 	}
 }
 

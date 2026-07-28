@@ -183,9 +183,27 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 
 	syncRepoContent(ctx, application.Source.Url, application.Source.Tag, application.Source.AuthToken)
 
+	// Read the synced app.yml once and reuse it for build sizing and parameter
+	// persistence. A missing or malformed app.yml yields ok=false so neither
+	// step blocks the deployment.
+	appCfg, haveAppCfg := readSyncedAppConfig(ctx, cfg, application.Source.Url, application.Source.Tag)
+
+	// Persist the app's declared parameters (with defaults) onto the appstore
+	// record. app.yml is the source of truth, so a successful parse overwrites
+	// any previously stored params (including clearing them when the app
+	// declares none). Advisory: a failure here never blocks the deployment.
+	if haveAppCfg {
+		if err := appStoreStore.UpdateParams(ctx, applicationId, appParameters(appCfg)); err != nil {
+			log.Printf("warning: unable to persist app parameters for %s: %v", applicationId, err)
+		}
+	}
+
 	// Derive build-time ephemeral storage from app.yml (e.g. GPU apps pull large
 	// dependencies that exhaust Fargate's default 20 GiB). 0 means no override.
-	buildStorage := detectBuildStorageGiB(ctx, cfg, application.Source.Url, application.Source.Tag)
+	buildStorage := int32(0)
+	if haveAppCfg {
+		buildStorage = buildStorageGiB(appCfg)
+	}
 
 	// StatusManager uses the version store for status updates (keyed by versionUuid)
 	statusManager := NewAppStoreStatusManager(handlerName, versionStore, versionUuid).
