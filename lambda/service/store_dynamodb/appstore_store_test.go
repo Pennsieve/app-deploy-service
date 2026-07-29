@@ -113,6 +113,53 @@ func TestAppStoreDatabaseStore_Insert(t *testing.T) {
 	assert.Equal(t, app, roundTripped)
 }
 
+func TestAppStoreDatabaseStore_UpdateParams(t *testing.T) {
+	mock := &ArgCaptureAppStoreTableAPI{}
+	tableName := "test-appstore-table"
+	store := NewAppStoreDatabaseStore(mock, tableName)
+
+	appUuid := uuid.NewString()
+	params := []AppParameter{
+		{Name: "threshold", Type: "number", DefaultValue: "0.5", ValidValues: []string{"0.1", "0.5"}},
+		{Name: "channel", Type: "string"},
+	}
+
+	err := store.UpdateParams(context.Background(), appUuid, params)
+	require.NoError(t, err)
+
+	require.NotNil(t, mock.UpdateItemInput)
+	assert.Equal(t, tableName, aws.ToString(mock.UpdateItemInput.TableName))
+
+	// Key targets the right record
+	keyAv, ok := mock.UpdateItemInput.Key["uuid"].(*types.AttributeValueMemberS)
+	require.True(t, ok)
+	assert.Equal(t, appUuid, keyAv.Value)
+
+	// The update sets the "params" attribute
+	foundParamsName := false
+	for _, name := range mock.UpdateItemInput.ExpressionAttributeNames {
+		if name == "params" {
+			foundParamsName = true
+		}
+	}
+	assert.True(t, foundParamsName, "update expression should reference the params attribute")
+
+	// The marshaled params round-trip back to the input list
+	var roundTripped []AppParameter
+	for _, v := range mock.UpdateItemInput.ExpressionAttributeValues {
+		if listAv, ok := v.(*types.AttributeValueMemberL); ok {
+			require.NoError(t, attributevalue.Unmarshal(listAv, &roundTripped))
+		}
+	}
+	assert.Equal(t, params, roundTripped)
+}
+
+func TestAppStoreDatabaseStore_UpdateParams_Error(t *testing.T) {
+	store := NewAppStoreDatabaseStore(&ErrorAppStoreTableAPI{updateErr: errors.New("boom")}, "test-table")
+	err := store.UpdateParams(context.Background(), uuid.NewString(), []AppParameter{{Name: "x"}})
+	require.Error(t, err)
+}
+
 func TestAppStoreDatabaseStore_GetBySourceUrl(t *testing.T) {
 	sourceUrl := "https://github.com/test/repo"
 	app := AppStoreApplication{
