@@ -22,14 +22,6 @@ resource "aws_cloudwatch_log_group" "status_lambda_cloudwatch_log_group" {
   tags = local.common_tags
 }
 
-resource "aws_cloudwatch_log_subscription_filter" "status_lambda_datadog_subscription" {
-  name            = "${aws_cloudwatch_log_group.status_lambda_cloudwatch_log_group.name}-subscription"
-  log_group_name  = aws_cloudwatch_log_group.status_lambda_cloudwatch_log_group.name
-  filter_pattern  = ""
-  destination_arn = data.terraform_remote_state.region.outputs.datadog_delivery_stream_arn
-  role_arn        = data.terraform_remote_state.region.outputs.cw_logs_to_datadog_logs_firehose_role_arn
-}
-
 // CREATE STATUS EVENT RULE
 resource "aws_cloudwatch_event_rule" "status_cloudwatch_event_rule" {
   name        = "${var.environment_name}-${var.service_name}-status-cloudwatch-event-rule-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
