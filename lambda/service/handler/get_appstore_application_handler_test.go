@@ -104,3 +104,49 @@ func TestLatestVersionTag_SingleVersion(t *testing.T) {
 	}
 	assert.Equal(t, "v0.1.0", latestVersionTag(versions))
 }
+
+func TestParamsFromAppConfig_WithParameters(t *testing.T) {
+	appYml := `
+parameters:
+  - name: threshold
+    type: number
+    description: Detection threshold.
+    defaultValue: "0.5"
+    validValues:
+      - "0.1"
+      - "0.5"
+  - name: mode
+`
+	params := paramsFromAppConfig(appYml)
+	assert.Equal(t, []models.AppParameter{
+		{Name: "threshold", Type: "number", Description: "Detection threshold.", DefaultValue: "0.5", ValidValues: []string{"0.1", "0.5"}},
+		{Name: "mode"},
+	}, params)
+}
+
+func TestParamsFromAppConfig_EmptyAsset(t *testing.T) {
+	assert.Nil(t, paramsFromAppConfig(""))
+}
+
+func TestParamsFromAppConfig_NoParameters(t *testing.T) {
+	appYml := `
+runtime:
+  computeTypes:
+    - standard
+`
+	assert.Nil(t, paramsFromAppConfig(appYml))
+}
+
+func TestParamsFromAppConfig_Malformed(t *testing.T) {
+	assert.Nil(t, paramsFromAppConfig("parameters: [unclosed"))
+}
+
+func TestParamsFromAppConfig_SkipsUnnamed(t *testing.T) {
+	appYml := `
+parameters:
+  - type: string
+  - name: keep
+`
+	params := paramsFromAppConfig(appYml)
+	assert.Equal(t, []models.AppParameter{{Name: "keep"}}, params)
+}
