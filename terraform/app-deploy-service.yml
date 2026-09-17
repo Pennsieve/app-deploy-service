@@ -246,6 +246,36 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AppStoreVersion'
+        params:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppParameter'
+          description: >
+            Parameter declarations from the most recently published release's
+            app.yml. Omitted when the app declares no parameters.
+    AppParameter:
+      type: object
+      description: >
+        A processor parameter declaration from app.yml. A parameter with no
+        defaultValue is treated as required.
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: Informational type hint (string, number, boolean, ...).
+        description:
+          type: string
+        defaultValue:
+          type: string
+          description: Value pre-filled in the workflow builder. Always a string.
+        validValues:
+          type: array
+          items:
+            type: string
+          description: Allowed values. When present, the parameter renders as a dropdown.
     AppStoreApplicationDetail:
       type: object
       properties:
@@ -284,6 +314,14 @@ components:
             Map of asset filename to content string. Includes files like
             app.yml and README.md when they exist in the synced
             repository content.
+        params:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppParameter'
+          description: >
+            Parameter declarations parsed from the app.yml of the requested
+            tag (or the latest version when tag is omitted). Omitted when the
+            app.yml is missing, malformed, or declares no parameters.
     PatchAppStoreApplicationRequest:
       type: object
       properties:
@@ -702,8 +740,8 @@ paths:
       summary: Get app store application
       description: >
         Get a single app store application by ID, including its versions,
-        deployment history, and repository assets (e.g. app.yml,
-        README.md) when available.
+        deployment history, repository assets (e.g. app.yml, README.md) and
+        the parameter declarations parsed from app.yml for the requested tag.
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
       operationId: getAppStoreApplication
@@ -725,13 +763,13 @@ paths:
           schema:
             type: string
           description: >
-            The release tag to retrieve assets from. When omitted, defaults to
-            the most recently created version's tag. If the application has no
-            versions, assets are not fetched and an empty assets map is
-            returned.
+            The release tag to retrieve assets and params from. When omitted,
+            defaults to the most recently created version's tag. If the
+            application has no versions, assets are not fetched, an empty
+            assets map is returned and params is omitted.
       responses:
         '200':
-          description: The app store application with versions, deployments, and assets
+          description: The app store application with versions, deployments, assets, and params
           content:
             application/json:
               schema:
