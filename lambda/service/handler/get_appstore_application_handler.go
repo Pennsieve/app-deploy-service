@@ -111,6 +111,7 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 		LatestVersionTag: latestTag,
 		Versions:         application.Versions,
 		Assets:           assets,
+		Params:           paramsFromAppConfig(assets[appConfigFile]),
 	}
 
 	m, err := json.Marshal(detail)
@@ -144,6 +145,22 @@ func latestVersionTag(versions []models.AppStoreVersion) string {
 		}
 	}
 	return latest
+}
+
+// paramsFromAppConfig parses the parameter declarations out of a synced
+// app.yml so the response reflects the requested tag rather than the latest
+// published release. Returns nil when the asset is missing, malformed, or
+// declares no parameters.
+func paramsFromAppConfig(appYml string) []models.AppParameter {
+	if appYml == "" {
+		return nil
+	}
+	c, err := parseAppConfig([]byte(appYml))
+	if err != nil {
+		log.Printf("warning: unable to parse %s for params: %v", appConfigFile, err)
+		return nil
+	}
+	return mappers.AppParametersToModels(appParameters(c))
 }
 
 func fetchAssets(ctx context.Context, cfg aws.Config, sourceUrl string, tag string) map[string]string {

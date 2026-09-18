@@ -172,6 +172,7 @@ type AppStoreApplicationDetail struct {
 	LatestVersionTag string            `json:"latestVersionTag,omitempty"`
 	Versions         []AppStoreVersion `json:"versions"`
 	Assets           map[string]string `json:"assets"`
+	Params           []AppParameter    `json:"params,omitempty"`
 }
 
 // RegistryImageResponse is returned by the registry endpoint.
