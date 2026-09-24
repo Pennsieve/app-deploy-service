@@ -105,6 +105,7 @@ runtime:
 parameters:
   - name: threshold
     type: number
+    required: true
     description: detection threshold
     defaultValue: "0.5"
     validValues:
@@ -114,6 +115,10 @@ parameters:
   - name: channel
     type: string
     description: channel to analyze
+  - name: accession
+    type: string
+    required: false
+    description: optional accession
 commandArguments: []
 `
 
@@ -130,6 +135,7 @@ func TestAppParameters(t *testing.T) {
 				{
 					Name:         "threshold",
 					Type:         "number",
+					Required:     true,
 					Description:  "detection threshold",
 					DefaultValue: "0.5",
 					ValidValues:  []string{"0.1", "0.5", "0.9"},
@@ -138,6 +144,12 @@ func TestAppParameters(t *testing.T) {
 					Name:        "channel",
 					Type:        "string",
 					Description: "channel to analyze",
+				},
+				{
+					Name:        "accession",
+					Type:        "string",
+					Required:    false,
+					Description: "optional accession",
 				},
 			},
 		},

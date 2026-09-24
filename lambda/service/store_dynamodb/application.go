@@ -74,12 +74,12 @@ type AppStoreApplication struct {
 	Params []AppParameter `dynamodbav:"params,omitempty"`
 }
 
-// AppParameter is a single processor parameter declaration from app.yml. A
-// parameter with no DefaultValue is treated as required by consumers. The
+// AppParameter is a single processor parameter declaration from app.yml. The
 // attribute names must stay stable — consumers read them by these keys.
 type AppParameter struct {
 	Name         string   `dynamodbav:"name"`
 	Type         string   `dynamodbav:"type,omitempty"`
+	Required     bool     `dynamodbav:"required"`
 	Description  string   `dynamodbav:"description,omitempty"`
 	DefaultValue string   `dynamodbav:"defaultValue,omitempty"`
 	ValidValues  []string `dynamodbav:"validValues,omitempty"`

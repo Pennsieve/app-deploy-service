@@ -32,11 +32,12 @@ type appConfig struct {
 	Parameters []appParameter `yaml:"parameters"`
 }
 
-// appParameter mirrors a single entry of app.yml's `parameters` list. A
-// parameter with no DefaultValue is treated as required by consumers.
+// appParameter mirrors a single entry of app.yml's `parameters` list.
+// Required defaults to false when omitted.
 type appParameter struct {
 	Name         string   `yaml:"name"`
 	Type         string   `yaml:"type"`
+	Required     bool     `yaml:"required"`
 	Description  string   `yaml:"description"`
 	DefaultValue string   `yaml:"defaultValue"`
 	ValidValues  []string `yaml:"validValues"`
@@ -116,6 +117,7 @@ func appParameters(c appConfig) []store_dynamodb.AppParameter {
 		params = append(params, store_dynamodb.AppParameter{
 			Name:         p.Name,
 			Type:         p.Type,
+			Required:     p.Required,
 			Description:  p.Description,
 			DefaultValue: p.DefaultValue,
 			ValidValues:  p.ValidValues,

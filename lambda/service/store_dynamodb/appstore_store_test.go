@@ -120,7 +120,7 @@ func TestAppStoreDatabaseStore_UpdateParams(t *testing.T) {
 
 	appUuid := uuid.NewString()
 	params := []AppParameter{
-		{Name: "threshold", Type: "number", DefaultValue: "0.5", ValidValues: []string{"0.1", "0.5"}},
+		{Name: "threshold", Type: "number", Required: true, DefaultValue: "0.5", ValidValues: []string{"0.1", "0.5"}},
 		{Name: "channel", Type: "string"},
 	}
 

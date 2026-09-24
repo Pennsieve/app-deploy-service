@@ -256,16 +256,21 @@ components:
     AppParameter:
       type: object
       description: >
-        A processor parameter declaration from app.yml. A parameter with no
-        defaultValue is treated as required.
+        A processor parameter declaration from app.yml.
       required:
         - name
+        - required
       properties:
         name:
           type: string
         type:
           type: string
           description: Informational type hint (string, number, boolean, ...).
+        required:
+          type: boolean
+          description: >
+            Whether a value must be supplied. Mirrors app.yml's `required`
+            field and is false when app.yml omits it.
         description:
           type: string
         defaultValue:
