@@ -101,10 +101,11 @@ type AppStoreApplication struct {
 }
 
 // AppParameter is a processor parameter declaration parsed from the app's
-// app.yml. A parameter with no defaultValue is treated as required.
+// app.yml.
 type AppParameter struct {
 	Name         string   `json:"name"`
 	Type         string   `json:"type,omitempty"`
+	Required     bool     `json:"required"`
 	Description  string   `json:"description,omitempty"`
 	DefaultValue string   `json:"defaultValue,omitempty"`
 	ValidValues  []string `json:"validValues,omitempty"`

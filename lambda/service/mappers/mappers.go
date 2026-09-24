@@ -89,6 +89,7 @@ func AppParametersToModels(params []store_dynamodb.AppParameter) []models.AppPar
 		result = append(result, models.AppParameter{
 			Name:         p.Name,
 			Type:         p.Type,
+			Required:     p.Required,
 			Description:  p.Description,
 			DefaultValue: p.DefaultValue,
 			ValidValues:  p.ValidValues,

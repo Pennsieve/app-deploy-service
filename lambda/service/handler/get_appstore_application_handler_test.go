@@ -110,17 +110,21 @@ func TestParamsFromAppConfig_WithParameters(t *testing.T) {
 parameters:
   - name: threshold
     type: number
+    required: true
     description: Detection threshold.
     defaultValue: "0.5"
     validValues:
       - "0.1"
       - "0.5"
   - name: mode
+  - name: accession
+    required: false
 `
 	params := paramsFromAppConfig(appYml)
 	assert.Equal(t, []models.AppParameter{
-		{Name: "threshold", Type: "number", Description: "Detection threshold.", DefaultValue: "0.5", ValidValues: []string{"0.1", "0.5"}},
+		{Name: "threshold", Type: "number", Required: true, Description: "Detection threshold.", DefaultValue: "0.5", ValidValues: []string{"0.1", "0.5"}},
 		{Name: "mode"},
+		{Name: "accession"},
 	}, params)
 }
 
