@@ -17,6 +17,8 @@ import (
 
 const (
 	appstoreApplicationsTableEnvVar = "APPSTORE_APPLICATIONS_TABLE"
+	applicationsTableEnvVar         = "APPLICATIONS_TABLE"
+	appstoreVersionsTableEnvVar     = "APPSTORE_VERSIONS_TABLE"
 	appAccessTableEnvVar            = "APP_ACCESS_TABLE"
 )
 
@@ -29,10 +31,14 @@ func init() {
 		os.Exit(1)
 	}
 	appsTable := requireEnv(appstoreApplicationsTableEnvVar)
+	applicationsTable := requireEnv(applicationsTableEnvVar)
+	versionsTable := requireEnv(appstoreVersionsTableEnvVar)
 	accessTable := requireEnv(appAccessTableEnvVar)
 	client := dynamodb.NewFromConfig(cfg)
 	checker = access.NewChecker(
 		store_dynamodb.NewAppStoreDatabaseStore(client, appsTable),
+		store_dynamodb.NewApplicationDatabaseStore(client, applicationsTable),
+		store_dynamodb.NewAppStoreVersionDatabaseStore(client, versionsTable),
 		store_dynamodb.NewAppAccessDatabaseStore(client, accessTable))
 }
 
