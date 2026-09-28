@@ -5,6 +5,7 @@ WORKING_DIR   ?= "$(shell pwd)"
 SERVICE_NAME ?= "app-deploy-service"
 PACKAGE_NAME  ?= "${SERVICE_NAME}-${IMAGE_TAG}.zip"
 STATUS_PACKAGE_NAME  ?= "${SERVICE_NAME}-status-${IMAGE_TAG}.zip"
+CHECK_APP_ACCESS_PACKAGE_NAME  ?= "${SERVICE_NAME}-check-app-access-${IMAGE_TAG}.zip"
 
 
 .DEFAULT: help
@@ -57,6 +58,15 @@ package:
 		cd $(WORKING_DIR)/lambda/bin/status/ ; \
 			zip -r $(WORKING_DIR)/lambda/bin/status/$(STATUS_PACKAGE_NAME) .
 	@echo ""
+	@echo "****************************************"
+	@echo "*   Building check-app-access lambda   *"
+	@echo "****************************************"
+	@echo ""
+	cd lambda/service; \
+  		env GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/check-app-access/bootstrap ./cmd/check-app-access; \
+		cd $(WORKING_DIR)/lambda/bin/check-app-access/ ; \
+			zip -r $(WORKING_DIR)/lambda/bin/check-app-access/$(CHECK_APP_ACCESS_PACKAGE_NAME) .
+	@echo ""
 	@echo "***********************"
 	@echo "*   Building Fargate   *"
 	@echo "***********************"
@@ -88,6 +98,16 @@ publish: package
 	aws s3 cp $(WORKING_DIR)/lambda/bin/status/$(STATUS_PACKAGE_NAME) s3://$(LAMBDA_BUCKET)/$(SERVICE_NAME)/ --output json
 	@echo "done cp"
 	rm -rf $(WORKING_DIR)/lambda/bin/status/$(STATUS_PACKAGE_NAME) $(WORKING_DIR)/lambda/bin/status/bootstrap
+	@echo ""
+	@echo "******************************************"
+	@echo "*   Publishing check-app-access lambda   *"
+	@echo "******************************************"
+	@echo ""
+	@echo "starting cp"
+	ls $(WORKING_DIR)/lambda/bin/check-app-access/
+	aws s3 cp $(WORKING_DIR)/lambda/bin/check-app-access/$(CHECK_APP_ACCESS_PACKAGE_NAME) s3://$(LAMBDA_BUCKET)/$(SERVICE_NAME)/ --output json
+	@echo "done cp"
+	rm -rf $(WORKING_DIR)/lambda/bin/check-app-access/$(CHECK_APP_ACCESS_PACKAGE_NAME) $(WORKING_DIR)/lambda/bin/check-app-access/bootstrap
 	@echo ""
 	@echo "**************************"
 	@echo "*   Publishing Fargate   *"
