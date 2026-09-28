@@ -8,9 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner"
-	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/pusher_config"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/status"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -86,12 +84,8 @@ func main() {
 		statusManager = statusManager.WithDeployment(deploymentsStore, deploymentId)
 	}
 
-	// use pusher if we can get the config
-	if pusherConfig, err := pusher_config.Get(ctx, ssm.NewFromConfig(cfg)); err != nil {
-		log.Printf("warning: unable to configure Pusher: %s\n", err.Error())
-	} else {
-		statusManager = statusManager.WithPusher(pusherConfig)
-	}
+	// live status updates: AppSync Events where configured, otherwise Pusher
+	statusManager = withLiveUpdates(ctx, statusManager, cfg)
 
 	// POST provisioning actions
 	switch action {
@@ -121,11 +115,7 @@ func main() {
 		appStoreDeploymentId := os.Getenv(provisioner.DeploymentIdKey)
 		deploymentsStore := store_dynamodb.NewDeploymentsStore(dynamoDBClient, deploymentsTable)
 		appStoreStatusManager = appStoreStatusManager.WithDeployment(deploymentsStore, appStoreDeploymentId)
-		if pusherConfig, err := pusher_config.Get(ctx, ssm.NewFromConfig(cfg)); err != nil {
-			log.Printf("warning: unable to configure Pusher: %s\n", err.Error())
-		} else {
-			appStoreStatusManager = appStoreStatusManager.WithPusher(pusherConfig)
-		}
+		appStoreStatusManager = withLiveUpdates(ctx, appStoreStatusManager, cfg)
 
 		ecsClient := ecs.NewFromConfig(cfg)
 		authToken := os.Getenv("AUTH_TOKEN")

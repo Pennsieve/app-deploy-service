@@ -17,14 +17,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/runner"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
-	"github.com/pusher/pusher-http-go/v5"
 )
 
 func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -209,19 +207,8 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	statusManager := NewAppStoreStatusManager(handlerName, versionStore, versionUuid).
 		WithDeployment(deploymentsStore, deploymentId)
 
-	// Add pusher for real-time updates
-	ssmClient := ssm.NewFromConfig(cfg)
-	if pusherConfig, err := GetPusherConfig(ctx, ssmClient); err != nil {
-		log.Printf("warning: %v\n", err)
-	} else {
-		statusManager = statusManager.WithPusher(&pusher.Client{
-			AppID:   pusherConfig.AppId,
-			Key:     pusherConfig.Key,
-			Secret:  pusherConfig.Secret,
-			Cluster: pusherConfig.Cluster,
-			Secure:  true,
-		})
-	}
+	// live status updates: AppSync Events where configured, otherwise Pusher
+	statusManager = withLiveUpdates(ctx, statusManager, cfg)
 
 	// Create deployment record (applicationId = versionUuid for tracking)
 	if err := statusManager.NewDeployment(ctx, store_dynamodb.Deployment{
