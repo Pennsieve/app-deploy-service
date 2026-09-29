@@ -7,6 +7,7 @@ import (
 	"github.com/pennsieve/app-deploy-service/status/external"
 	"github.com/pennsieve/app-deploy-service/status/logging"
 	"github.com/pennsieve/app-deploy-service/status/models"
+	"github.com/pennsieve/pennsieve-go-core/pkg/realtime"
 	"github.com/pusher/pusher-http-go/v5"
 	"log/slog"
 )
@@ -15,6 +16,7 @@ type DeployTaskStateChangeHandler struct {
 	ECSApi            external.ECSApi
 	DynamoDBApi       external.DynamoDBApi
 	PusherClient      *pusher.Client
+	Realtime          realtime.Publisher
 	ApplicationsTable string
 	DeploymentsTable  string
 	logger            *slog.Logger
@@ -26,6 +28,12 @@ func NewDeployTaskStateChangeHandler(ecsApi external.ECSApi, dynamoDBApi externa
 
 func (h *DeployTaskStateChangeHandler) WithPusher(pusherClient *pusher.Client) *DeployTaskStateChangeHandler {
 	h.PusherClient = pusherClient
+	return h
+}
+
+// WithRealtime publishes status events through AppSync Events instead of Pusher.
+func (h *DeployTaskStateChangeHandler) WithRealtime(publisher realtime.Publisher) *DeployTaskStateChangeHandler {
+	h.Realtime = publisher
 	return h
 }
 
@@ -68,7 +76,7 @@ func (h *DeployTaskStateChangeHandler) Handle(ctx context.Context, event models.
 	}
 
 	if final := IsFinalState(event); final != nil {
-		h.SendApplicationStatusEvent(applicationId, deploymentId, final, event.Detail.UpdatedAt)
+		h.SendApplicationStatusEvent(ctx, applicationId, deploymentId, final, event.Detail.UpdatedAt)
 		if err := h.UpdateApplicationsTable(ctx, applicationId, final, applicationsTable); err != nil {
 			return err
 		}

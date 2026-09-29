@@ -9,9 +9,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/pennsieve/app-deploy-service/status/handler"
 	"github.com/pennsieve/app-deploy-service/status/logging"
+	"github.com/pennsieve/pennsieve-go-core/pkg/realtime"
 	"github.com/pusher/pusher-http-go/v5"
 	"log/slog"
 	"os"
+	"strings"
 )
 
 // This Lambda listens for ECS state change events and logs them to DynamoDB
@@ -38,7 +40,10 @@ func init() {
 		applicationsTable,
 		deploymentsTable)
 
-	if pusherConfig, err := handler.GetPusherConfig(ctx, ssm.NewFromConfig(awsConfig)); err != nil {
+	// live status updates: AppSync Events where configured, otherwise Pusher
+	if strings.TrimSpace(os.Getenv(realtime.EnvEventsEndpoint)) != "" {
+		stateChangeHandler = stateChangeHandler.WithRealtime(realtime.FromEnv(ctx))
+	} else if pusherConfig, err := handler.GetPusherConfig(ctx, ssm.NewFromConfig(awsConfig)); err != nil {
 		logging.Default.Warn("unable to get pusher config", slog.Any("error", err))
 	} else {
 		stateChangeHandler = stateChangeHandler.WithPusher(&pusher.Client{

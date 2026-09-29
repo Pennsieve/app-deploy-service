@@ -17,8 +17,18 @@ type ArgCaptureAppStoreVersionTableAPI struct {
 	PutItemInput    *dynamodb.PutItemInput
 	QueryInput      *dynamodb.QueryInput
 	UpdateItemInput *dynamodb.UpdateItemInput
+	GetItemInput    *dynamodb.GetItemInput
 
-	QueryOutput *dynamodb.QueryOutput
+	QueryOutput   *dynamodb.QueryOutput
+	GetItemOutput *dynamodb.GetItemOutput
+}
+
+func (m *ArgCaptureAppStoreVersionTableAPI) GetItem(_ context.Context, params *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	m.GetItemInput = params
+	if m.GetItemOutput != nil {
+		return m.GetItemOutput, nil
+	}
+	return &dynamodb.GetItemOutput{}, nil
 }
 
 func (m *ArgCaptureAppStoreVersionTableAPI) PutItem(_ context.Context, params *dynamodb.PutItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error) {
@@ -253,4 +263,26 @@ func TestAppStoreVersion_StatusFieldName(t *testing.T) {
 
 func TestAppStoreVersionDatabaseStore_ImplementsInterface(t *testing.T) {
 	var _ AppStoreVersionDBStore = (*AppStoreVersionDatabaseStore)(nil)
+}
+
+func TestAppStoreVersionDatabaseStore_GetById(t *testing.T) {
+	version := AppStoreVersion{Uuid: "version-1", ApplicationId: "app-1", Version: "1.0.0"}
+	item, err := attributevalue.MarshalMap(version)
+	require.NoError(t, err)
+	mock := &ArgCaptureAppStoreVersionTableAPI{GetItemOutput: &dynamodb.GetItemOutput{Item: item}}
+	store := NewAppStoreVersionDatabaseStore(mock, "versions-table")
+
+	got, err := store.GetById(context.Background(), "version-1")
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "app-1", got.ApplicationId)
+	assert.Equal(t, "versions-table", aws.ToString(mock.GetItemInput.TableName))
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "version-1"}, mock.GetItemInput.Key["uuid"])
+}
+
+func TestAppStoreVersionDatabaseStore_GetById_NotFound(t *testing.T) {
+	store := NewAppStoreVersionDatabaseStore(&ArgCaptureAppStoreVersionTableAPI{}, "versions-table")
+	got, err := store.GetById(context.Background(), "missing")
+	require.NoError(t, err)
+	assert.Nil(t, got)
 }

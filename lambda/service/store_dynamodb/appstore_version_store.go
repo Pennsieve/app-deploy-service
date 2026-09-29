@@ -15,11 +15,13 @@ import (
 type AppStoreVersionTableAPI interface {
 	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
 }
 
 // AppStoreVersionDBStore operates on the appstore versions table.
 type AppStoreVersionDBStore interface {
+	GetById(context.Context, string) (*AppStoreVersion, error)
 	GetByApplicationId(context.Context, string) ([]AppStoreVersion, error)
 	GetByApplicationIdAndVersion(ctx context.Context, applicationId string, version string) ([]AppStoreVersion, error)
 	Insert(context.Context, AppStoreVersion) error
@@ -33,6 +35,25 @@ type AppStoreVersionDatabaseStore struct {
 
 func NewAppStoreVersionDatabaseStore(api AppStoreVersionTableAPI, tableName string) *AppStoreVersionDatabaseStore {
 	return &AppStoreVersionDatabaseStore{api, tableName}
+}
+
+// GetById returns the version with the given uuid, or nil, nil when there is none.
+func (r *AppStoreVersionDatabaseStore) GetById(ctx context.Context, uuid string) (*AppStoreVersion, error) {
+	response, err := r.api.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(r.TableName),
+		Key:       AppStoreVersion{Uuid: uuid}.GetKey(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error getting appstore version: %w", err)
+	}
+	if response.Item == nil {
+		return nil, nil
+	}
+	var version AppStoreVersion
+	if err := attributevalue.UnmarshalMap(response.Item, &version); err != nil {
+		return nil, fmt.Errorf("error unmarshaling appstore version: %w", err)
+	}
+	return &version, nil
 }
 
 // GetByApplicationId returns all versions for a given application using the applicationId-version-index GSI.

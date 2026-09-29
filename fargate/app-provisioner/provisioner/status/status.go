@@ -6,6 +6,7 @@ import (
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/status/events"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/store_dynamodb"
 	pennsievePusher "github.com/pennsieve/pennsieve-go-core/pkg/models/pusher"
+	"github.com/pennsieve/pennsieve-go-core/pkg/realtime"
 	"github.com/pusher/pusher-http-go/v5"
 	"log"
 	"time"
@@ -26,6 +27,7 @@ type Manager struct {
 	StatusStore       StatusUpdater
 	DeploymentsStore  *store_dynamodb.DeploymentsStore
 	Pusher            *pusher.Client
+	Realtime          realtime.Publisher
 	ApplicationId     string
 	DeploymentId      string
 }
@@ -57,6 +59,12 @@ func (m *Manager) WithPusher(pusherConfig *pennsievePusher.Config) *Manager {
 	return m
 }
 
+// WithRealtime publishes status events through AppSync Events instead of Pusher.
+func (m *Manager) WithRealtime(publisher realtime.Publisher) *Manager {
+	m.Realtime = publisher
+	return m
+}
+
 func (m *Manager) SetErrorStatus(ctx context.Context, err error) {
 	msg := fmt.Sprintf("error: %s", err.Error())
 	if appStoreErr := m.StatusStore.UpdateStatus(ctx, msg, m.ApplicationId); appStoreErr != nil {
@@ -67,28 +75,27 @@ func (m *Manager) SetErrorStatus(ctx context.Context, err error) {
 			log.Printf("warning: error setting errored on deployments table: %s\n", deployStoreErr.Error())
 		}
 	}
-	m.sendApplicationStatusEvent(msg, true)
+	m.sendApplicationStatusEvent(ctx, msg, true)
 }
 
 func (m *Manager) UpdateApplicationStatus(ctx context.Context, newStatus string, isError bool) {
 	if err := m.StatusStore.UpdateStatus(ctx, newStatus, m.ApplicationId); err != nil {
 		log.Printf("warning: error updating status of application %s to %q: %s\n", m.ApplicationId, newStatus, err.Error())
 	}
-	m.sendApplicationStatusEvent(newStatus, isError)
+	m.sendApplicationStatusEvent(ctx, newStatus, isError)
 }
 
 func (m *Manager) ApplicationCreateUpdate(ctx context.Context, application store_dynamodb.Application) error {
 	status := application.Status
-	m.sendApplicationStatusEvent(status, false)
+	m.sendApplicationStatusEvent(ctx, status, false)
 	return m.ApplicationsStore.Update(ctx, application, m.ApplicationId)
 }
 
-func (m *Manager) sendApplicationStatusEvent(status string, isErrorStatus bool) {
-	if m.Pusher == nil {
+func (m *Manager) sendApplicationStatusEvent(ctx context.Context, status string, isErrorStatus bool) {
+	if m.Realtime == nil && m.Pusher == nil {
 		log.Printf("warning: no Pusher client configured")
 		return
 	}
-	channel := events.ApplicationStatusChannel(m.ApplicationId)
 	event := events.ApplicationStatusEvent{
 		ApplicationId: m.ApplicationId,
 		DeploymentId:  m.DeploymentId,
@@ -97,6 +104,14 @@ func (m *Manager) sendApplicationStatusEvent(status string, isErrorStatus bool) 
 		IsErrorStatus: isErrorStatus,
 		Source:        m.HandlerName,
 	}
+	if m.Realtime != nil {
+		channel := realtime.Application(m.ApplicationId)
+		if err := m.Realtime.Publish(ctx, channel, events.ApplicationStatusEventName, event); err != nil {
+			log.Printf("warning: error publishing realtime application channel %s with status: %s: %s\n", channel, status, err.Error())
+		}
+		return
+	}
+	channel := events.ApplicationStatusChannel(m.ApplicationId)
 	if err := m.Pusher.Trigger(channel, events.ApplicationStatusEventName, event); err != nil {
 		log.Printf("warning: error updating pusher application channel %s with status: %s: %s\n", channel, status, err.Error())
 	}

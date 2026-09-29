@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -206,4 +208,31 @@ func TestIsAppOwner_False(t *testing.T) {
 	app := &store_dynamodb.AppStoreApplication{OwnerId: "N:user:owner-123"}
 	claims := newTestClaims("N:user:someone-else", "N:org:org1", nil)
 	assert.False(t, IsAppOwner(context.Background(), claims, app))
+}
+
+type failingUserQueryAPI struct {
+	mockAppAccessTableAPI
+}
+
+func (m *failingUserQueryAPI) Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error) {
+	for _, v := range params.ExpressionAttributeValues {
+		if sv, ok := v.(*types.AttributeValueMemberS); ok && strings.HasPrefix(sv.Value, "user#") {
+			return nil, errors.New("throttled")
+		}
+	}
+	return m.mockAppAccessTableAPI.Query(ctx, params, optFns...)
+}
+
+func TestCanAccessApp_LookupErrorFallsThroughToWorkspace(t *testing.T) {
+	app := &store_dynamodb.AppStoreApplication{Uuid: "app-uuid", Visibility: "private", OwnerId: "N:user:other"}
+	item, _ := attributevalue.MarshalMap(store_dynamodb.AppAccess{EntityId: "workspace#N:org:org1", AppId: "app#app-uuid"})
+	mock := &failingUserQueryAPI{mockAppAccessTableAPI{QueryOutputs: map[string]*dynamodb.QueryOutput{}}}
+	for _, k := range []string{":0", ":1"} {
+		mock.QueryOutputs[k+":workspace#N:org:org1"] = &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{item}, Count: 1}
+	}
+	store := store_dynamodb.NewAppAccessDatabaseStore(mock, "test-table")
+
+	assert.True(t, CanAccessApp(context.Background(), newTestClaims("N:user:someone", "N:org:org1", nil), app, store))
+	assert.False(t, CanAccessApp(context.Background(), newTestClaims("N:user:someone", "N:org:org2", nil), app, store),
+		"a failed lookup is treated as no grant")
 }

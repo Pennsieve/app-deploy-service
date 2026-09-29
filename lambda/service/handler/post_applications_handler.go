@@ -16,7 +16,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/google/uuid"
 	"github.com/pennsieve/app-deploy-service/service/mappers"
 	"github.com/pennsieve/app-deploy-service/service/models"
@@ -24,7 +23,6 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
-	"github.com/pusher/pusher-http-go/v5"
 )
 
 func defaultComputeTypes(ct []string) []string {
@@ -178,19 +176,8 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	statusManager := NewStatusManager(handlerName, applicationsStore, applicationUuid).
 		WithDeployment(deploymentsStore, deploymentId)
 
-	// add pusher to statusManager if possible
-	ssmClient := ssm.NewFromConfig(cfg)
-	if pusherConfig, err := GetPusherConfig(ctx, ssmClient); err != nil {
-		log.Printf("warning: %v\n", err)
-	} else {
-		statusManager = statusManager.WithPusher(&pusher.Client{
-			AppID:   pusherConfig.AppId,
-			Key:     pusherConfig.Key,
-			Secret:  pusherConfig.Secret,
-			Cluster: pusherConfig.Cluster,
-			Secure:  true,
-		})
-	}
+	// live status updates: AppSync Events where configured, otherwise Pusher
+	statusManager = withLiveUpdates(ctx, statusManager, cfg)
 
 	params := map[string]string{
 		"computeNodeUuid": computeNodeUuidValue,
