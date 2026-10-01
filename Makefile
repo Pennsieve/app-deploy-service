@@ -45,7 +45,7 @@ package:
 	@echo "*******************************"
 	@echo ""
 	cd lambda/service; \
-  		env GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/service/bootstrap; \
+  		env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/service/bootstrap; \
 		cd $(WORKING_DIR)/lambda/bin/service/ ; \
 			zip -r $(WORKING_DIR)/lambda/bin/service/$(PACKAGE_NAME) .
 	@echo ""
@@ -54,7 +54,7 @@ package:
 	@echo "******************************"
 	@echo ""
 	cd lambda/status; \
-  		env GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/status/bootstrap; \
+  		env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/status/bootstrap; \
 		cd $(WORKING_DIR)/lambda/bin/status/ ; \
 			zip -r $(WORKING_DIR)/lambda/bin/status/$(STATUS_PACKAGE_NAME) .
 	@echo ""
@@ -63,7 +63,7 @@ package:
 	@echo "****************************************"
 	@echo ""
 	cd lambda/service; \
-  		env GOOS=linux GOARCH=arm64 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/check-app-access/bootstrap ./cmd/check-app-access; \
+  		env GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -tags lambda.norpc -o $(WORKING_DIR)/lambda/bin/check-app-access/bootstrap ./cmd/check-app-access; \
 		cd $(WORKING_DIR)/lambda/bin/check-app-access/ ; \
 			zip -r $(WORKING_DIR)/lambda/bin/check-app-access/$(CHECK_APP_ACCESS_PACKAGE_NAME) .
 	@echo ""
