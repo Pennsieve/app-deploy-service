@@ -287,7 +287,7 @@ func TestAppStoreVersionDatabaseStore_GetById_NotFound(t *testing.T) {
 	assert.Nil(t, got)
 }
 
-func TestAppStoreVersionDatabaseStore_InsertDevBuildRoundTrip(t *testing.T) {
+func TestAppStoreVersionDatabaseStore_InsertRevisionRoundTrip(t *testing.T) {
 	mock := &ArgCaptureAppStoreVersionTableAPI{}
 	store := NewAppStoreVersionDatabaseStore(mock, "test-versions-table")
 
@@ -309,7 +309,7 @@ func TestAppStoreVersionDatabaseStore_InsertDevBuildRoundTrip(t *testing.T) {
 	assert.Equal(t, version, roundTripped)
 }
 
-func TestAppStoreVersionDatabaseStore_InsertReleaseOmitsDevFields(t *testing.T) {
+func TestAppStoreVersionDatabaseStore_InsertReleaseOmitsRevisionFields(t *testing.T) {
 	mock := &ArgCaptureAppStoreVersionTableAPI{}
 	store := NewAppStoreVersionDatabaseStore(mock, "test-versions-table")
 
@@ -321,13 +321,13 @@ func TestAppStoreVersionDatabaseStore_InsertReleaseOmitsDevFields(t *testing.T) 
 	assert.False(t, hasCommit)
 }
 
-func TestAppStoreVersionDatabaseStore_UpdateDevBuild(t *testing.T) {
+func TestAppStoreVersionDatabaseStore_UpdateRevision(t *testing.T) {
 	mock := &ArgCaptureAppStoreVersionTableAPI{}
 	tableName := "test-versions-table"
 	store := NewAppStoreVersionDatabaseStore(mock, tableName)
 	versionUuid := uuid.NewString()
 
-	err := store.UpdateDevBuild(context.Background(), versionUuid, "abcdef0123456789", "registering")
+	err := store.UpdateRevision(context.Background(), versionUuid, "abcdef0123456789", "registering")
 	require.NoError(t, err)
 
 	require.NotNil(t, mock.UpdateItemInput)

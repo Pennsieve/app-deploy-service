@@ -124,7 +124,7 @@ components:
           description: The source repository URL
         tag:
           type: string
-          description: The release tag. Empty for dev builds.
+          description: The release tag. Empty for revision builds.
         isPrivate:
           type: boolean
           description: Whether the source repository is private
@@ -135,7 +135,7 @@ components:
           $ref: '#/components/schemas/Revision'
     Revision:
       type: object
-      description: The git revision to build. Present only for a build that is not tied to a GitHub release; its presence marks the build as a dev version. Omitted for release builds.
+      description: The git revision to build. Present only for a build that is not tied to a GitHub release; such builds are recorded on the "dev" channel. Omitted for release builds.
       required: [ref, refType, commit]
       properties:
         ref:
@@ -234,13 +234,13 @@ components:
           description: '"dev" for builds not tied to a release; omitted for release versions'
         ref:
           type: string
-          description: Dev builds only. The branch, tag, or commit requested.
+          description: Revision builds only. The branch, tag, or commit requested.
         refType:
           type: string
-          description: Dev builds only. One of branch, tag, commit.
+          description: Revision builds only. One of branch, tag, commit.
         commit:
           type: string
-          description: Dev builds only. The commit sha the build is pinned to.
+          description: Revision builds only. The commit sha the build is pinned to.
         deployments:
           type: array
           items:

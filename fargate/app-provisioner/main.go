@@ -49,7 +49,7 @@ func main() {
 		Commit:  os.Getenv("SOURCE_COMMIT"),
 		Channel: os.Getenv("SOURCE_CHANNEL"),
 	}
-	if sourceRef.Tag == "" && !sourceRef.IsDev() {
+	if sourceRef.Tag == "" && !sourceRef.IsRevisionBuild() {
 		sourceRef.Tag = "latest"
 	}
 
@@ -177,7 +177,7 @@ func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId str
 		return fmt.Errorf("APPSTORE_PRIVATE_ECR_URL environment variable is not set")
 	}
 
-	// Release builds use {hash}-{source_tag}; dev builds use dev-{hash}-{ref}-{commit}-{build}
+	// Release builds use {hash}-{source_tag}; revision builds use {channel}-{hash}-{ref}-{commit}-{build}
 	// so each source gets unique tags in the shared, immutable ECR repo
 	uniqueTag := utils.ImageTag(sourceUrl, sourceRef, deploymentId)
 	destinationUrl := fmt.Sprintf("%s:%s", ecrRepoUrl, uniqueTag)

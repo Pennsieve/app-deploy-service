@@ -26,7 +26,7 @@ type AppStoreVersionDBStore interface {
 	GetByApplicationIdAndVersion(ctx context.Context, applicationId string, version string) ([]AppStoreVersion, error)
 	Insert(context.Context, AppStoreVersion) error
 	UpdateStatus(ctx context.Context, newStatus string, uuid string) error
-	UpdateDevBuild(ctx context.Context, uuid string, commit string, newStatus string) error
+	UpdateRevision(ctx context.Context, uuid string, commit string, newStatus string) error
 }
 
 type AppStoreVersionDatabaseStore struct {
@@ -152,13 +152,13 @@ func (r *AppStoreVersionDatabaseStore) UpdateStatus(ctx context.Context, newStat
 	return nil
 }
 
-// UpdateDevBuild re-points an existing dev version at a new commit and resets
+// UpdateRevision re-points an existing version at a new commit and resets
 // its status, clearing the previous image so a stale build is never served
 // while the new one is in flight.
-func (r *AppStoreVersionDatabaseStore) UpdateDevBuild(ctx context.Context, uuid string, commit string, newStatus string) error {
+func (r *AppStoreVersionDatabaseStore) UpdateRevision(ctx context.Context, uuid string, commit string, newStatus string) error {
 	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: uuid})
 	if err != nil {
-		return fmt.Errorf("error marshaling key for appstore dev build update: %w", err)
+		return fmt.Errorf("error marshaling key for appstore revision update: %w", err)
 	}
 
 	_, err = r.api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
@@ -175,7 +175,7 @@ func (r *AppStoreVersionDatabaseStore) UpdateDevBuild(ctx context.Context, uuid 
 		UpdateExpression: aws.String("set #commit = :c, registrationStatus = :s, destinationUrl = :d"),
 	})
 	if err != nil {
-		return fmt.Errorf("error updating appstore dev build: %w", err)
+		return fmt.Errorf("error updating appstore revision: %w", err)
 	}
 
 	return nil

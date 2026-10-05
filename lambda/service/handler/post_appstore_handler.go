@@ -45,7 +45,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	versionLabel := application.Source.VersionLabel()
 	contentRef := application.Source.ContentRef()
 	var revision models.Revision
-	if application.Source.IsDevBuild() {
+	if application.Source.IsRevisionBuild() {
 		revision = *application.Source.Revision
 	}
 
@@ -174,7 +174,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		log.Printf("created new appstore application %s for sourceUrl %s", applicationId, application.Source.Url)
 	}
 
-	// Release builds always create a new version entry. Dev builds reuse the
+	// Release builds always create a new version entry. Revision builds reuse the
 	// version that shares their label (one per branch/tag/commit) so repeated
 	// builds update in place instead of piling up.
 	versionUuid := uuid.NewString()
@@ -191,10 +191,10 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		Commit:        revision.Commit,
 	}
 	reusedVersion := false
-	if application.Source.IsDevBuild() {
+	if application.Source.IsRevisionBuild() {
 		existing, err := versionStore.GetByApplicationIdAndVersion(ctx, applicationId, versionLabel)
 		if err != nil {
-			log.Println("error looking up dev version: ", err.Error())
+			log.Println("error looking up existing version for revision: ", err.Error())
 			return events.APIGatewayV2HTTPResponse{
 				StatusCode: http.StatusInternalServerError,
 				Body:       handlerError(handlerName, ErrDynamoDB),
@@ -203,14 +203,14 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		if len(existing) > 0 {
 			versionUuid = existing[0].Uuid
 			reusedVersion = true
-			if err := versionStore.UpdateDevBuild(ctx, versionUuid, revision.Commit, "registering"); err != nil {
-				log.Println("error updating dev version: ", err.Error())
+			if err := versionStore.UpdateRevision(ctx, versionUuid, revision.Commit, "registering"); err != nil {
+				log.Println("error updating existing version for revision: ", err.Error())
 				return events.APIGatewayV2HTTPResponse{
 					StatusCode: http.StatusInternalServerError,
 					Body:       handlerError(handlerName, ErrStoringApplication),
 				}, nil
 			}
-			log.Printf("reusing dev version %s (%s) for application %s at commit %s", versionUuid, versionLabel, applicationId, revision.Commit)
+			log.Printf("reusing version %s (%s) for application %s at commit %s", versionUuid, versionLabel, applicationId, revision.Commit)
 		}
 	}
 	if !reusedVersion {

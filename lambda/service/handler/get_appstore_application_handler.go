@@ -188,7 +188,7 @@ func fetchAssets(ctx context.Context, cfg aws.Config, sourceUrl string, tag stri
 	return assets
 }
 
-// visibleVersions hides dev builds from everyone but the app owner. Release
+// visibleVersions hides dev-channel versions from everyone but the app owner. Release
 // versions are always returned.
 func visibleVersions(versions []models.AppStoreVersion, isOwner bool) []models.AppStoreVersion {
 	if isOwner {
