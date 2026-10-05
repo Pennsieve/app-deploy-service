@@ -30,15 +30,14 @@ var commitShaPattern = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 var invalidVersionChars = regexp.MustCompile(`[^A-Za-z0-9_.-]+`)
 
 // IsDevBuild reports whether the source asks for a build of a git revision
-// rather than a release. The
-// presence of the "revision" object is the signal; release builds omit it.
+// rather than a release. The presence of the "revision" object is the signal;
+// release builds omit it.
 func (s DeploymentSource) IsDevBuild() bool {
 	return s.Revision != nil
 }
 
 // Channel is the value stored on the version record. Revision builds land on
-// the dev channel;
-// releases have none.
+// the dev channel; releases have none.
 func (s DeploymentSource) Channel() string {
 	if s.IsDevBuild() {
 		return ChannelDev
