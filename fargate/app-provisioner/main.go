@@ -42,10 +42,15 @@ func main() {
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
 	accountsTable := os.Getenv("ACCOUNTS_TABLE")
 
-	var tag string
-	tag = os.Getenv("SOURCE_TAG")
-	if tag == "" {
-		tag = "latest"
+	sourceRef := utils.SourceRef{
+		Tag:     os.Getenv("SOURCE_TAG"),
+		Ref:     os.Getenv("SOURCE_REF"),
+		RefType: os.Getenv("SOURCE_REF_TYPE"),
+		Commit:  os.Getenv("SOURCE_COMMIT"),
+		Channel: os.Getenv("SOURCE_CHANNEL"),
+	}
+	if sourceRef.Tag == "" && !sourceRef.IsDev() {
+		sourceRef.Tag = "latest"
 	}
 
 	// Initializing environment
@@ -119,7 +124,7 @@ func main() {
 
 		ecsClient := ecs.NewFromConfig(cfg)
 		authToken := os.Getenv("AUTH_TOKEN")
-		err := AddToAppstore(ctx, applicationUuid, appStoreDeploymentId, sourceUrl, tag, authToken, buildStorageGiB, appProvisioner, ecsClient, appStoreStatusManager, versionStore)
+		err := AddToAppstore(ctx, applicationUuid, appStoreDeploymentId, sourceUrl, sourceRef, authToken, buildStorageGiB, appProvisioner, ecsClient, appStoreStatusManager, versionStore)
 		if err != nil {
 			appStoreStatusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
@@ -165,17 +170,16 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, authToken string, buildStorageGiB int32, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager, versionStore store_dynamodb.AppStoreVersionDBStore) error {
+func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, sourceRef utils.SourceRef, authToken string, buildStorageGiB int32, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager, versionStore store_dynamodb.AppStoreVersionDBStore) error {
 	// Get the pre-existing private ECR URL from environment variable
 	ecrRepoUrl := os.Getenv("APPSTORE_PRIVATE_ECR_URL")
 	if ecrRepoUrl == "" {
 		return fmt.Errorf("APPSTORE_PRIVATE_ECR_URL environment variable is not set")
 	}
 
-	// Generate unique tag using source URL hash: {hash}-{source_tag}
-	// This ensures each source gets unique tags in the shared ECR repo
-	sourceUrlHash := utils.GenerateHash(sourceUrl)
-	uniqueTag := fmt.Sprintf("%d-%s", sourceUrlHash, tag)
+	// Release builds use {hash}-{source_tag}; dev builds use dev-{hash}-{ref}-{commit}-{build}
+	// so each source gets unique tags in the shared, immutable ECR repo
+	uniqueTag := utils.ImageTag(sourceUrl, sourceRef, deploymentId)
 	destinationUrl := fmt.Sprintf("%s:%s", ecrRepoUrl, uniqueTag)
 
 	log.Printf("Using private ECR repository with unique tag: %s", destinationUrl)
@@ -187,9 +191,9 @@ func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId str
 	statusManager.UpdateApplicationStatus(ctx, "deploying", false)
 
 	// Build and push
-	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", sourceUrl, tag, destinationUrl)
+	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, ref: %+v, destinationUrl: %s", sourceUrl, sourceRef, destinationUrl)
 	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
-	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, authToken, applicationsTable, buildStorageGiB, appProvisioner, ecsClient); err != nil {
+	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, sourceRef, destinationUrl, authToken, applicationsTable, buildStorageGiB, appProvisioner, ecsClient); err != nil {
 		return err
 	}
 
@@ -363,13 +367,13 @@ func PublicDeploy(ctx context.Context, applicationUuid string, deploymentId stri
 	return nil
 }
 
-func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, destinationUrl string, authToken string, applicationsTable string, buildStorageGiB int32, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
+func PrivateDeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, sourceRef utils.SourceRef, destinationUrl string, authToken string, applicationsTable string, buildStorageGiB int32, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client) error {
 	creds, err := appProvisioner.GetProvisionerCreds(ctx)
 	if err != nil {
 		return fmt.Errorf("error retrieving credentials: %w", err)
 	}
 
-	deploymentSourceUrl, err := utils.DetermineSourceURL(sourceUrl, tag)
+	deploymentSourceUrl, err := utils.DetermineSourceURLForRef(sourceUrl, sourceRef)
 	if err != nil {
 		return fmt.Errorf("error determining sourceUrl variable for deployment: %w", err)
 	}

@@ -286,3 +286,56 @@ func TestAppStoreVersionDatabaseStore_GetById_NotFound(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, got)
 }
+
+func TestAppStoreVersionDatabaseStore_InsertDevBuildRoundTrip(t *testing.T) {
+	mock := &ArgCaptureAppStoreVersionTableAPI{}
+	store := NewAppStoreVersionDatabaseStore(mock, "test-versions-table")
+
+	version := AppStoreVersion{
+		Uuid:          uuid.NewString(),
+		ApplicationId: uuid.NewString(),
+		Version:       "dev-feature-x",
+		CreatedAt:     "2026-01-01",
+		Status:        "registering",
+		Channel:       "dev",
+		Ref:           "feature/x",
+		RefType:       "branch",
+		Commit:        "0123456789abcdef0123456789abcdef01234567",
+	}
+	require.NoError(t, store.Insert(context.Background(), version))
+
+	var roundTripped AppStoreVersion
+	require.NoError(t, attributevalue.UnmarshalMap(mock.PutItemInput.Item, &roundTripped))
+	assert.Equal(t, version, roundTripped)
+}
+
+func TestAppStoreVersionDatabaseStore_InsertReleaseOmitsDevFields(t *testing.T) {
+	mock := &ArgCaptureAppStoreVersionTableAPI{}
+	store := NewAppStoreVersionDatabaseStore(mock, "test-versions-table")
+
+	require.NoError(t, store.Insert(context.Background(), AppStoreVersion{Uuid: uuid.NewString(), Version: "v1.0.0"}))
+
+	_, hasChannel := mock.PutItemInput.Item["channel"]
+	_, hasCommit := mock.PutItemInput.Item["commit"]
+	assert.False(t, hasChannel)
+	assert.False(t, hasCommit)
+}
+
+func TestAppStoreVersionDatabaseStore_UpdateDevBuild(t *testing.T) {
+	mock := &ArgCaptureAppStoreVersionTableAPI{}
+	tableName := "test-versions-table"
+	store := NewAppStoreVersionDatabaseStore(mock, tableName)
+	versionUuid := uuid.NewString()
+
+	err := store.UpdateDevBuild(context.Background(), versionUuid, "abcdef0123456789", "registering")
+	require.NoError(t, err)
+
+	require.NotNil(t, mock.UpdateItemInput)
+	assert.Equal(t, tableName, aws.ToString(mock.UpdateItemInput.TableName))
+	assert.Equal(t, &types.AttributeValueMemberS{Value: versionUuid}, mock.UpdateItemInput.Key["uuid"])
+	assert.Equal(t, "set #commit = :c, registrationStatus = :s, destinationUrl = :d", aws.ToString(mock.UpdateItemInput.UpdateExpression))
+	assert.Equal(t, "commit", mock.UpdateItemInput.ExpressionAttributeNames["#commit"])
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "abcdef0123456789"}, mock.UpdateItemInput.ExpressionAttributeValues[":c"])
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "registering"}, mock.UpdateItemInput.ExpressionAttributeValues[":s"])
+	assert.Equal(t, &types.AttributeValueMemberS{Value: ""}, mock.UpdateItemInput.ExpressionAttributeValues[":d"])
+}
