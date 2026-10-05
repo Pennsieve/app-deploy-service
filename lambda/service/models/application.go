@@ -39,16 +39,19 @@ type ComputeNode struct {
 }
 
 type DeploymentSource struct {
-	SourceType string `json:"type"`
-	Url        string `json:"url"`
-	Tag        string `json:"tag"`
-	IsPrivate  bool   `json:"isPrivate,omitempty"`
-	AuthToken  string `json:"authToken,omitempty"`
-	Owner      string `json:"owner,omitempty"`
-	Ref        string `json:"ref,omitempty"`
-	RefType    string `json:"refType,omitempty"`
-	Commit     string `json:"commit,omitempty"`
-	Channel    string `json:"channel,omitempty"`
+	SourceType string    `json:"type"`
+	Url        string    `json:"url"`
+	Tag        string    `json:"tag"`
+	IsPrivate  bool      `json:"isPrivate,omitempty"`
+	AuthToken  string    `json:"authToken,omitempty"`
+	Owner      string    `json:"owner,omitempty"`
+	Dev        *DevBuild `json:"dev,omitempty"`
+}
+
+type DevBuild struct {
+	Ref     string `json:"ref"`
+	RefType string `json:"refType"`
+	Commit  string `json:"commit"`
 }
 
 type Source struct {

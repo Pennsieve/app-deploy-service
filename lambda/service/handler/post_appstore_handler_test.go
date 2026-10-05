@@ -24,10 +24,7 @@ func devDeployment(refType, ref, commit string) models.AppStoreDeployment {
 	return models.AppStoreDeployment{Source: models.DeploymentSource{
 		SourceType: "github",
 		Url:        "https://github.com/owner/repo",
-		Channel:    models.ChannelDev,
-		RefType:    refType,
-		Ref:        ref,
-		Commit:     commit,
+		Dev:        &models.DevBuild{RefType: refType, Ref: ref, Commit: commit},
 	}}
 }
 
@@ -43,6 +40,7 @@ func TestPostAppStoreHandler_DevBuildValidation(t *testing.T) {
 		deployment models.AppStoreDeployment
 		wantErr    error
 	}{
+		{"release without tag", models.AppStoreDeployment{Source: models.DeploymentSource{SourceType: "github", Url: "https://github.com/owner/repo"}}, models.ErrReleaseTagRequired},
 		{"missing commit", devDeployment(models.RefTypeBranch, "main", ""), models.ErrDevCommitRequired},
 		{"missing ref", devDeployment(models.RefTypeBranch, "", devTestSha), models.ErrDevRefRequired},
 		{"bad ref type", devDeployment("pull", "1", devTestSha), models.ErrDevRefTypeInvalid},

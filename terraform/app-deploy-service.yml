@@ -131,20 +131,23 @@ components:
         authToken:
           type: string
           description: Auth token used to access a private source repository
-        channel:
-          type: string
-          enum: [dev]
-          description: Set to "dev" for a build that is not tied to a GitHub release. Omitted for release builds.
+        dev:
+          $ref: '#/components/schemas/DevBuild'
+    DevBuild:
+      type: object
+      description: Present only for a build that is not tied to a GitHub release. Omitted for release builds.
+      required: [ref, refType, commit]
+      properties:
         ref:
           type: string
-          description: Dev builds only. The branch name, tag name, or commit sha requested.
+          description: The branch name, tag name, or commit sha requested.
         refType:
           type: string
           enum: [branch, tag, commit]
-          description: Dev builds only. How to interpret "ref".
+          description: How to interpret "ref".
         commit:
           type: string
-          description: Dev builds only. The resolved full commit sha the build is pinned to.
+          description: The resolved full commit sha the build is pinned to.
     DeploymentRelease:
       type: object
       properties:

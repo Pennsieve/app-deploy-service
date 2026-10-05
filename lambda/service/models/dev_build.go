@@ -23,44 +23,66 @@ var (
 	ErrDevCommitInvalid   = errors.New("dev build commit must be a 7 to 40 character hex sha")
 	ErrDevRefDisallowed   = errors.New("dev builds cannot target the ref 'latest'")
 	ErrDevReleaseNotEmpty = errors.New("dev builds cannot reference a release")
+	ErrReleaseTagRequired = errors.New("release builds require a tag")
 )
 
 var commitShaPattern = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 var invalidVersionChars = regexp.MustCompile(`[^A-Za-z0-9_.-]+`)
 
+// IsDevBuild reports whether the source carries a dev build request. The
+// presence of the "dev" object is the signal; release builds omit it.
 func (s DeploymentSource) IsDevBuild() bool {
-	return s.Channel == ChannelDev
+	return s.Dev != nil
+}
+
+// Channel is the value stored on the version record: "dev" for dev builds,
+// empty for releases.
+func (s DeploymentSource) Channel() string {
+	if s.IsDevBuild() {
+		return ChannelDev
+	}
+	return ""
 }
 
 func (s DeploymentSource) ValidateDevBuild() error {
 	if !s.IsDevBuild() {
 		return nil
 	}
-	switch s.RefType {
+	return s.Dev.Validate()
+}
+
+func (d DevBuild) Validate() error {
+	switch d.RefType {
 	case RefTypeBranch, RefTypeTag, RefTypeCommit:
 	default:
 		return ErrDevRefTypeInvalid
 	}
-	if s.Ref == "" {
+	if d.Ref == "" {
 		return ErrDevRefRequired
 	}
-	if strings.EqualFold(s.Ref, disallowedRef) {
+	if strings.EqualFold(d.Ref, disallowedRef) {
 		return ErrDevRefDisallowed
 	}
-	if s.Commit == "" {
+	if d.Commit == "" {
 		return ErrDevCommitRequired
 	}
-	if !commitShaPattern.MatchString(strings.ToLower(s.Commit)) {
+	if !commitShaPattern.MatchString(strings.ToLower(d.Commit)) {
 		return ErrDevCommitInvalid
 	}
 	return nil
 }
 
 func (a AppStoreDeployment) Validate() error {
+	if !a.Source.IsDevBuild() {
+		if strings.TrimSpace(a.Source.Tag) == "" {
+			return ErrReleaseTagRequired
+		}
+		return nil
+	}
 	if err := a.Source.ValidateDevBuild(); err != nil {
 		return err
 	}
-	if a.Source.IsDevBuild() && a.Release.ID != 0 {
+	if a.Release.ID != 0 {
 		return ErrDevReleaseNotEmpty
 	}
 	return nil
@@ -70,7 +92,7 @@ func (a AppStoreDeployment) Validate() error {
 // Dev builds pin to the commit so the synced content matches the build exactly.
 func (s DeploymentSource) ContentRef() string {
 	if s.IsDevBuild() {
-		return s.Commit
+		return s.Dev.Commit
 	}
 	return s.Tag
 }
@@ -89,11 +111,11 @@ func (s DeploymentSource) VersionLabel() string {
 	if !s.IsDevBuild() {
 		return s.Tag
 	}
-	switch s.RefType {
+	switch s.Dev.RefType {
 	case RefTypeBranch, RefTypeTag:
-		return devVersionPrefix + sanitizeVersionComponent(s.Ref)
+		return devVersionPrefix + sanitizeVersionComponent(s.Dev.Ref)
 	default:
-		return devVersionPrefix + ShortCommit(strings.ToLower(s.Commit))
+		return devVersionPrefix + ShortCommit(strings.ToLower(s.Dev.Commit))
 	}
 }
 

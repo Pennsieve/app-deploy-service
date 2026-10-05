@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,7 @@ import (
 const testSha = "0123456789abcdef0123456789abcdef01234567"
 
 func devSource(refType, ref, commit string) DeploymentSource {
-	return DeploymentSource{SourceType: "github", Url: "https://github.com/owner/repo", Channel: ChannelDev, RefType: refType, Ref: ref, Commit: commit}
+	return DeploymentSource{SourceType: "github", Url: "https://github.com/owner/repo", Dev: &DevBuild{RefType: refType, Ref: ref, Commit: commit}}
 }
 
 func TestValidateDevBuild(t *testing.T) {
@@ -19,6 +20,7 @@ func TestValidateDevBuild(t *testing.T) {
 		err    error
 	}{
 		{"release build skips validation", DeploymentSource{Tag: "v1.0.0"}, nil},
+		{"empty dev object", DeploymentSource{Dev: &DevBuild{}}, ErrDevRefTypeInvalid},
 		{"commit", devSource(RefTypeCommit, testSha, testSha), nil},
 		{"short commit", devSource(RefTypeCommit, "0123456", "0123456"), nil},
 		{"branch", devSource(RefTypeBranch, "feature/x", testSha), nil},
@@ -41,6 +43,8 @@ func TestValidateDevBuild(t *testing.T) {
 
 func TestAppStoreDeploymentValidate(t *testing.T) {
 	assert.NoError(t, AppStoreDeployment{Source: DeploymentSource{Tag: "v1.0.0"}, Release: Release{ID: 12}}.Validate())
+	assert.ErrorIs(t, AppStoreDeployment{Source: DeploymentSource{Url: "https://github.com/o/r"}, Release: Release{ID: 12}}.Validate(), ErrReleaseTagRequired)
+	assert.ErrorIs(t, AppStoreDeployment{Source: DeploymentSource{Tag: "  "}}.Validate(), ErrReleaseTagRequired)
 	assert.NoError(t, AppStoreDeployment{Source: devSource(RefTypeCommit, testSha, testSha)}.Validate())
 	assert.ErrorIs(t, AppStoreDeployment{Source: devSource(RefTypeCommit, testSha, testSha), Release: Release{ID: 12}}.Validate(), ErrDevReleaseNotEmpty)
 	assert.ErrorIs(t, AppStoreDeployment{Source: devSource(RefTypeCommit, testSha, "")}.Validate(), ErrDevCommitRequired)
@@ -58,6 +62,29 @@ func TestVersionLabel(t *testing.T) {
 func TestContentRef(t *testing.T) {
 	assert.Equal(t, "v1.0.0", DeploymentSource{Tag: "v1.0.0"}.ContentRef())
 	assert.Equal(t, testSha, devSource(RefTypeBranch, "main", testSha).ContentRef())
+}
+
+func TestIsDevBuildAndChannel(t *testing.T) {
+	assert.False(t, DeploymentSource{Tag: "v1.0.0"}.IsDevBuild())
+	assert.Equal(t, "", DeploymentSource{Tag: "v1.0.0"}.Channel())
+	assert.True(t, devSource(RefTypeBranch, "main", testSha).IsDevBuild())
+	assert.Equal(t, ChannelDev, devSource(RefTypeBranch, "main", testSha).Channel())
+}
+
+func TestDeploymentSourceJSON(t *testing.T) {
+	var release DeploymentSource
+	assert.NoError(t, json.Unmarshal([]byte(`{"type":"github","url":"https://github.com/o/r","tag":"v1.0.0"}`), &release))
+	assert.Nil(t, release.Dev)
+	assert.False(t, release.IsDevBuild())
+
+	var dev DeploymentSource
+	assert.NoError(t, json.Unmarshal([]byte(`{"type":"github","url":"https://github.com/o/r","dev":{"ref":"main","refType":"branch","commit":"`+testSha+`"}}`), &dev))
+	assert.True(t, dev.IsDevBuild())
+	assert.Equal(t, "dev-main", dev.VersionLabel())
+
+	out, err := json.Marshal(DeploymentSource{SourceType: "github", Url: "https://github.com/o/r", Tag: "v1.0.0"})
+	assert.NoError(t, err)
+	assert.NotContains(t, string(out), `"dev"`)
 }
 
 func TestIsDevVersion(t *testing.T) {
