@@ -131,11 +131,11 @@ components:
         authToken:
           type: string
           description: Auth token used to access a private source repository
-        dev:
-          $ref: '#/components/schemas/DevBuild'
-    DevBuild:
+        revision:
+          $ref: '#/components/schemas/Revision'
+    Revision:
       type: object
-      description: Present only for a build that is not tied to a GitHub release. Omitted for release builds.
+      description: The git revision to build. Present only for a build that is not tied to a GitHub release; its presence marks the build as a dev version. Omitted for release builds.
       required: [ref, refType, commit]
       properties:
         ref:

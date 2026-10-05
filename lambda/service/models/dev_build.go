@@ -30,9 +30,9 @@ var commitShaPattern = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 var invalidVersionChars = regexp.MustCompile(`[^A-Za-z0-9_.-]+`)
 
 // IsDevBuild reports whether the source carries a dev build request. The
-// presence of the "dev" object is the signal; release builds omit it.
+// presence of the "revision" object is the signal; release builds omit it.
 func (s DeploymentSource) IsDevBuild() bool {
-	return s.Dev != nil
+	return s.Revision != nil
 }
 
 // Channel is the value stored on the version record: "dev" for dev builds,
@@ -48,25 +48,25 @@ func (s DeploymentSource) ValidateDevBuild() error {
 	if !s.IsDevBuild() {
 		return nil
 	}
-	return s.Dev.Validate()
+	return s.Revision.Validate()
 }
 
-func (d DevBuild) Validate() error {
-	switch d.RefType {
+func (r Revision) Validate() error {
+	switch r.RefType {
 	case RefTypeBranch, RefTypeTag, RefTypeCommit:
 	default:
 		return ErrDevRefTypeInvalid
 	}
-	if d.Ref == "" {
+	if r.Ref == "" {
 		return ErrDevRefRequired
 	}
-	if strings.EqualFold(d.Ref, disallowedRef) {
+	if strings.EqualFold(r.Ref, disallowedRef) {
 		return ErrDevRefDisallowed
 	}
-	if d.Commit == "" {
+	if r.Commit == "" {
 		return ErrDevCommitRequired
 	}
-	if !commitShaPattern.MatchString(strings.ToLower(d.Commit)) {
+	if !commitShaPattern.MatchString(strings.ToLower(r.Commit)) {
 		return ErrDevCommitInvalid
 	}
 	return nil
@@ -92,7 +92,7 @@ func (a AppStoreDeployment) Validate() error {
 // Dev builds pin to the commit so the synced content matches the build exactly.
 func (s DeploymentSource) ContentRef() string {
 	if s.IsDevBuild() {
-		return s.Dev.Commit
+		return s.Revision.Commit
 	}
 	return s.Tag
 }
@@ -111,11 +111,11 @@ func (s DeploymentSource) VersionLabel() string {
 	if !s.IsDevBuild() {
 		return s.Tag
 	}
-	switch s.Dev.RefType {
+	switch s.Revision.RefType {
 	case RefTypeBranch, RefTypeTag:
-		return devVersionPrefix + sanitizeVersionComponent(s.Dev.Ref)
+		return devVersionPrefix + sanitizeVersionComponent(s.Revision.Ref)
 	default:
-		return devVersionPrefix + ShortCommit(strings.ToLower(s.Dev.Commit))
+		return devVersionPrefix + ShortCommit(strings.ToLower(s.Revision.Commit))
 	}
 }
 

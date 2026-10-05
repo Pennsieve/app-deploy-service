@@ -24,7 +24,7 @@ func devDeployment(refType, ref, commit string) models.AppStoreDeployment {
 	return models.AppStoreDeployment{Source: models.DeploymentSource{
 		SourceType: "github",
 		Url:        "https://github.com/owner/repo",
-		Dev:        &models.DevBuild{RefType: refType, Ref: ref, Commit: commit},
+		Revision:   &models.Revision{RefType: refType, Ref: ref, Commit: commit},
 	}}
 }
 

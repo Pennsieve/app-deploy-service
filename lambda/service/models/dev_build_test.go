@@ -10,7 +10,7 @@ import (
 const testSha = "0123456789abcdef0123456789abcdef01234567"
 
 func devSource(refType, ref, commit string) DeploymentSource {
-	return DeploymentSource{SourceType: "github", Url: "https://github.com/owner/repo", Dev: &DevBuild{RefType: refType, Ref: ref, Commit: commit}}
+	return DeploymentSource{SourceType: "github", Url: "https://github.com/owner/repo", Revision: &Revision{RefType: refType, Ref: ref, Commit: commit}}
 }
 
 func TestValidateDevBuild(t *testing.T) {
@@ -20,7 +20,7 @@ func TestValidateDevBuild(t *testing.T) {
 		err    error
 	}{
 		{"release build skips validation", DeploymentSource{Tag: "v1.0.0"}, nil},
-		{"empty dev object", DeploymentSource{Dev: &DevBuild{}}, ErrDevRefTypeInvalid},
+		{"empty revision object", DeploymentSource{Revision: &Revision{}}, ErrDevRefTypeInvalid},
 		{"commit", devSource(RefTypeCommit, testSha, testSha), nil},
 		{"short commit", devSource(RefTypeCommit, "0123456", "0123456"), nil},
 		{"branch", devSource(RefTypeBranch, "feature/x", testSha), nil},
@@ -74,17 +74,17 @@ func TestIsDevBuildAndChannel(t *testing.T) {
 func TestDeploymentSourceJSON(t *testing.T) {
 	var release DeploymentSource
 	assert.NoError(t, json.Unmarshal([]byte(`{"type":"github","url":"https://github.com/o/r","tag":"v1.0.0"}`), &release))
-	assert.Nil(t, release.Dev)
+	assert.Nil(t, release.Revision)
 	assert.False(t, release.IsDevBuild())
 
 	var dev DeploymentSource
-	assert.NoError(t, json.Unmarshal([]byte(`{"type":"github","url":"https://github.com/o/r","dev":{"ref":"main","refType":"branch","commit":"`+testSha+`"}}`), &dev))
+	assert.NoError(t, json.Unmarshal([]byte(`{"type":"github","url":"https://github.com/o/r","revision":{"ref":"main","refType":"branch","commit":"`+testSha+`"}}`), &dev))
 	assert.True(t, dev.IsDevBuild())
 	assert.Equal(t, "dev-main", dev.VersionLabel())
 
 	out, err := json.Marshal(DeploymentSource{SourceType: "github", Url: "https://github.com/o/r", Tag: "v1.0.0"})
 	assert.NoError(t, err)
-	assert.NotContains(t, string(out), `"dev"`)
+	assert.NotContains(t, string(out), `"revision"`)
 }
 
 func TestIsDevVersion(t *testing.T) {

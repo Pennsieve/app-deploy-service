@@ -45,10 +45,10 @@ type DeploymentSource struct {
 	IsPrivate  bool      `json:"isPrivate,omitempty"`
 	AuthToken  string    `json:"authToken,omitempty"`
 	Owner      string    `json:"owner,omitempty"`
-	Dev        *DevBuild `json:"dev,omitempty"`
+	Revision   *Revision `json:"revision,omitempty"`
 }
 
-type DevBuild struct {
+type Revision struct {
 	Ref     string `json:"ref"`
 	RefType string `json:"refType"`
 	Commit  string `json:"commit"`

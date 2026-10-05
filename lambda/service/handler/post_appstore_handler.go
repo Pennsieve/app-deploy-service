@@ -44,9 +44,9 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	}
 	versionLabel := application.Source.VersionLabel()
 	contentRef := application.Source.ContentRef()
-	var devBuild models.DevBuild
+	var revision models.Revision
 	if application.Source.IsDevBuild() {
-		devBuild = *application.Source.Dev
+		revision = *application.Source.Revision
 	}
 
 	envValue := os.Getenv("ENV")
@@ -186,9 +186,9 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		CreatedAt:     time.Now().UTC().String(),
 		Status:        "registering",
 		Channel:       application.Source.Channel(),
-		Ref:           devBuild.Ref,
-		RefType:       devBuild.RefType,
-		Commit:        devBuild.Commit,
+		Ref:           revision.Ref,
+		RefType:       revision.RefType,
+		Commit:        revision.Commit,
 	}
 	reusedVersion := false
 	if application.Source.IsDevBuild() {
@@ -203,14 +203,14 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		if len(existing) > 0 {
 			versionUuid = existing[0].Uuid
 			reusedVersion = true
-			if err := versionStore.UpdateDevBuild(ctx, versionUuid, devBuild.Commit, "registering"); err != nil {
+			if err := versionStore.UpdateDevBuild(ctx, versionUuid, revision.Commit, "registering"); err != nil {
 				log.Println("error updating dev version: ", err.Error())
 				return events.APIGatewayV2HTTPResponse{
 					StatusCode: http.StatusInternalServerError,
 					Body:       handlerError(handlerName, ErrStoringApplication),
 				}, nil
 			}
-			log.Printf("reusing dev version %s (%s) for application %s at commit %s", versionUuid, versionLabel, applicationId, devBuild.Commit)
+			log.Printf("reusing dev version %s (%s) for application %s at commit %s", versionUuid, versionLabel, applicationId, revision.Commit)
 		}
 	}
 	if !reusedVersion {
@@ -287,11 +287,11 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	sourceUrlKey := "SOURCE_URL"
 	sourceUrlValue := application.Source.Url
 	sourceRefKey := "SOURCE_REF"
-	sourceRefValue := devBuild.Ref
+	sourceRefValue := revision.Ref
 	sourceRefTypeKey := "SOURCE_REF_TYPE"
-	sourceRefTypeValue := devBuild.RefType
+	sourceRefTypeValue := revision.RefType
 	sourceCommitKey := "SOURCE_COMMIT"
-	sourceCommitValue := devBuild.Commit
+	sourceCommitValue := revision.Commit
 	sourceChannelKey := "SOURCE_CHANNEL"
 	sourceChannelValue := application.Source.Channel()
 
@@ -444,7 +444,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			deploymentId,
 			versionUuid,
 			versionLabel,
-			devBuild.Commit,
+			revision.Commit,
 			application.Source.Url,
 			aws.ToString(runTaskOut.Tasks[0].TaskArn))
 	}
