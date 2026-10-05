@@ -45,6 +45,10 @@ type DeploymentSource struct {
 	IsPrivate  bool   `json:"isPrivate,omitempty"`
 	AuthToken  string `json:"authToken,omitempty"`
 	Owner      string `json:"owner,omitempty"`
+	Ref        string `json:"ref,omitempty"`
+	RefType    string `json:"refType,omitempty"`
+	Commit     string `json:"commit,omitempty"`
+	Channel    string `json:"channel,omitempty"`
 }
 
 type Source struct {
@@ -158,6 +162,10 @@ type AppStoreVersion struct {
 	ReleaseId     int          `json:"releaseId"`
 	CreatedAt     string       `json:"createdAt"`
 	Status        string       `json:"status"`
+	Channel       string       `json:"channel,omitempty"`
+	Ref           string       `json:"ref,omitempty"`
+	RefType       string       `json:"refType,omitempty"`
+	Commit        string       `json:"commit,omitempty"`
 	Deployments   []Deployment `json:"deployments"`
 }
 

@@ -26,6 +26,7 @@ type AppStoreVersionDBStore interface {
 	GetByApplicationIdAndVersion(ctx context.Context, applicationId string, version string) ([]AppStoreVersion, error)
 	Insert(context.Context, AppStoreVersion) error
 	UpdateStatus(ctx context.Context, newStatus string, uuid string) error
+	UpdateDevBuild(ctx context.Context, uuid string, commit string, newStatus string) error
 }
 
 type AppStoreVersionDatabaseStore struct {
@@ -146,6 +147,35 @@ func (r *AppStoreVersionDatabaseStore) UpdateStatus(ctx context.Context, newStat
 	})
 	if err != nil {
 		return fmt.Errorf("error updating appstore version status: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateDevBuild re-points an existing dev version at a new commit and resets
+// its status, clearing the previous image so a stale build is never served
+// while the new one is in flight.
+func (r *AppStoreVersionDatabaseStore) UpdateDevBuild(ctx context.Context, uuid string, commit string, newStatus string) error {
+	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: uuid})
+	if err != nil {
+		return fmt.Errorf("error marshaling key for appstore dev build update: %w", err)
+	}
+
+	_, err = r.api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(r.TableName),
+		Key:       key,
+		ExpressionAttributeNames: map[string]string{
+			"#commit": "commit",
+		},
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":c": &types.AttributeValueMemberS{Value: commit},
+			":s": &types.AttributeValueMemberS{Value: newStatus},
+			":d": &types.AttributeValueMemberS{Value: ""},
+		},
+		UpdateExpression: aws.String("set #commit = :c, registrationStatus = :s, destinationUrl = :d"),
+	})
+	if err != nil {
+		return fmt.Errorf("error updating appstore dev build: %w", err)
 	}
 
 	return nil

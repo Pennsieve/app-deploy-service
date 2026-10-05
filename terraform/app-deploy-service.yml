@@ -124,13 +124,27 @@ components:
           description: The source repository URL
         tag:
           type: string
-          description: The source tag or branch
+          description: The release tag. Empty for dev builds.
         isPrivate:
           type: boolean
           description: Whether the source repository is private
         authToken:
           type: string
           description: Auth token used to access a private source repository
+        channel:
+          type: string
+          enum: [dev]
+          description: Set to "dev" for a build that is not tied to a GitHub release. Omitted for release builds.
+        ref:
+          type: string
+          description: Dev builds only. The branch name, tag name, or commit sha requested.
+        refType:
+          type: string
+          enum: [branch, tag, commit]
+          description: Dev builds only. How to interpret "ref".
+        commit:
+          type: string
+          description: Dev builds only. The resolved full commit sha the build is pinned to.
     DeploymentRelease:
       type: object
       properties:
@@ -212,6 +226,18 @@ components:
           type: string
         status:
           type: string
+        channel:
+          type: string
+          description: '"dev" for builds not tied to a release; omitted for release versions'
+        ref:
+          type: string
+          description: Dev builds only. The branch, tag, or commit requested.
+        refType:
+          type: string
+          description: Dev builds only. One of branch, tag, commit.
+        commit:
+          type: string
+          description: Dev builds only. The commit sha the build is pinned to.
         deployments:
           type: array
           items:

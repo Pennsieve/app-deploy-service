@@ -36,6 +36,15 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}, nil
 	}
 
+	if err := application.Validate(); err != nil {
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusBadRequest,
+			Body:       handlerError(handlerName, err),
+		}, nil
+	}
+	versionLabel := application.Source.VersionLabel()
+	contentRef := application.Source.ContentRef()
+
 	envValue := os.Getenv("ENV")
 
 	TaskDefinitionArn := os.Getenv("TASK_DEF_ARN")
@@ -161,30 +170,61 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		log.Printf("created new appstore application %s for sourceUrl %s", applicationId, application.Source.Url)
 	}
 
-	// Always create a new version entry
+	// Release builds always create a new version entry. Dev builds reuse the
+	// version that shares their label (one per branch/tag/commit) so repeated
+	// builds update in place instead of piling up.
 	versionUuid := uuid.NewString()
 	versionRecord := store_dynamodb.AppStoreVersion{
 		Uuid:          versionUuid,
 		ApplicationId: applicationId,
-		Version:       application.Source.Tag,
+		Version:       versionLabel,
 		ReleaseId:     application.Release.ID,
 		CreatedAt:     time.Now().UTC().String(),
 		Status:        "registering",
+		Channel:       application.Source.Channel,
+		Ref:           application.Source.Ref,
+		RefType:       application.Source.RefType,
+		Commit:        application.Source.Commit,
 	}
-	if err := versionStore.Insert(ctx, versionRecord); err != nil {
-		log.Println("error inserting appstore version: ", err.Error())
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrStoringApplication),
-		}, nil
+	reusedVersion := false
+	if application.Source.IsDevBuild() {
+		existing, err := versionStore.GetByApplicationIdAndVersion(ctx, applicationId, versionLabel)
+		if err != nil {
+			log.Println("error looking up dev version: ", err.Error())
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       handlerError(handlerName, ErrDynamoDB),
+			}, nil
+		}
+		if len(existing) > 0 {
+			versionUuid = existing[0].Uuid
+			reusedVersion = true
+			if err := versionStore.UpdateDevBuild(ctx, versionUuid, application.Source.Commit, "registering"); err != nil {
+				log.Println("error updating dev version: ", err.Error())
+				return events.APIGatewayV2HTTPResponse{
+					StatusCode: http.StatusInternalServerError,
+					Body:       handlerError(handlerName, ErrStoringApplication),
+				}, nil
+			}
+			log.Printf("reusing dev version %s (%s) for application %s at commit %s", versionUuid, versionLabel, applicationId, application.Source.Commit)
+		}
+	}
+	if !reusedVersion {
+		if err := versionStore.Insert(ctx, versionRecord); err != nil {
+			log.Println("error inserting appstore version: ", err.Error())
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       handlerError(handlerName, ErrStoringApplication),
+			}, nil
+		}
 	}
 
-	syncRepoContent(ctx, application.Source.Url, application.Source.Tag, application.Source.AuthToken)
+	syncRepoContent(ctx, application.Source.Url, contentRef, application.Source.AuthToken)
 
 	// Read the synced app.yml once and reuse it for build sizing and parameter
 	// persistence. A missing or malformed app.yml yields ok=false so neither
 	// step blocks the deployment.
-	appCfg, haveAppCfg := readSyncedAppConfig(ctx, cfg, application.Source.Url, application.Source.Tag)
+	appCfg, haveAppCfg := readSyncedAppConfig(ctx, cfg, application.Source.Url, contentRef)
 
 	// Persist the app's declared parameters (with defaults) onto the appstore
 	// record. app.yml is the source of truth, so a successful parse overwrites
@@ -223,7 +263,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		Action:          actionValue,
 		LastStatus:      "NOT_STARTED",
 		SourceUrl:       application.Source.Url,
-		Tag:             application.Source.Tag,
+		Tag:             versionLabel,
 	}); err != nil {
 		log.Println("error creating deployment record: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
@@ -242,6 +282,14 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	sourceTagValue := application.Source.Tag
 	sourceUrlKey := "SOURCE_URL"
 	sourceUrlValue := application.Source.Url
+	sourceRefKey := "SOURCE_REF"
+	sourceRefValue := application.Source.Ref
+	sourceRefTypeKey := "SOURCE_REF_TYPE"
+	sourceRefTypeValue := application.Source.RefType
+	sourceCommitKey := "SOURCE_COMMIT"
+	sourceCommitValue := application.Source.Commit
+	sourceChannelKey := "SOURCE_CHANNEL"
+	sourceChannelValue := application.Source.Channel
 
 	deployerTaskDefnKey := "DEPLOYER_TASK_DEF_ARN"
 	deployerTaskDefnValue := DeployerTaskDefinitionArn
@@ -285,6 +333,22 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		{
 			Name:  &sourceTagKey,
 			Value: &sourceTagValue,
+		},
+		{
+			Name:  &sourceRefKey,
+			Value: &sourceRefValue,
+		},
+		{
+			Name:  &sourceRefTypeKey,
+			Value: &sourceRefTypeValue,
+		},
+		{
+			Name:  &sourceCommitKey,
+			Value: &sourceCommitValue,
+		},
+		{
+			Name:  &sourceChannelKey,
+			Value: &sourceChannelValue,
 		},
 		{
 			Name:  &deployerTaskDefnKey,
@@ -372,10 +436,11 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}, nil
 	}
 	if len(runTaskOut.Tasks) > 0 {
-		log.Printf("started Add to AppStore deployment %s of version %s (tag %s) from %s in task %s",
+		log.Printf("started Add to AppStore deployment %s of version %s (%s, commit %q) from %s in task %s",
 			deploymentId,
 			versionUuid,
-			application.Source.Tag,
+			versionLabel,
+			application.Source.Commit,
 			application.Source.Url,
 			aws.ToString(runTaskOut.Tasks[0].TaskArn))
 	}
