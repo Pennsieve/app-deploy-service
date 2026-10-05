@@ -29,14 +29,16 @@ var (
 var commitShaPattern = regexp.MustCompile(`^[0-9a-f]{7,40}$`)
 var invalidVersionChars = regexp.MustCompile(`[^A-Za-z0-9_.-]+`)
 
-// IsDevBuild reports whether the source carries a dev build request. The
+// IsDevBuild reports whether the source asks for a build of a git revision
+// rather than a release. The
 // presence of the "revision" object is the signal; release builds omit it.
 func (s DeploymentSource) IsDevBuild() bool {
 	return s.Revision != nil
 }
 
-// Channel is the value stored on the version record: "dev" for dev builds,
-// empty for releases.
+// Channel is the value stored on the version record. Revision builds land on
+// the dev channel;
+// releases have none.
 func (s DeploymentSource) Channel() string {
 	if s.IsDevBuild() {
 		return ChannelDev
@@ -89,7 +91,7 @@ func (a AppStoreDeployment) Validate() error {
 }
 
 // ContentRef is the git ref used to sync repository content (app.yml, README).
-// Dev builds pin to the commit so the synced content matches the build exactly.
+// Revision builds pin to the commit so the synced content matches the build exactly.
 func (s DeploymentSource) ContentRef() string {
 	if s.IsDevBuild() {
 		return s.Revision.Commit
@@ -105,7 +107,7 @@ func ShortCommit(commit string) string {
 }
 
 // VersionLabel is the value stored in the version record's "version" field.
-// Release builds keep the tag. Dev builds of a branch share one label so
+// Release builds keep the tag. Revision builds of a branch share one label so
 // repeated builds update the same version; tags and commits get their own.
 func (s DeploymentSource) VersionLabel() string {
 	if !s.IsDevBuild() {
