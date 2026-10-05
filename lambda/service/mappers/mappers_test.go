@@ -50,7 +50,7 @@ func TestAppParametersToModels_Empty(t *testing.T) {
 	assert.Nil(t, AppParametersToModels([]store_dynamodb.AppParameter{}))
 }
 
-func TestAppStoreVersionToModelCarriesRevisionFields(t *testing.T) {
+func TestAppStoreVersionToModelCarriesDevFields(t *testing.T) {
 	v := store_dynamodb.AppStoreVersion{
 		Uuid:          "v-1",
 		ApplicationId: "a-1",

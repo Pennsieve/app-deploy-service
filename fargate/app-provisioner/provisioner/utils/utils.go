@@ -30,9 +30,9 @@ func AppSlug(s string, t string) string {
 }
 
 var ErrTagRequired = errors.New("tag is required for https source URLs")
-var ErrRefRequired = errors.New("ref is required for revision builds")
-var ErrCommitRequired = errors.New("commit is required for revision builds")
-var ErrUnknownRefType = errors.New("unknown ref type for revision build")
+var ErrRefRequired = errors.New("ref is required for dev builds")
+var ErrCommitRequired = errors.New("commit is required for dev builds")
+var ErrUnknownRefType = errors.New("unknown ref type for dev build")
 
 const (
 	ChannelDev    = "dev"
@@ -49,10 +49,8 @@ type SourceRef struct {
 	Channel string
 }
 
-// IsRevisionBuild reports whether the ref describes a build of a git revision
-// rather than a release. Such builds always carry a channel (currently "dev").
-func (r SourceRef) IsRevisionBuild() bool {
-	return r.Channel != ""
+func (r SourceRef) IsDev() bool {
+	return r.Channel == ChannelDev
 }
 
 func DetermineSourceURL(sourceURL string, tag string) (string, error) {
@@ -65,7 +63,7 @@ func DetermineSourceURLForRef(sourceURL string, ref SourceRef) (string, error) {
 	}
 	gitURL := strings.Replace(sourceURL, "https://", "git://", 1)
 
-	if !ref.IsRevisionBuild() {
+	if !ref.IsDev() {
 		if ref.Tag == "" {
 			return "", ErrTagRequired
 		}
@@ -118,16 +116,15 @@ func SanitizeTagComponent(s string, maxLen int) string {
 }
 
 // ImageTag returns the ECR image tag for a build. Release builds keep the
-// historical {hash}-{tag} form. Revision builds are prefixed with their channel
-// (e.g. "dev-") so a lifecycle policy can expire them, and carry the short
-// commit plus a build suffix so repeated builds never collide in an immutable
-// repository.
+// historical {hash}-{tag} form. Dev builds are prefixed with "dev-" so a
+// lifecycle policy can expire them, and carry the short commit plus a build
+// suffix so repeated builds never collide in an immutable repository.
 func ImageTag(sourceURL string, ref SourceRef, buildId string) string {
 	hash := GenerateHash(sourceURL)
-	if !ref.IsRevisionBuild() {
+	if !ref.IsDev() {
 		return fmt.Sprintf("%d-%s", hash, ref.Tag)
 	}
-	parts := []string{ref.Channel, fmt.Sprint(hash)}
+	parts := []string{"dev", fmt.Sprint(hash)}
 	if ref.RefType != RefTypeCommit {
 		if component := SanitizeTagComponent(ref.Ref, 40); component != "" {
 			parts = append(parts, component)

@@ -18,7 +18,7 @@ func TestVisibleVersions(t *testing.T) {
 	assert.Empty(t, visibleVersions(nil, false))
 }
 
-func TestLatestVersionTagSkipsDevChannel(t *testing.T) {
+func TestLatestVersionTagSkipsDevBuilds(t *testing.T) {
 	versions := []models.AppStoreVersion{
 		{Version: "v1.0.0", CreatedAt: "2026-01-01"},
 		{Version: "v1.1.0", CreatedAt: "2026-02-01"},

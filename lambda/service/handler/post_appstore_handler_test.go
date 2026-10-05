@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const revisionTestSha = "0123456789abcdef0123456789abcdef01234567"
+const devTestSha = "0123456789abcdef0123456789abcdef01234567"
 
 func appStoreRequest(t *testing.T, deployment models.AppStoreDeployment) events.APIGatewayV2HTTPRequest {
 	t.Helper()
@@ -20,7 +20,7 @@ func appStoreRequest(t *testing.T, deployment models.AppStoreDeployment) events.
 	return events.APIGatewayV2HTTPRequest{Body: string(body)}
 }
 
-func revisionDeployment(refType, ref, commit string) models.AppStoreDeployment {
+func devDeployment(refType, ref, commit string) models.AppStoreDeployment {
 	return models.AppStoreDeployment{Source: models.DeploymentSource{
 		SourceType: "github",
 		Url:        "https://github.com/owner/repo",
@@ -34,18 +34,18 @@ func TestPostAppStoreHandler_BadBody(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
 }
 
-func TestPostAppStoreHandler_RevisionValidation(t *testing.T) {
+func TestPostAppStoreHandler_DevBuildValidation(t *testing.T) {
 	tests := []struct {
 		name       string
 		deployment models.AppStoreDeployment
 		wantErr    error
 	}{
 		{"release without tag", models.AppStoreDeployment{Source: models.DeploymentSource{SourceType: "github", Url: "https://github.com/owner/repo"}}, models.ErrReleaseTagRequired},
-		{"missing commit", revisionDeployment(models.RefTypeBranch, "main", ""), models.ErrRevisionCommitRequired},
-		{"missing ref", revisionDeployment(models.RefTypeBranch, "", revisionTestSha), models.ErrRevisionRefRequired},
-		{"bad ref type", revisionDeployment("pull", "1", revisionTestSha), models.ErrRevisionRefTypeInvalid},
-		{"latest is blocked", revisionDeployment(models.RefTypeBranch, "latest", revisionTestSha), models.ErrRevisionRefDisallowed},
-		{"malformed commit", revisionDeployment(models.RefTypeCommit, "nothex!", "nothex!"), models.ErrRevisionCommitInvalid},
+		{"missing commit", devDeployment(models.RefTypeBranch, "main", ""), models.ErrDevCommitRequired},
+		{"missing ref", devDeployment(models.RefTypeBranch, "", devTestSha), models.ErrDevRefRequired},
+		{"bad ref type", devDeployment("pull", "1", devTestSha), models.ErrDevRefTypeInvalid},
+		{"latest is blocked", devDeployment(models.RefTypeBranch, "latest", devTestSha), models.ErrDevRefDisallowed},
+		{"malformed commit", devDeployment(models.RefTypeCommit, "nothex!", "nothex!"), models.ErrDevCommitInvalid},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -60,12 +60,12 @@ func TestPostAppStoreHandler_RevisionValidation(t *testing.T) {
 	}
 }
 
-func TestPostAppStoreHandler_RevisionRejectsRelease(t *testing.T) {
-	deployment := revisionDeployment(models.RefTypeCommit, revisionTestSha, revisionTestSha)
+func TestPostAppStoreHandler_DevBuildRejectsRelease(t *testing.T) {
+	deployment := devDeployment(models.RefTypeCommit, devTestSha, devTestSha)
 	deployment.Release = models.Release{ID: 99}
 
 	resp, err := PostAppStoreHandler(t.Context(), appStoreRequest(t, deployment))
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-	assert.Contains(t, resp.Body, models.ErrRevisionWithRelease.Error())
+	assert.Contains(t, resp.Body, models.ErrDevReleaseNotEmpty.Error())
 }

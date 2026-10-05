@@ -88,14 +88,14 @@ func TestDetermineSourceURLForRef(t *testing.T) {
 	}{
 		{"release tag", utils.SourceRef{Tag: "v1.0.0"}, "git://github.com/owner/repo#refs/tags/v1.0.0", nil},
 		{"release missing tag", utils.SourceRef{}, "", utils.ErrTagRequired},
-		{"revision commit", utils.SourceRef{Channel: "dev", RefType: "commit", Ref: sha, Commit: sha}, "git://github.com/owner/repo#" + sha, nil},
-		{"revision commit missing commit", utils.SourceRef{Channel: "dev", RefType: "commit"}, "", utils.ErrCommitRequired},
-		{"revision branch pinned", utils.SourceRef{Channel: "dev", RefType: "branch", Ref: "feature/x", Commit: sha}, "git://github.com/owner/repo#refs/heads/feature/x#" + sha, nil},
-		{"revision branch unpinned", utils.SourceRef{Channel: "dev", RefType: "branch", Ref: "main"}, "git://github.com/owner/repo#refs/heads/main", nil},
-		{"revision branch missing ref", utils.SourceRef{Channel: "dev", RefType: "branch", Commit: sha}, "", utils.ErrRefRequired},
-		{"revision tag pinned", utils.SourceRef{Channel: "dev", RefType: "tag", Ref: "v2.0.0-rc1", Commit: sha}, "git://github.com/owner/repo#refs/tags/v2.0.0-rc1#" + sha, nil},
-		{"revision tag unpinned", utils.SourceRef{Channel: "dev", RefType: "tag", Ref: "v2.0.0-rc1"}, "git://github.com/owner/repo#refs/tags/v2.0.0-rc1", nil},
-		{"revision unknown ref type", utils.SourceRef{Channel: "dev", RefType: "pr", Ref: "1", Commit: sha}, "", utils.ErrUnknownRefType},
+		{"dev commit", utils.SourceRef{Channel: "dev", RefType: "commit", Ref: sha, Commit: sha}, "git://github.com/owner/repo#" + sha, nil},
+		{"dev commit missing commit", utils.SourceRef{Channel: "dev", RefType: "commit"}, "", utils.ErrCommitRequired},
+		{"dev branch pinned", utils.SourceRef{Channel: "dev", RefType: "branch", Ref: "feature/x", Commit: sha}, "git://github.com/owner/repo#refs/heads/feature/x#" + sha, nil},
+		{"dev branch unpinned", utils.SourceRef{Channel: "dev", RefType: "branch", Ref: "main"}, "git://github.com/owner/repo#refs/heads/main", nil},
+		{"dev branch missing ref", utils.SourceRef{Channel: "dev", RefType: "branch", Commit: sha}, "", utils.ErrRefRequired},
+		{"dev tag pinned", utils.SourceRef{Channel: "dev", RefType: "tag", Ref: "v2.0.0-rc1", Commit: sha}, "git://github.com/owner/repo#refs/tags/v2.0.0-rc1#" + sha, nil},
+		{"dev tag unpinned", utils.SourceRef{Channel: "dev", RefType: "tag", Ref: "v2.0.0-rc1"}, "git://github.com/owner/repo#refs/tags/v2.0.0-rc1", nil},
+		{"dev unknown ref type", utils.SourceRef{Channel: "dev", RefType: "pr", Ref: "1", Commit: sha}, "", utils.ErrUnknownRefType},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
