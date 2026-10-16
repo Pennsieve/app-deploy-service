@@ -145,6 +145,23 @@ Private repos work exactly the same way. Pennsieve uses the access token stored 
 
 Pennsieve treats each release tag as immutable. To ship a fix, **cut a new release with a new tag** (e.g. `v1.0.8`). Re-tagging the same name on GitHub is not a supported way to update an existing App Store version.
 
+### Deploying a dev build without a release
+
+Cutting a release for every small fix is slow when you are iterating on a workflow. Repositories can opt in to **dev deployments**, which build a specific branch, tag, or commit on demand without touching GitHub releases.
+
+1. Open the repo's **Publishing Settings** dialog from **My Code** and tick **Dev deployments**. Only someone whose GitHub account can access the repo can turn this on.
+2. On the repository page, choose **Deploy dev build** and enter the commit SHA you want built (branch and tag names are also accepted by the API).
+3. Pennsieve resolves the ref to a commit, builds it, and pushes the image to the registry exactly as it does for a release.
+
+How dev builds differ from releases:
+
+- They never create a GitHub release and are not recorded in the release list.
+- They show up under **Versions** with a `dev` channel marker, a version label like `dev-<branch>` or `dev-<short sha>`, and the exact commit that was built.
+- Rebuilding the same branch updates that branch's dev version in place rather than adding a new entry. Tags and commits each get their own entry.
+- Dev versions are visible only to the app owner. Other users continue to see release versions only.
+- The ref `latest` is not allowed, for the same reason it is blocked for releases.
+- Dev images carry a `dev-` prefix in the registry and are expired automatically after a retention window. Release images are kept.
+
 ### Turning off App Store publishing
 
 Open the repo's **Publishing Settings** dialog from **My Code**, untick **App Store**, and save. New releases will no longer be ingested. Existing versions remain in the App Store for users who already have them.

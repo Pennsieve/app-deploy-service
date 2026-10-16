@@ -76,7 +76,7 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 	if err != nil {
 		log.Printf("error fetching versions for application %s: %v", application.Uuid, err)
 	} else {
-		versions := mappers.AppStoreVersionsToModels(dynamoVersions)
+		versions := visibleVersions(mappers.AppStoreVersionsToModels(dynamoVersions), IsAppOwner(ctx, claims, app))
 		for j := range versions {
 			deployments, err := deploymentsStore.GetHistory(ctx, versions[j].Uuid)
 			if err != nil {
@@ -136,7 +136,7 @@ func latestVersionTag(versions []models.AppStoreVersion) string {
 	latest := ""
 	latestCreatedAt := ""
 	for _, v := range versions {
-		if v.Version == "" {
+		if v.Version == "" || models.IsDevVersion(v) {
 			continue
 		}
 		if v.CreatedAt > latestCreatedAt {
@@ -186,4 +186,20 @@ func fetchAssets(ctx context.Context, cfg aws.Config, sourceUrl string, tag stri
 	}
 
 	return assets
+}
+
+// visibleVersions hides dev builds from everyone but the app owner. Release
+// versions are always returned.
+func visibleVersions(versions []models.AppStoreVersion, isOwner bool) []models.AppStoreVersion {
+	if isOwner {
+		return versions
+	}
+	visible := make([]models.AppStoreVersion, 0, len(versions))
+	for _, v := range versions {
+		if models.IsDevVersion(v) {
+			continue
+		}
+		visible = append(visible, v)
+	}
+	return visible
 }
