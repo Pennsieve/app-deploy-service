@@ -1,11 +1,18 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"log"
+	"log/slog"
 	"net/http"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambdacontext"
+	"github.com/pennsieve/app-deploy-service/service/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -114,6 +121,43 @@ func TestRouteMatching(t *testing.T) {
 			assert.Equal(t, "ok", resp.Body)
 		})
 	}
+}
+
+func TestRouterDoesNotLogCredentials(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	request := newRequest("POST", "POST /store", "/store", nil)
+	request.Headers = map[string]string{"authorization": "Bearer secret-access-token"}
+	request.Body = `{"source":{"url":"https://github.com/o/r","tag":"v1","authToken":"secret-source-token"}}`
+
+	_, err := newTestRouter().Start(context.Background(), request)
+	assert.NoError(t, err)
+	assert.NotContains(t, buf.String(), "secret-access-token")
+	assert.NotContains(t, buf.String(), "secret-source-token")
+}
+
+func TestHandlerLoggerHasOneRequestID(t *testing.T) {
+	var buf bytes.Buffer
+	defaultLogger := logging.Default
+	logging.Default = slog.New(slog.NewJSONHandler(&buf, nil))
+	t.Cleanup(func() {
+		logging.Default = defaultLogger
+		logger = defaultLogger
+	})
+
+	request := newRequest("GET", "GET /nonexistent", "/nonexistent", nil)
+	for _, id := range []string{"first", "second"} {
+		buf.Reset()
+		ctx := lambdacontext.NewContext(context.Background(), &lambdacontext.LambdaContext{AwsRequestID: id})
+		_, _ = AppDeployServiceHandler(ctx, request)
+	}
+
+	// buf holds only the second invocation's log lines
+	firstLine := strings.SplitN(buf.String(), "\n", 2)[0]
+	assert.Equal(t, 1, strings.Count(firstLine, `"requestID"`))
+	assert.Contains(t, firstLine, `"requestID":"second"`)
 }
 
 func TestUnknownRoutePerMethod(t *testing.T) {
