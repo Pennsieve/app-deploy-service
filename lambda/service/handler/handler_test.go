@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambdacontext"
+	"github.com/pennsieve/app-deploy-service/service/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -132,6 +136,28 @@ func TestRouterDoesNotLogCredentials(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotContains(t, buf.String(), "secret-access-token")
 	assert.NotContains(t, buf.String(), "secret-source-token")
+}
+
+func TestHandlerLoggerHasOneRequestID(t *testing.T) {
+	var buf bytes.Buffer
+	defaultLogger := logging.Default
+	logging.Default = slog.New(slog.NewJSONHandler(&buf, nil))
+	t.Cleanup(func() {
+		logging.Default = defaultLogger
+		logger = defaultLogger
+	})
+
+	request := newRequest("GET", "GET /nonexistent", "/nonexistent", nil)
+	for _, id := range []string{"first", "second"} {
+		buf.Reset()
+		ctx := lambdacontext.NewContext(context.Background(), &lambdacontext.LambdaContext{AwsRequestID: id})
+		_, _ = AppDeployServiceHandler(ctx, request)
+	}
+
+	// buf holds only the second invocation's log lines
+	firstLine := strings.SplitN(buf.String(), "\n", 2)[0]
+	assert.Equal(t, 1, strings.Count(firstLine, `"requestID"`))
+	assert.Contains(t, firstLine, `"requestID":"second"`)
 }
 
 func TestUnknownRoutePerMethod(t *testing.T) {

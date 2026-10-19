@@ -16,6 +16,9 @@ func init() {
 }
 
 func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	// Rebuilt from Default on every invocation: deriving from the previous
+	// logger would stack one requestID attribute per warm invocation.
+	logger = logging.Default
 	if lc, ok := lambdacontext.FromContext(ctx); ok {
 		logger = logger.With(slog.String("requestID", lc.AwsRequestID))
 	}
