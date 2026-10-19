@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"log"
 	"net/http"
+	"os"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -114,6 +117,21 @@ func TestRouteMatching(t *testing.T) {
 			assert.Equal(t, "ok", resp.Body)
 		})
 	}
+}
+
+func TestRouterDoesNotLogCredentials(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	request := newRequest("POST", "POST /store", "/store", nil)
+	request.Headers = map[string]string{"authorization": "Bearer secret-access-token"}
+	request.Body = `{"source":{"url":"https://github.com/o/r","tag":"v1","authToken":"secret-source-token"}}`
+
+	_, err := newTestRouter().Start(context.Background(), request)
+	assert.NoError(t, err)
+	assert.NotContains(t, buf.String(), "secret-access-token")
+	assert.NotContains(t, buf.String(), "secret-source-token")
 }
 
 func TestUnknownRoutePerMethod(t *testing.T) {

@@ -59,8 +59,10 @@ func (r *LambdaRouter) PATCH(routeKey string, handler RouterHandlerFunc) {
 	r.patchRoutes[routeKey] = handler
 }
 
+// Start dispatches the request to its route's handler. It must not log the
+// request itself: its headers carry the caller's bearer token and its body can
+// carry a source authToken. AppDeployServiceHandler logs the routing fields.
 func (r *LambdaRouter) Start(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	log.Println(request)
 	routeKey := utils.ExtractRoute(request.RouteKey)
 
 	switch request.RequestContext.HTTP.Method {
