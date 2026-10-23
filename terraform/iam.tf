@@ -32,6 +32,14 @@ resource "aws_iam_policy" "service_lambda_iam_policy" {
 
 data "aws_iam_policy_document" "service_iam_policy_document" {
 
+  # Verify the workspace a token_auth request names (handler/workspace_access.go).
+  statement {
+    sid       = "AppDeployServiceInvokeDirectAuthorizer"
+    effect    = "Allow"
+    actions   = ["lambda:InvokeFunction"]
+    resources = [data.terraform_remote_state.api_gateway.outputs.direct_authorizer_lambda_arn]
+  }
+
   statement {
     sid    = "AppDeployServiceLambdaLogsPermissions"
     effect = "Allow"

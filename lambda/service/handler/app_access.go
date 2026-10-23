@@ -9,6 +9,9 @@ import (
 )
 
 // CanAccessApp treats a failed grant lookup as no grant, as it always has.
+// Only for routes under token_workspace_auth, whose organization and team
+// claims the gateway verified for the request's workspace. On token_auth
+// routes use CanAccessAppIn with workspaceFromRequest.
 func CanAccessApp(ctx context.Context, claims *authorizer.Claims, app *store_dynamodb.AppStoreApplication, accessStore *store_dynamodb.AppAccessDatabaseStore) bool {
 	if app.Visibility == "public" {
 		return true
@@ -25,6 +28,21 @@ func CanAccessApp(ctx context.Context, claims *authorizer.Claims, app *store_dyn
 		teamIds = append(teamIds, teamClaim.NodeId)
 	}
 	ok, _ := access.HasAppAccess(ctx, app, claims.UserClaim.NodeId, workspaceIds, teamIds, accessStore)
+	return ok
+}
+
+// CanAccessAppPersonally is CanAccessApp outside any workspace: public apps,
+// apps the user owns, and apps shared with the user directly. Workspace and
+// team grants don't count, whatever the claims carry, so a user token with a
+// default organization doesn't pull that workspace's apps in.
+func CanAccessAppPersonally(ctx context.Context, claims *authorizer.Claims, app *store_dynamodb.AppStoreApplication, accessStore *store_dynamodb.AppAccessDatabaseStore) bool {
+	if app.Visibility == "public" {
+		return true
+	}
+	if claims.UserClaim == nil {
+		return false
+	}
+	ok, _ := access.HasAppAccess(ctx, app, claims.UserClaim.NodeId, nil, nil, accessStore)
 	return ok
 }
 

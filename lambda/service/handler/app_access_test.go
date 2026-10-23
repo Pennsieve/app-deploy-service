@@ -236,3 +236,47 @@ func TestCanAccessApp_LookupErrorFallsThroughToWorkspace(t *testing.T) {
 	assert.False(t, CanAccessApp(context.Background(), newTestClaims("N:user:someone", "N:org:org2", nil), app, store),
 		"a failed lookup is treated as no grant")
 }
+
+// grantFor returns an access store holding one grant of the app to entityId.
+func grantFor(entityId, entityType string) *store_dynamodb.AppAccessDatabaseStore {
+	item, _ := attributevalue.MarshalMap(store_dynamodb.AppAccess{
+		EntityId:   entityId,
+		AppId:      "app#app-uuid",
+		EntityType: entityType,
+		AppUuid:    "app-uuid",
+		AccessType: "shared",
+	})
+	mock := &mockAppAccessTableAPI{QueryOutputs: map[string]*dynamodb.QueryOutput{}}
+	for _, k := range []string{":0", ":1"} {
+		mock.QueryOutputs[k+":"+entityId] = &dynamodb.QueryOutput{Items: []map[string]types.AttributeValue{item}, Count: 1}
+	}
+	return store_dynamodb.NewAppAccessDatabaseStore(mock, "test-table")
+}
+
+func TestCanAccessAppPersonally(t *testing.T) {
+	private := &store_dynamodb.AppStoreApplication{Uuid: "app-uuid", Visibility: "private", OwnerId: "N:user:owner"}
+	public := &store_dynamodb.AppStoreApplication{Uuid: "app-uuid", Visibility: "public", OwnerId: "N:user:owner"}
+	teams := []teamUser.Claim{{NodeId: "N:team:team1", Name: "Team1", TeamType: "team"}}
+	empty := grantFor("user#N:user:nobody", "user")
+	ctx := context.Background()
+
+	assert.True(t, CanAccessAppPersonally(ctx, newTestClaims("N:user:me", "N:org:org1", nil), public, empty), "public")
+	assert.True(t, CanAccessAppPersonally(ctx, newTestClaims("N:user:owner", "N:org:org1", nil), private, empty), "owner")
+	assert.True(t, CanAccessAppPersonally(ctx, newTestClaims("N:user:me", "N:org:org1", nil), private,
+		grantFor("user#N:user:me", "user")), "shared with the user directly")
+	assert.False(t, CanAccessAppPersonally(ctx, newTestClaims("N:user:me", "N:org:org1", nil), private, empty), "no grant")
+
+	// Workspace and team grants don't count outside a workspace, even when the
+	// claims carry that workspace (CanAccessApp would allow both).
+	ws := grantFor("workspace#N:org:org1", "workspace")
+	assert.True(t, CanAccessApp(ctx, newTestClaims("N:user:me", "N:org:org1", nil), private, ws))
+	assert.False(t, CanAccessAppPersonally(ctx, newTestClaims("N:user:me", "N:org:org1", nil), private, ws), "workspace grant")
+	team := grantFor("team#N:team:team1", "team")
+	assert.True(t, CanAccessApp(ctx, newTestClaims("N:user:me", "N:org:org1", teams), private, team))
+	assert.False(t, CanAccessAppPersonally(ctx, newTestClaims("N:user:me", "N:org:org1", teams), private, team), "team grant")
+
+	// No user claim: only public apps.
+	noUser := &authorizer.Claims{}
+	assert.True(t, CanAccessAppPersonally(ctx, noUser, public, empty))
+	assert.False(t, CanAccessAppPersonally(ctx, noUser, private, empty))
+}

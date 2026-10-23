@@ -49,6 +49,11 @@ resource "aws_lambda_function" "service_lambda" {
       APP_ACCESS_TABLE                 = aws_dynamodb_table.app_access_table.name,
       ACCOUNTS_TABLE                   = data.terraform_remote_state.account_service.outputs.accounts_table_name
       CONTENT_SYNC_BUCKET              = aws_s3_bucket.content_sync_bucket.id
+      // token_auth routes verify the request's organization_id through the
+      // platform's direct authorizer (handler/workspace_access.go). Not
+      // wrapped in try(): a missing output must fail the plan, not every
+      // workspace check.
+      DIRECT_AUTHORIZER_LAMBDA_NAME = data.terraform_remote_state.api_gateway.outputs.direct_authorizer_lambda_name
     }
   }
 }

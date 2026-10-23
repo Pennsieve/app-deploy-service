@@ -44,6 +44,7 @@ func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTT
 	// AppStore routes
 	router.POST("/store", PostAppStoreHandler)
 	router.GET("/store", GetAppstoreApplicationsHandler)
+	router.GET("/store/me", GetMyAppstoreApplicationsHandler)
 	router.GET("/store/registry", GetAppStoreRegistryHandler)
 
 	// AppStore sync route

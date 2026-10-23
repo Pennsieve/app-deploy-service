@@ -58,7 +58,13 @@ func GetAppStoreAssetHandler(ctx context.Context, request events.APIGatewayV2HTT
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
 	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, os.Getenv(appAccessTableNameKey))
-	if !CanAccessApp(ctx, claims, app, appAccessStore) {
+	// token_auth: the workspace comes from the request, verified here; none
+	// means the personal scope. Never claims.OrgClaim (see workspace_access.go).
+	ws, errResp := workspaceFromRequest(ctx, request, claims, handlerName)
+	if errResp != nil {
+		return *errResp, nil
+	}
+	if !CanAccessAppIn(ctx, claims, ws, app, appAccessStore) {
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusForbidden,
 			Body:       handlerError(handlerName, ErrNotPermitted),

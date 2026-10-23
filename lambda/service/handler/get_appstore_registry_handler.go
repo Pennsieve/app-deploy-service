@@ -128,7 +128,13 @@ func GetAppStoreRegistryHandler(ctx context.Context, request events.APIGatewayV2
 	appAccessTable := os.Getenv(appAccessTableNameKey)
 	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, appAccessTable)
 
-	if !CanAccessApp(ctx, claims, &apps[0], appAccessStore) {
+	// token_auth: the workspace comes from the request, verified here; none
+	// means the personal scope. Never claims.OrgClaim (see workspace_access.go).
+	ws, errResp := workspaceFromRequest(ctx, request, claims, handlerName)
+	if errResp != nil {
+		return *errResp, nil
+	}
+	if !CanAccessAppIn(ctx, claims, ws, &apps[0], appAccessStore) {
 		resp := models.RegistryImageResponse{
 			Authorized: false,
 			Message:    "user does not have access to this application",
