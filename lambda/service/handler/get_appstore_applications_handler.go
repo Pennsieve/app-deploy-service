@@ -17,8 +17,23 @@ import (
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
 )
 
+// GetAppstoreApplicationsHandler serves GET /store: the apps the caller can
+// use in the workspace of the request (organization_id), including apps
+// shared with that workspace or the caller's teams in it.
 func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	handlerName := "GetAppstoreApplicationsHandler"
+	return listAppstoreApplications(ctx, request, "GetAppstoreApplicationsHandler", CanAccessApp)
+}
+
+// GetPersonalAppstoreApplicationsHandler serves GET /store/personal: the apps
+// the caller can use outside any workspace (public, owned, or shared with the
+// caller directly).
+func GetPersonalAppstoreApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	return listAppstoreApplications(ctx, request, "GetPersonalAppstoreApplicationsHandler", CanAccessAppPersonally)
+}
+
+type appAccessCheck func(context.Context, *authorizer.Claims, *store_dynamodb.AppStoreApplication, *store_dynamodb.AppAccessDatabaseStore) bool
+
+func listAppstoreApplications(ctx context.Context, request events.APIGatewayV2HTTPRequest, handlerName string, canAccess appAccessCheck) (events.APIGatewayV2HTTPResponse, error) {
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -40,7 +55,14 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, appAccessTable)
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	log.Printf("%s: caller org=%s user=%s", handlerName, claims.OrgClaim.NodeId, claims.UserClaim.NodeId)
+	callerOrg, callerUser := "", ""
+	if claims.OrgClaim != nil {
+		callerOrg = claims.OrgClaim.NodeId
+	}
+	if claims.UserClaim != nil {
+		callerUser = claims.UserClaim.NodeId
+	}
+	log.Printf("%s: caller org=%s user=%s", handlerName, callerOrg, callerUser)
 
 	// Get all apps (or filter by sourceUrl if provided)
 	queryParams := request.QueryStringParameters
@@ -70,7 +92,7 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 		if !includeArchived && app.Status == models.AppStoreStatusArchived {
 			continue
 		}
-		if CanAccessApp(ctx, claims, &app, appAccessStore) {
+		if canAccess(ctx, claims, &app, appAccessStore) {
 			filteredApps = append(filteredApps, app)
 		}
 	}
