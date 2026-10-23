@@ -24,11 +24,11 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 	return listAppstoreApplications(ctx, request, "GetAppstoreApplicationsHandler", CanAccessApp)
 }
 
-// GetPersonalAppstoreApplicationsHandler serves GET /store/personal: the apps
+// GetMyAppstoreApplicationsHandler serves GET /store/me: the apps
 // the caller can use outside any workspace (public, owned, or shared with the
 // caller directly).
-func GetPersonalAppstoreApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	return listAppstoreApplications(ctx, request, "GetPersonalAppstoreApplicationsHandler", CanAccessAppPersonally)
+func GetMyAppstoreApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	return listAppstoreApplications(ctx, request, "GetMyAppstoreApplicationsHandler", CanAccessAppPersonally)
 }
 
 type appAccessCheck func(context.Context, *authorizer.Claims, *store_dynamodb.AppStoreApplication, *store_dynamodb.AppAccessDatabaseStore) bool

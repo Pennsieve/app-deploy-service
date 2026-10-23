@@ -760,7 +760,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '5XX':
           $ref: '#/components/responses/Error'
-  /store/personal:
+  /store/me:
     get:
       summary: List app store applications outside a workspace
       description: >
@@ -771,7 +771,7 @@ paths:
         workspace.
       x-amazon-apigateway-integration:
         $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
-      operationId: getPersonalAppStoreApplications
+      operationId: getMyAppStoreApplications
       security:
         - token_auth: []
       tags:
