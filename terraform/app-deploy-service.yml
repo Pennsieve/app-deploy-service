@@ -447,6 +447,13 @@ paths:
         - token_auth: []
       tags:
         - Applications
+      parameters:
+        - in: query
+          name: organization_id
+          required: true
+          schema:
+            type: string
+          description: The workspace to act in. Membership is verified.
       responses:
         '201':
           description: Application created
@@ -546,6 +553,12 @@ paths:
       tags:
         - Applications
       parameters:
+        - in: query
+          name: organization_id
+          required: true
+          schema:
+            type: string
+          description: The workspace to act in. Membership is verified.
         - in: path
           name: id
           required: true
@@ -647,6 +660,13 @@ paths:
         - token_auth: []
       tags:
         - Deployments
+      parameters:
+        - in: query
+          name: organization_id
+          required: true
+          schema:
+            type: string
+          description: The workspace to act in. Membership is verified.
       responses:
         '200':
           description: Deployment triggered
@@ -802,6 +822,16 @@ paths:
       tags:
         - App Store
       parameters:
+        - in: query
+          name: organization_id
+          required: false
+          schema:
+            type: string
+          description: >
+            The workspace the request is made in. Membership is verified. With
+            it, apps shared with that workspace or your teams in it count;
+            without it, only public apps, your own, and apps shared with you
+            directly.
         - in: path
           name: id
           required: true
@@ -891,6 +921,16 @@ paths:
         - App Store
       parameters:
         - in: query
+          name: organization_id
+          required: false
+          schema:
+            type: string
+          description: >
+            The workspace the request is made in. Membership is verified. With
+            it, apps shared with that workspace or your teams in it count;
+            without it, only public apps, your own, and apps shared with you
+            directly.
+        - in: query
           name: sourceUrl
           required: true
           schema:
@@ -977,6 +1017,16 @@ paths:
       tags:
         - App Store
       parameters:
+        - in: query
+          name: organization_id
+          required: false
+          schema:
+            type: string
+          description: >
+            The workspace the request is made in. Membership is verified. With
+            it, apps shared with that workspace or your teams in it count;
+            without it, only public apps, your own, and apps shared with you
+            directly.
         - in: path
           name: id
           required: true
@@ -1027,6 +1077,16 @@ paths:
       tags:
         - App Store
       parameters:
+        - in: query
+          name: organization_id
+          required: false
+          schema:
+            type: string
+          description: >
+            The workspace the request is made in. Membership is verified. With
+            it, apps shared with that workspace or your teams in it count;
+            without it, only public apps, your own, and apps shared with you
+            directly.
         - in: path
           name: id
           required: true

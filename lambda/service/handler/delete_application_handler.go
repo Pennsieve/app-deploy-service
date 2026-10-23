@@ -43,7 +43,13 @@ func DeleteApplicationHandler(ctx context.Context, request events.APIGatewayV2HT
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	organizationId := claims.OrgClaim.NodeId
+	// token_auth: the workspace comes from the request, verified here, never
+	// from claims.OrgClaim (see workspace_access.go).
+	ws, errResp := requireWorkspaceFromRequest(ctx, request, claims, handlerName)
+	if errResp != nil {
+		return *errResp, nil
+	}
+	organizationId := ws.OrgNodeId
 	userId := claims.UserClaim.NodeId
 
 	dynamoDBClient := dynamodb.NewFromConfig(cfg)
