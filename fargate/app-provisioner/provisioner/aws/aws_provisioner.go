@@ -37,10 +37,13 @@ type AWSProvisioner struct {
 	AppSlug             string
 	RunOnGPU            bool
 	RoleName            string
+	// ExternalId is the sts:ExternalId the role requires, sent with AssumeRole
+	// when set (empty for accounts registered before Pennsieve issued one).
+	ExternalId          string
 }
 
-func NewAWSProvisioner(cfg aws.Config, accountId string, action string, env string, gitUrl string, computeNodeEfsId string, computeNodeUuid string, app_slug string, runOnGPU bool, roleName string) provisioner.Provisioner {
-	return &AWSProvisioner{Config: cfg, AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, ComputeNodeUuid: computeNodeUuid, AppSlug: app_slug, RunOnGPU: runOnGPU, RoleName: roleName}
+func NewAWSProvisioner(cfg aws.Config, accountId string, action string, env string, gitUrl string, computeNodeEfsId string, computeNodeUuid string, app_slug string, runOnGPU bool, roleName string, externalId string) provisioner.Provisioner {
+	return &AWSProvisioner{Config: cfg, AccountId: accountId, Action: action, Env: env, GitUrl: gitUrl, ComputeNodeEfsId: computeNodeEfsId, ComputeNodeUuid: computeNodeUuid, AppSlug: app_slug, RunOnGPU: runOnGPU, RoleName: roleName, ExternalId: externalId}
 }
 
 func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error) {
@@ -49,7 +52,11 @@ func (p *AWSProvisioner) AssumeRole(ctx context.Context) (aws.Credentials, error
 	stsClient := sts.NewFromConfig(p.Config)
 
 	roleArn := fmt.Sprintf("arn:aws:iam::%s:role/%s", p.AccountId, p.RoleName)
-	appCreds := stscreds.NewAssumeRoleProvider(stsClient, roleArn)
+	appCreds := stscreds.NewAssumeRoleProvider(stsClient, roleArn, func(o *stscreds.AssumeRoleOptions) {
+		if p.ExternalId != "" {
+			o.ExternalID = aws.String(p.ExternalId)
+		}
+	})
 	credentials, err := appCreds.Retrieve(ctx)
 	if err != nil {
 		return aws.Credentials{}, err

@@ -13,6 +13,9 @@ import (
 type Account struct {
 	Uuid     string `dynamodbav:"uuid"`
 	RoleName string `dynamodbav:"roleName"`
+	// ExternalId is the sts:ExternalId the role requires; empty for accounts
+	// registered before Pennsieve issued one.
+	ExternalId string `dynamodbav:"externalId"`
 }
 
 type AccountStore struct {
