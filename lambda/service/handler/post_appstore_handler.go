@@ -186,13 +186,19 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	// step blocks the deployment.
 	appCfg, haveAppCfg := readSyncedAppConfig(ctx, cfg, application.Source.Url, application.Source.Tag)
 
-	// Persist the app's declared parameters (with defaults) onto the appstore
-	// record. app.yml is the source of truth, so a successful parse overwrites
-	// any previously stored params (including clearing them when the app
-	// declares none). Advisory: a failure here never blocks the deployment.
+	// Record the version's app.yml on the version, and, when this is the
+	// app's newest version, its parameters on the app (what consumers of the
+	// app's top-level params read). Registering an older tag again doesn't
+	// roll the app back. Advisory: a failure here never blocks the deployment,
+	// and an app without an app.yml simply has no manifest.
 	if haveAppCfg {
-		if err := appStoreStore.UpdateParams(ctx, applicationId, appParameters(appCfg)); err != nil {
-			log.Printf("warning: unable to persist app parameters for %s: %v", applicationId, err)
+		if err := versionStore.SetManifest(ctx, versionUuid, appManifest(appCfg)); err != nil {
+			log.Printf("warning: unable to persist the manifest of %s %s: %v", applicationId, application.Source.Tag, err)
+		}
+		if isNewestVersion(ctx, versionStore, applicationId, application.Source.Tag) {
+			if err := appStoreStore.UpdateParams(ctx, applicationId, appParameters(appCfg)); err != nil {
+				log.Printf("warning: unable to persist app parameters for %s: %v", applicationId, err)
+			}
 		}
 	}
 

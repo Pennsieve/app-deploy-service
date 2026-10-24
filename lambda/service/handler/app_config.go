@@ -22,14 +22,32 @@ const (
 	gpuBuildStorageGiB int32 = 100
 )
 
-// appConfig is a partial view of app.yml, limited to the fields consumed by
-// this service: build-affecting runtime hints and the parameter declarations
-// (with defaults) surfaced to downstream services. app.yml is authored as YAML.
+// appConfig is app.yml as this service reads it: what the app is, its
+// runtime (build sizing and what it asks for), its parameters and its
+// inputs and outputs. app.yml is authored as YAML; fields it doesn't declare
+// stay zero.
 type appConfig struct {
+	Application struct {
+		Name        string   `yaml:"name"`
+		Description string   `yaml:"description"`
+		Tags        []string `yaml:"tags"`
+	} `yaml:"application"`
 	Runtime struct {
-		ComputeTypes []string `yaml:"computeTypes"`
+		CPU            int      `yaml:"cpu"`
+		Memory         int      `yaml:"memory"`
+		ComputeTypes   []string `yaml:"computeTypes"`
+		TimeoutSeconds int      `yaml:"timeoutSeconds"`
 	} `yaml:"runtime"`
 	Parameters []appParameter `yaml:"parameters"`
+	Inputs     []appPort      `yaml:"inputs"`
+	Outputs    []appPort      `yaml:"outputs"`
+}
+
+// appPort mirrors an entry of app.yml's `inputs` or `outputs`.
+type appPort struct {
+	Name        string   `yaml:"name"`
+	Description string   `yaml:"description"`
+	MediaTypes  []string `yaml:"mediaTypes"`
 }
 
 // appParameter mirrors a single entry of app.yml's `parameters` list.
@@ -124,4 +142,38 @@ func appParameters(c appConfig) []store_dynamodb.AppParameter {
 		})
 	}
 	return params
+}
+
+// appManifest is the version's record of its app.yml: what the app is, what
+// it asks for, its parameters, and what goes in and out. Stored per version,
+// so a workflow pinned to a version can be shown and run with that version's.
+func appManifest(c appConfig) *store_dynamodb.AppManifest {
+	return &store_dynamodb.AppManifest{
+		Name:        c.Application.Name,
+		Description: c.Application.Description,
+		Tags:        c.Application.Tags,
+		Runtime: store_dynamodb.AppRuntime{
+			CPU:            c.Runtime.CPU,
+			Memory:         c.Runtime.Memory,
+			ComputeTypes:   c.Runtime.ComputeTypes,
+			TimeoutSeconds: c.Runtime.TimeoutSeconds,
+		},
+		Parameters: appParameters(c),
+		Inputs:     appPorts(c.Inputs),
+		Outputs:    appPorts(c.Outputs),
+	}
+}
+
+func appPorts(ports []appPort) []store_dynamodb.AppPort {
+	if len(ports) == 0 {
+		return nil
+	}
+	out := make([]store_dynamodb.AppPort, 0, len(ports))
+	for _, p := range ports {
+		if p.Name == "" {
+			continue
+		}
+		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes})
+	}
+	return out
 }

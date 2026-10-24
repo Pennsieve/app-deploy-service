@@ -136,7 +136,44 @@ func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVer
 		ReleaseId:     v.ReleaseId,
 		CreatedAt:     v.CreatedAt,
 		Status:        v.Status,
+		Manifest:      AppManifestToModel(v.Manifest),
 	}
+}
+
+func AppManifestToModel(m *store_dynamodb.AppManifest) *models.AppManifest {
+	if m == nil {
+		return nil
+	}
+	params := AppParametersToModels(m.Parameters)
+	if params == nil {
+		params = []models.AppParameter{}
+	}
+	return &models.AppManifest{
+		Name:        m.Name,
+		Description: m.Description,
+		Tags:        m.Tags,
+		Runtime: models.AppRuntime{
+			CPU:            m.Runtime.CPU,
+			Memory:         m.Runtime.Memory,
+			ComputeTypes:   m.Runtime.ComputeTypes,
+			TimeoutSeconds: m.Runtime.TimeoutSeconds,
+		},
+		Parameters: params,
+		Inputs:     appPortsToModels(m.Inputs),
+		Outputs:    appPortsToModels(m.Outputs),
+	}
+}
+
+func appPortsToModels(ports []store_dynamodb.AppPort) []models.AppPort {
+	out := []models.AppPort{}
+	for _, p := range ports {
+		media := p.MediaTypes
+		if media == nil {
+			media = []string{}
+		}
+		out = append(out, models.AppPort{Name: p.Name, Description: p.Description, MediaTypes: media})
+	}
+	return out
 }
 
 func AppStoreVersionsToModels(versions []store_dynamodb.AppStoreVersion) []models.AppStoreVersion {

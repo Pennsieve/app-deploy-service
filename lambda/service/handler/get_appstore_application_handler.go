@@ -134,22 +134,16 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 	}, nil
 }
 
-// latestVersionTag returns the Version tag of the most recently created version,
-// or an empty string if there are no versions with a tag. Assets are only synced
+// latestVersionTag returns the newest version's tag (version_order.go): the
+// highest semantic version, else the most recently registered; or an empty
+// string if there are no versions with a tag. Assets are only synced
 // for release tags, so there is no meaningful default when no release exists.
 func latestVersionTag(versions []models.AppStoreVersion) string {
-	latest := ""
-	latestCreatedAt := ""
+	tagged := make([]taggedVersion, 0, len(versions))
 	for _, v := range versions {
-		if v.Version == "" {
-			continue
-		}
-		if v.CreatedAt > latestCreatedAt {
-			latestCreatedAt = v.CreatedAt
-			latest = v.Version
-		}
+		tagged = append(tagged, taggedVersion{Tag: v.Version, CreatedAt: v.CreatedAt})
 	}
-	return latest
+	return newestTag(tagged)
 }
 
 // paramsFromAppConfig parses the parameter declarations out of a synced

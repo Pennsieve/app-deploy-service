@@ -116,6 +116,36 @@ type AppStoreVersion struct {
 	DestinationUrl string `dynamodbav:"destinationUrl"`
 	CreatedAt      string `dynamodbav:"createdAt"`
 	Status         string `dynamodbav:"registrationStatus"`
+	// Manifest is this version's app.yml, parsed at registration; nil for an
+	// app without one, or a version registered before manifests were kept.
+	Manifest *AppManifest `dynamodbav:"manifest,omitempty"`
+}
+
+// AppManifest is a version's app.yml as stored.
+type AppManifest struct {
+	Name        string         `dynamodbav:"name,omitempty"`
+	Description string         `dynamodbav:"description,omitempty"`
+	Tags        []string       `dynamodbav:"tags,omitempty"`
+	Runtime     AppRuntime     `dynamodbav:"runtime"`
+	Parameters  []AppParameter `dynamodbav:"parameters,omitempty"`
+	Inputs      []AppPort      `dynamodbav:"inputs,omitempty"`
+	Outputs     []AppPort      `dynamodbav:"outputs,omitempty"`
+}
+
+// AppRuntime is what a version asks for to run: CPU units and MiB, the
+// compute types it runs on, and its timeout. Zero means not declared.
+type AppRuntime struct {
+	CPU            int      `dynamodbav:"cpu,omitempty"`
+	Memory         int      `dynamodbav:"memory,omitempty"`
+	ComputeTypes   []string `dynamodbav:"computeTypes,omitempty"`
+	TimeoutSeconds int      `dynamodbav:"timeoutSeconds,omitempty"`
+}
+
+// AppPort is one of a version's declared inputs or outputs.
+type AppPort struct {
+	Name        string   `dynamodbav:"name"`
+	Description string   `dynamodbav:"description,omitempty"`
+	MediaTypes  []string `dynamodbav:"mediaTypes,omitempty"`
 }
 
 func (i AppStoreVersion) GetKey() map[string]types.AttributeValue {
