@@ -152,7 +152,6 @@ func AppManifestToModel(m *store_dynamodb.AppManifest) *models.AppManifest {
 		Name:        m.Name,
 		Description: m.Description,
 		Tags:        m.Tags,
-		Categories:  m.Categories,
 		Runtime: models.AppRuntime{
 			CPU:            m.Runtime.CPU,
 			Memory:         m.Runtime.Memory,

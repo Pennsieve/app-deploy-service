@@ -262,18 +262,3 @@ func TestAppManifest_Minimal(t *testing.T) {
 	assert.Nil(t, m.Inputs)
 	assert.Nil(t, m.Parameters)
 }
-
-// What the app is comes from `application:`, categories included.
-func TestParseAppConfigCategories(t *testing.T) {
-	c, err := parseAppConfig([]byte(`
-application:
-  name: Seurat Processor
-  categories: [Visualization, Single Cell]
-  tags: [scrna-seq]
-`))
-	assert.NoError(t, err)
-	m := appManifest(c)
-	assert.Equal(t, "Seurat Processor", m.Name)
-	assert.Equal(t, []string{"Visualization", "Single Cell"}, m.Categories)
-	assert.Equal(t, []string{"scrna-seq"}, m.Tags)
-}

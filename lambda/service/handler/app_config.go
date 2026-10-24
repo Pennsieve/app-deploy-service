@@ -48,7 +48,6 @@ type appInfo struct {
 	Name        string   `yaml:"name"`
 	Description string   `yaml:"description"`
 	Tags        []string `yaml:"tags"`
-	Categories  []string `yaml:"categories"`
 }
 
 // appPort mirrors an entry of app.yml's `inputs` or `outputs`.
@@ -160,7 +159,6 @@ func appManifest(c appConfig) *store_dynamodb.AppManifest {
 		Name:        c.Application.Name,
 		Description: c.Application.Description,
 		Tags:        c.Application.Tags,
-		Categories:  c.Application.Categories,
 		Runtime: store_dynamodb.AppRuntime{
 			CPU:            c.Runtime.CPU,
 			Memory:         c.Runtime.Memory,
