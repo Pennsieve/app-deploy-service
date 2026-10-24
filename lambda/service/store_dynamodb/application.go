@@ -126,6 +126,7 @@ type AppManifest struct {
 	Name        string         `dynamodbav:"name,omitempty"`
 	Description string         `dynamodbav:"description,omitempty"`
 	Tags        []string       `dynamodbav:"tags,omitempty"`
+	Categories  []string       `dynamodbav:"categories,omitempty"`
 	Runtime     AppRuntime     `dynamodbav:"runtime"`
 	Parameters  []AppParameter `dynamodbav:"parameters,omitempty"`
 	Inputs      []AppPort      `dynamodbav:"inputs,omitempty"`

@@ -230,6 +230,10 @@ components:
           type: array
           items:
             type: string
+        categories:
+          type: array
+          items:
+            type: string
         runtime:
           type: object
           properties:

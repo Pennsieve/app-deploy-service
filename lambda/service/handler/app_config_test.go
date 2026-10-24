@@ -262,3 +262,53 @@ func TestAppManifest_Minimal(t *testing.T) {
 	assert.Nil(t, m.Inputs)
 	assert.Nil(t, m.Parameters)
 }
+
+// The flat app.yml shape (what the app is at the top level, cpu/memory under
+// resources, `default`) reads as the nested one.
+func TestParseAppConfigFlatShape(t *testing.T) {
+	c, err := parseAppConfig([]byte(`
+schemaVersion: '1.0'
+name: Seurat Processor
+description: Exports UMAP embeddings to Parquet.
+categories: [Visualization, Single Cell]
+tags: [scrna-seq]
+runtime:
+  computeTypes: [standard]
+resources:
+  cpu: 4096
+  memory: 65536
+parameters:
+  - name: OUTPUT_MODE
+    type: string
+    default: expanded
+    allowedValues: [expanded, consolidated]
+`))
+	assert.NoError(t, err)
+	m := appManifest(c)
+	assert.Equal(t, "Seurat Processor", m.Name)
+	assert.Equal(t, "Exports UMAP embeddings to Parquet.", m.Description)
+	assert.Equal(t, []string{"Visualization", "Single Cell"}, m.Categories)
+	assert.Equal(t, []string{"scrna-seq"}, m.Tags)
+	assert.Equal(t, 4096, m.Runtime.CPU)
+	assert.Equal(t, 65536, m.Runtime.Memory)
+	assert.Equal(t, "expanded", m.Parameters[0].DefaultValue)
+	assert.Equal(t, []string{"expanded", "consolidated"}, m.Parameters[0].ValidValues)
+}
+
+// The nested shape wins where both are set.
+func TestParseAppConfigNestedWins(t *testing.T) {
+	c, err := parseAppConfig([]byte(`
+name: flat
+application:
+  name: nested
+  categories: [Statistics]
+runtime:
+  cpu: 1024
+resources:
+  cpu: 4096
+`))
+	assert.NoError(t, err)
+	assert.Equal(t, "nested", c.Application.Name)
+	assert.Equal(t, []string{"Statistics"}, c.Application.Categories)
+	assert.Equal(t, 1024, c.Runtime.CPU)
+}

@@ -26,12 +26,18 @@ const (
 // runtime (build sizing and what it asks for), its parameters and its
 // inputs and outputs. app.yml is authored as YAML; fields it doesn't declare
 // stay zero.
+//
+// Two shapes are in use. The canonical one nests what the app is under
+// `application:` and cpu/memory under `runtime:`; the older flat one has
+// name, description, tags and categories at the top level and cpu/memory
+// under `resources:`. parseAppConfig reads both into the nested fields.
 type appConfig struct {
-	Application struct {
-		Name        string   `yaml:"name"`
-		Description string   `yaml:"description"`
-		Tags        []string `yaml:"tags"`
-	} `yaml:"application"`
+	Application appInfo `yaml:"application"`
+	appInfo     `yaml:",inline"`
+	Resources   struct {
+		CPU    int `yaml:"cpu"`
+		Memory int `yaml:"memory"`
+	} `yaml:"resources"`
 	Runtime struct {
 		CPU            int      `yaml:"cpu"`
 		Memory         int      `yaml:"memory"`
@@ -45,6 +51,15 @@ type appConfig struct {
 	Parameters []appParameter `yaml:"parameters"`
 	Inputs     []appPort      `yaml:"inputs"`
 	Outputs    []appPort      `yaml:"outputs"`
+}
+
+// appInfo is what the app is: under `application:`, or top-level in the
+// flat shape.
+type appInfo struct {
+	Name        string   `yaml:"name"`
+	Description string   `yaml:"description"`
+	Tags        []string `yaml:"tags"`
+	Categories  []string `yaml:"categories"`
 }
 
 // appPort mirrors an entry of app.yml's `inputs` or `outputs`.
@@ -63,6 +78,9 @@ type appParameter struct {
 	Description  string   `yaml:"description"`
 	DefaultValue string   `yaml:"defaultValue"`
 	ValidValues  []string `yaml:"validValues"`
+	// The flat shape's names for the same.
+	Default       string   `yaml:"default"`
+	AllowedValues []string `yaml:"allowedValues"`
 }
 
 func (c appConfig) needsGPU() bool {
@@ -78,6 +96,36 @@ func parseAppConfig(data []byte) (appConfig, error) {
 	var c appConfig
 	if err := yaml.Unmarshal(data, &c); err != nil {
 		return appConfig{}, err
+	}
+	// The flat shape: what the app is at the top level, cpu/memory under
+	// resources. The nested fields win where both are set.
+	a, flat := &c.Application, c.appInfo
+	if a.Name == "" {
+		a.Name = flat.Name
+	}
+	if a.Description == "" {
+		a.Description = flat.Description
+	}
+	if len(a.Tags) == 0 {
+		a.Tags = flat.Tags
+	}
+	if len(a.Categories) == 0 {
+		a.Categories = flat.Categories
+	}
+	if c.Runtime.CPU == 0 {
+		c.Runtime.CPU = c.Resources.CPU
+	}
+	if c.Runtime.Memory == 0 {
+		c.Runtime.Memory = c.Resources.Memory
+	}
+	for i := range c.Parameters {
+		p := &c.Parameters[i]
+		if p.DefaultValue == "" {
+			p.DefaultValue = p.Default
+		}
+		if len(p.ValidValues) == 0 {
+			p.ValidValues = p.AllowedValues
+		}
 	}
 	return c, nil
 }
@@ -156,6 +204,7 @@ func appManifest(c appConfig) *store_dynamodb.AppManifest {
 		Name:        c.Application.Name,
 		Description: c.Application.Description,
 		Tags:        c.Application.Tags,
+		Categories:  c.Application.Categories,
 		Runtime: store_dynamodb.AppRuntime{
 			CPU:            c.Runtime.CPU,
 			Memory:         c.Runtime.Memory,

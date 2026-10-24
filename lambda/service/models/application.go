@@ -169,6 +169,7 @@ type AppManifest struct {
 	Name        string         `json:"name,omitempty"`
 	Description string         `json:"description,omitempty"`
 	Tags        []string       `json:"tags,omitempty"`
+	Categories  []string       `json:"categories,omitempty"`
 	Runtime     AppRuntime     `json:"runtime"`
 	Parameters  []AppParameter `json:"parameters"`
 	Inputs      []AppPort      `json:"inputs"`
