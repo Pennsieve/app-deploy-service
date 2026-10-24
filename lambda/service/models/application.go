@@ -39,12 +39,19 @@ type ComputeNode struct {
 }
 
 type DeploymentSource struct {
-	SourceType string `json:"type"`
-	Url        string `json:"url"`
-	Tag        string `json:"tag"`
-	IsPrivate  bool   `json:"isPrivate,omitempty"`
-	AuthToken  string `json:"authToken,omitempty"`
-	Owner      string `json:"owner,omitempty"`
+	SourceType string    `json:"type"`
+	Url        string    `json:"url"`
+	Tag        string    `json:"tag"`
+	IsPrivate  bool      `json:"isPrivate,omitempty"`
+	AuthToken  string    `json:"authToken,omitempty"`
+	Owner      string    `json:"owner,omitempty"`
+	Revision   *Revision `json:"revision,omitempty"`
+}
+
+type Revision struct {
+	Ref     string `json:"ref"`
+	RefType string `json:"refType"`
+	Commit  string `json:"commit"`
 }
 
 type Source struct {
@@ -158,6 +165,10 @@ type AppStoreVersion struct {
 	ReleaseId     int          `json:"releaseId"`
 	CreatedAt     string       `json:"createdAt"`
 	Status        string       `json:"status"`
+	Channel       string       `json:"channel,omitempty"`
+	Ref           string       `json:"ref,omitempty"`
+	RefType       string       `json:"refType,omitempty"`
+	Commit        string       `json:"commit,omitempty"`
 	Deployments   []Deployment `json:"deployments"`
 }
 

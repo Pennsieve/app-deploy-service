@@ -106,7 +106,7 @@ func listAppstoreApplications(ctx context.Context, request events.APIGatewayV2HT
 			log.Printf("error fetching versions for application %s: %v", applications[i].Uuid, err)
 			continue
 		}
-		versions := mappers.AppStoreVersionsToModels(dynamoVersions)
+		versions := visibleVersions(mappers.AppStoreVersionsToModels(dynamoVersions), applications[i].OwnerId == claims.UserClaim.NodeId)
 
 		// Fetch deployments for each version (keyed by version uuid)
 		for j := range versions {

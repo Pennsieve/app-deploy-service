@@ -136,6 +136,10 @@ func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVer
 		ReleaseId:     v.ReleaseId,
 		CreatedAt:     v.CreatedAt,
 		Status:        v.Status,
+		Channel:       v.Channel,
+		Ref:           v.Ref,
+		RefType:       v.RefType,
+		Commit:        v.Commit,
 	}
 }
 

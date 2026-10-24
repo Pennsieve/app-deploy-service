@@ -116,6 +116,10 @@ type AppStoreVersion struct {
 	DestinationUrl string `dynamodbav:"destinationUrl"`
 	CreatedAt      string `dynamodbav:"createdAt"`
 	Status         string `dynamodbav:"registrationStatus"`
+	Channel        string `dynamodbav:"channel,omitempty"`
+	Ref            string `dynamodbav:"ref,omitempty"`
+	RefType        string `dynamodbav:"refType,omitempty"`
+	Commit         string `dynamodbav:"commit,omitempty"`
 }
 
 func (i AppStoreVersion) GetKey() map[string]types.AttributeValue {
