@@ -26,6 +26,7 @@ type AppStoreVersionDBStore interface {
 	GetByApplicationIdAndVersion(ctx context.Context, applicationId string, version string) ([]AppStoreVersion, error)
 	Insert(context.Context, AppStoreVersion) error
 	UpdateStatus(ctx context.Context, newStatus string, uuid string) error
+	SetManifest(ctx context.Context, uuid string, manifest *AppManifest) error
 }
 
 type AppStoreVersionDatabaseStore struct {
@@ -148,5 +149,27 @@ func (r *AppStoreVersionDatabaseStore) UpdateStatus(ctx context.Context, newStat
 		return fmt.Errorf("error updating appstore version status: %w", err)
 	}
 
+	return nil
+}
+
+// SetManifest records a version's parsed app.yml.
+func (r *AppStoreVersionDatabaseStore) SetManifest(ctx context.Context, uuid string, manifest *AppManifest) error {
+	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: uuid})
+	if err != nil {
+		return fmt.Errorf("error marshaling key for appstore version manifest: %w", err)
+	}
+	value, err := attributevalue.Marshal(manifest)
+	if err != nil {
+		return fmt.Errorf("error marshaling appstore version manifest: %w", err)
+	}
+	_, err = r.api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(r.TableName),
+		Key:                       key,
+		ExpressionAttributeValues: map[string]types.AttributeValue{":m": value},
+		UpdateExpression:          aws.String("set manifest = :m"),
+	})
+	if err != nil {
+		return fmt.Errorf("error setting appstore version manifest: %w", err)
+	}
 	return nil
 }

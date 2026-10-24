@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
+	"github.com/stretchr/testify/assert"
 )
 
 const gpuAppYAML = `schemaVersion: 1.0.0
@@ -195,4 +196,84 @@ func TestNeedsGPUCaseInsensitive(t *testing.T) {
 	if !c.needsGPU() {
 		t.Error("needsGPU = false, want true for mixed-case/padded 'GPU'")
 	}
+}
+
+const fullAppYml = `schemaVersion: 1.0.0
+application:
+  name: spike-detect
+  description: Finds spikes.
+  tags: [eeg, detection]
+runtime:
+  cpu: 2048
+  memory: 4096
+  computeTypes: [standard, lambda]
+  timeoutSeconds: 300
+parameters:
+  - name: threshold
+    type: number
+    defaultValue: "0.5"
+    validValues: ["0.1", "0.5"]
+  - name: channel
+    type: string
+inputs:
+  - name: recording
+    description: The EEG.
+    mediaTypes: [application/edf]
+outputs:
+  - name: events
+    mediaTypes: [application/json]
+  - description: unnamed, skipped
+`
+
+func TestAppManifest_FromFullAppYml(t *testing.T) {
+	c, err := parseAppConfig([]byte(fullAppYml))
+	assert.NoError(t, err)
+	m := appManifest(c)
+	assert.Equal(t, "spike-detect", m.Name)
+	assert.Equal(t, "Finds spikes.", m.Description)
+	assert.Equal(t, []string{"eeg", "detection"}, m.Tags)
+	assert.Equal(t, 2048, m.Runtime.CPU)
+	assert.Equal(t, 4096, m.Runtime.Memory)
+	assert.Equal(t, []string{"standard", "lambda"}, m.Runtime.ComputeTypes)
+	assert.Equal(t, 300, m.Runtime.TimeoutSeconds)
+	assert.Len(t, m.Parameters, 2)
+	assert.Equal(t, "0.5", m.Parameters[0].DefaultValue)
+	assert.Len(t, m.Inputs, 1)
+	assert.Equal(t, []string{"application/edf"}, m.Inputs[0].MediaTypes)
+	assert.Len(t, m.Outputs, 1, "an output without a name is skipped")
+}
+
+func TestAppManifest_Interactive(t *testing.T) {
+	c, err := parseAppConfig([]byte("runtime:\n  sessionType: jupyter\n"))
+	assert.NoError(t, err)
+	m := appManifest(c)
+	assert.True(t, m.Runtime.Interactive, "a session type makes it interactive")
+	assert.Equal(t, "jupyter", m.Runtime.SessionType)
+
+	c, _ = parseAppConfig([]byte("runtime:\n  interactive: true\n"))
+	assert.True(t, appManifest(c).Runtime.Interactive)
+}
+
+func TestAppManifest_Minimal(t *testing.T) {
+	c, err := parseAppConfig([]byte("runtime:\n  computeTypes: [standard]\n"))
+	assert.NoError(t, err)
+	m := appManifest(c)
+	assert.Empty(t, m.Name)
+	assert.Nil(t, m.Inputs)
+	assert.Nil(t, m.Parameters)
+}
+
+// What the app is comes from `application:`, categories included.
+func TestParseAppConfigCategories(t *testing.T) {
+	c, err := parseAppConfig([]byte(`
+application:
+  name: Seurat Processor
+  categories: [Visualization, Single Cell]
+  tags: [scrna-seq]
+`))
+	assert.NoError(t, err)
+	m := appManifest(c)
+	assert.Equal(t, "Seurat Processor", m.Name)
+	assert.Equal(t, []string{"Visualization", "Single Cell"}, m.Categories)
+	assert.Equal(t, []string{"scrna-seq"}, m.Tags)
 }

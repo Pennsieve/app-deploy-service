@@ -49,3 +49,20 @@ func TestAppParametersToModels_Empty(t *testing.T) {
 	assert.Nil(t, AppParametersToModels(nil))
 	assert.Nil(t, AppParametersToModels([]store_dynamodb.AppParameter{}))
 }
+
+func TestAppStoreVersionToModel_Manifest(t *testing.T) {
+	v := store_dynamodb.AppStoreVersion{Uuid: "v1", Version: "v1.0.0"}
+	assert.Nil(t, AppStoreVersionToModel(v).Manifest, "no app.yml, no manifest")
+
+	v.Manifest = &store_dynamodb.AppManifest{
+		Name:    "spike-detect",
+		Runtime: store_dynamodb.AppRuntime{CPU: 1024},
+		Inputs:  []store_dynamodb.AppPort{{Name: "recording"}},
+	}
+	m := AppStoreVersionToModel(v).Manifest
+	assert.Equal(t, "spike-detect", m.Name)
+	assert.Equal(t, 1024, m.Runtime.CPU)
+	assert.Equal(t, []models.AppParameter{}, m.Parameters, "empty lists, not null, in JSON")
+	assert.Equal(t, []string{}, m.Inputs[0].MediaTypes)
+	assert.Equal(t, []models.AppPort{}, m.Outputs)
+}

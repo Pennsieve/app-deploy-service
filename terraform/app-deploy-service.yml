@@ -216,6 +216,83 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Deployment'
+        manifest:
+          $ref: '#/components/schemas/AppManifest'
+    AppManifest:
+      type: object
+      description: The version's app.yml, parsed when it was registered. Absent for an app without an app.yml.
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        categories:
+          type: array
+          items:
+            type: string
+        runtime:
+          type: object
+          properties:
+            cpu:
+              type: integer
+              description: CPU units (1024 = 1 vCPU).
+            memory:
+              type: integer
+              description: MiB.
+            computeTypes:
+              type: array
+              items:
+                type: string
+            timeoutSeconds:
+              type: integer
+            interactive:
+              type: boolean
+              description: A human-in-the-loop app (e.g. a notebook kernel), run as a live session.
+            sessionType:
+              type: string
+              description: The session's kind, e.g. "jupyter" or "r".
+        parameters:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+              required:
+                type: boolean
+              description:
+                type: string
+              defaultValue:
+                type: string
+              validValues:
+                type: array
+                items:
+                  type: string
+        inputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppPort'
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppPort'
+    AppPort:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        mediaTypes:
+          type: array
+          items:
+            type: string
     AppStoreApplication:
       type: object
       properties:
