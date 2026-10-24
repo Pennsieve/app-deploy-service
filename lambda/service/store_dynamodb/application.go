@@ -139,6 +139,10 @@ type AppRuntime struct {
 	Memory         int      `dynamodbav:"memory,omitempty"`
 	ComputeTypes   []string `dynamodbav:"computeTypes,omitempty"`
 	TimeoutSeconds int      `dynamodbav:"timeoutSeconds,omitempty"`
+	// Interactive: a human-in-the-loop app, run as a live session of
+	// SessionType ("jupyter", "r").
+	Interactive bool   `dynamodbav:"interactive,omitempty"`
+	SessionType string `dynamodbav:"sessionType,omitempty"`
 }
 
 // AppPort is one of a version's declared inputs or outputs.

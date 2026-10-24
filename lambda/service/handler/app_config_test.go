@@ -243,6 +243,17 @@ func TestAppManifest_FromFullAppYml(t *testing.T) {
 	assert.Len(t, m.Outputs, 1, "an output without a name is skipped")
 }
 
+func TestAppManifest_Interactive(t *testing.T) {
+	c, err := parseAppConfig([]byte("runtime:\n  sessionType: jupyter\n"))
+	assert.NoError(t, err)
+	m := appManifest(c)
+	assert.True(t, m.Runtime.Interactive, "a session type makes it interactive")
+	assert.Equal(t, "jupyter", m.Runtime.SessionType)
+
+	c, _ = parseAppConfig([]byte("runtime:\n  interactive: true\n"))
+	assert.True(t, appManifest(c).Runtime.Interactive)
+}
+
 func TestAppManifest_Minimal(t *testing.T) {
 	c, err := parseAppConfig([]byte("runtime:\n  computeTypes: [standard]\n"))
 	assert.NoError(t, err)

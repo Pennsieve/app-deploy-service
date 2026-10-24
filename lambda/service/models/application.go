@@ -182,6 +182,10 @@ type AppRuntime struct {
 	Memory         int      `json:"memory,omitempty"`
 	ComputeTypes   []string `json:"computeTypes,omitempty"`
 	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+	// Interactive: a human-in-the-loop app (e.g. a notebook kernel), run as
+	// a live session of SessionType.
+	Interactive bool   `json:"interactive,omitempty"`
+	SessionType string `json:"sessionType,omitempty"`
 }
 
 type AppPort struct {

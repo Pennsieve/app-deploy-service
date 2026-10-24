@@ -245,6 +245,12 @@ components:
                 type: string
             timeoutSeconds:
               type: integer
+            interactive:
+              type: boolean
+              description: A human-in-the-loop app (e.g. a notebook kernel), run as a live session.
+            sessionType:
+              type: string
+              description: The session's kind, e.g. "jupyter" or "r".
         parameters:
           type: array
           items:
