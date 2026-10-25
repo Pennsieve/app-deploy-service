@@ -93,7 +93,7 @@ parameters:
     validValues: [fast, accurate]
 inputs:
   - name: recording
-    formats: [format_3998, http://edamontology.org/format_3961]
+    formats: [format_3590, http://edamontology.org/format_3549]
 outputs:
   - name: spikes
     mediaTypes: [application/vnd.apache.parquet]

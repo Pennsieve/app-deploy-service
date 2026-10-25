@@ -61,7 +61,7 @@ type appMaintainer struct {
 }
 
 // appPort mirrors an entry of app.yml's `inputs` or `outputs`: MIME types,
-// EDAM format ids (format_3998, or its http://edamontology.org/ URI), or
+// EDAM format ids (format_3590, or its http://edamontology.org/ URI), or
 // neither, meaning any file.
 type appPort struct {
 	Name        string   `yaml:"name"`
@@ -226,7 +226,7 @@ func appMaintainers(ms []appMaintainer) []store_dynamodb.AppMaintainer {
 	return out
 }
 
-// edamFormats keeps EDAM format ids short (format_3998), whether written so
+// edamFormats keeps EDAM format ids short (format_3590), whether written so
 // or as their http://edamontology.org/ URI.
 func edamFormats(fs []string) []string {
 	if len(fs) == 0 {
