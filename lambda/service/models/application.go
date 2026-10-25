@@ -204,12 +204,15 @@ type AppMaintainer struct {
 }
 
 // AppPort is an input or output: MIME types, EDAM format ids, or neither
-// (any file).
+// (any file). Container and ConformsTo are omitted when app.yml doesn't set
+// them; no container means file.
 type AppPort struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	MediaTypes  []string `json:"mediaTypes"`
 	Formats     []string `json:"formats,omitempty"`
+	Container   string   `json:"container,omitempty"`
+	ConformsTo  string   `json:"conformsTo,omitempty"`
 }
 
 type AppStoreApplicationDetail struct {

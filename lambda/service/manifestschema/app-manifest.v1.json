@@ -5,32 +5,47 @@
   "description": "What a Pennsieve app is and needs: its metadata, how it runs, its parameters, and what goes in and comes out. Kept at the root of the app's repository as app.yml and read when a release is registered. Version 1 grows only by optional, backward-compatible additions; a breaking change is a new major version (v2.json). Field names follow CodeMeta/schema.org, Boutiques and CWL where they overlap, so a manifest can be translated to them.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["application"],
+  "required": [
+    "application"
+  ],
   "properties": {
     "$schema": {
       "type": "string",
       "description": "The schema this file follows. Prefer the editor comment `# yaml-language-server: $schema=https://schemas.pennsieve.io/app-manifest/v1.json` on the first line."
     },
     "schemaVersion": {
-      "type": ["string", "number"],
+      "type": [
+        "string",
+        "number"
+      ],
       "description": "The manifest format version the file was written for, e.g. \"1.0\". Informational."
     },
-    "application": { "$ref": "#/$defs/application" },
-    "runtime": { "$ref": "#/$defs/runtime" },
+    "application": {
+      "$ref": "#/$defs/application"
+    },
+    "runtime": {
+      "$ref": "#/$defs/runtime"
+    },
     "parameters": {
       "type": "array",
       "description": "The app's parameters, which a workflow sets per step.",
-      "items": { "$ref": "#/$defs/parameter" }
+      "items": {
+        "$ref": "#/$defs/parameter"
+      }
     },
     "inputs": {
       "type": "array",
       "description": "What the app reads.",
-      "items": { "$ref": "#/$defs/port" }
+      "items": {
+        "$ref": "#/$defs/port"
+      }
     },
     "outputs": {
       "type": "array",
       "description": "What the app writes.",
-      "items": { "$ref": "#/$defs/port" }
+      "items": {
+        "$ref": "#/$defs/port"
+      }
     },
     "commandArguments": {
       "type": "array",
@@ -43,7 +58,9 @@
       "type": "object",
       "description": "What the app is (CodeMeta/schema.org SoftwareSourceCode terms). Its version comes from the release tag, its repository from where it's registered, and its license from the repository's LICENSE file, so none of those are declared here.",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -60,38 +77,60 @@
         },
         "type": {
           "type": "string",
-          "enum": ["processor"],
+          "enum": [
+            "processor"
+          ],
           "description": "The role the app plays in a workflow. Only \"processor\" today."
         },
         "version": {
-          "type": ["string", "number"],
+          "type": [
+            "string",
+            "number"
+          ],
           "description": "Optional and informational: the version Pennsieve shows is the release tag."
         },
         "maintainers": {
           "type": "array",
           "description": "Who maintains the app (schema.org maintainer).",
-          "items": { "$ref": "#/$defs/maintainer" }
+          "items": {
+            "$ref": "#/$defs/maintainer"
+          }
         },
         "tags": {
           "type": "array",
           "description": "Keywords (schema.org keywords) that say what the app is for, e.g. eeg, spikes, visualization. A known subject or task places the app in the Gallery's colours and filters.",
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "categories": {
           "type": "array",
           "deprecated": true,
           "description": "Deprecated: use tags. Older manifests' categories are read as tags.",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
     "maintainer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "description": "The maintainer's name." },
-        "email": { "type": "string", "format": "email", "description": "How to reach them." },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The maintainer's name."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "How to reach them."
+        },
         "orcid": {
           "type": "string",
           "pattern": "^(https://orcid\\.org/)?\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]$",
@@ -119,7 +158,14 @@
           "minItems": 1,
           "uniqueItems": true,
           "description": "The compute the app can run on: standard (a container), lambda, or gpu. Default: [standard].",
-          "items": { "type": "string", "enum": ["standard", "lambda", "gpu"] }
+          "items": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "lambda",
+              "gpu"
+            ]
+          }
         },
         "timeoutSeconds": {
           "type": "integer",
@@ -132,12 +178,17 @@
         },
         "sessionType": {
           "type": "string",
-          "enum": ["jupyter"],
+          "enum": [
+            "jupyter"
+          ],
           "description": "The kind of live session. \"jupyter\" is a Jupyter notebook. Needs interactive: true."
         },
         "kernel": {
           "type": "string",
-          "enum": ["python", "r"],
+          "enum": [
+            "python",
+            "r"
+          ],
           "description": "A Jupyter notebook's language. Needs sessionType: jupyter."
         },
         "gpu": {
@@ -147,27 +198,72 @@
       },
       "allOf": [
         {
-          "if": { "required": ["sessionType"] },
-          "then": { "required": ["interactive"], "properties": { "interactive": { "const": true } } }
+          "if": {
+            "required": [
+              "sessionType"
+            ]
+          },
+          "then": {
+            "required": [
+              "interactive"
+            ],
+            "properties": {
+              "interactive": {
+                "const": true
+              }
+            }
+          }
         },
         {
-          "if": { "required": ["sessionType"], "properties": { "sessionType": { "const": "jupyter" } } },
-          "then": { "required": ["kernel"] }
+          "if": {
+            "required": [
+              "sessionType"
+            ],
+            "properties": {
+              "sessionType": {
+                "const": "jupyter"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "kernel"
+            ]
+          }
         },
         {
-          "if": { "required": ["kernel"] },
-          "then": { "required": ["sessionType"], "properties": { "sessionType": { "const": "jupyter" } } }
+          "if": {
+            "required": [
+              "kernel"
+            ]
+          },
+          "then": {
+            "required": [
+              "sessionType"
+            ],
+            "properties": {
+              "sessionType": {
+                "const": "jupyter"
+              }
+            }
+          }
         }
       ]
     },
     "scalar": {
-      "type": ["string", "number", "boolean"]
+      "type": [
+        "string",
+        "number",
+        "boolean"
+      ]
     },
     "parameter": {
       "type": "object",
       "description": "One parameter. Types are JSON Schema's; they correspond to Boutiques String/Number/Flag and CWL string/float/int/boolean. A choice is a string (or number) with validValues.",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -176,11 +272,22 @@
         },
         "type": {
           "type": "string",
-          "enum": ["string", "number", "integer", "boolean"],
+          "enum": [
+            "string",
+            "number",
+            "integer",
+            "boolean"
+          ],
           "description": "string, number, integer or boolean. Default: string."
         },
-        "label": { "type": "string", "description": "A short display name." },
-        "description": { "type": "string", "description": "What it does." },
+        "label": {
+          "type": "string",
+          "description": "A short display name."
+        },
+        "description": {
+          "type": "string",
+          "description": "What it does."
+        },
         "required": {
           "type": "boolean",
           "description": "Whether a run must set it. Default: required when it has no defaultValue."
@@ -193,31 +300,72 @@
           "type": "array",
           "minItems": 1,
           "description": "The values it may take, making it a choice.",
-          "items": { "$ref": "#/$defs/scalar" }
+          "items": {
+            "$ref": "#/$defs/scalar"
+          }
         },
-        "min": { "type": "number", "description": "For a number or integer: the smallest value." },
-        "max": { "type": "number", "description": "For a number or integer: the largest value." }
+        "min": {
+          "type": "number",
+          "description": "For a number or integer: the smallest value."
+        },
+        "max": {
+          "type": "number",
+          "description": "For a number or integer: the largest value."
+        }
       }
     },
     "port": {
       "type": "object",
-      "description": "An input or output. Without mediaTypes or formats it accepts any file.",
+      "description": "An input or output. Without mediaTypes, formats or conformsTo it accepts any file.",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "description": "Its name." },
-        "description": { "type": "string", "description": "What it is." },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Its name."
+        },
+        "description": {
+          "type": "string",
+          "description": "What it is."
+        },
         "mediaTypes": {
           "type": "array",
           "description": "The MIME types it takes or makes, e.g. application/x-rds.",
-          "items": { "type": "string", "pattern": "^[\\w.+-]+/[\\w.+-]+$" }
+          "items": {
+            "type": "string",
+            "pattern": "^[\\w.+-]+/[\\w.+-]+$"
+          }
         },
         "formats": {
           "type": "array",
           "description": "EDAM format identifiers (https://edamontology.org/page), for scientific formats without a MIME type, e.g. format_3590 (HDF5) or http://edamontology.org/format_3549 (NIfTI-1). EDAM has no id for some formats (EDF, NWB, MEF3); use mediaTypes for those.",
-          "items": { "type": "string", "pattern": "^(http://edamontology\\.org/)?format_\\d{4}$" }
+          "items": {
+            "type": "string",
+            "pattern": "^(http://edamontology\\.org/)?format_\\d{4}$"
+          }
         },
-        "required": { "type": "boolean", "description": "Whether a run must give it something." },
+        "container": {
+          "type": "string",
+          "enum": [
+            "file",
+            "directory",
+            "archive"
+          ],
+          "default": "file",
+          "description": "How the app reads or writes it. file: one file per package (the default). directory: the platform unpacks a folder format (e.g. OME-Zarr) into a folder before the step and packs the folder it writes after. archive: the app works with the zipped form (.ozx, .ts.zarr.zip) itself."
+        },
+        "conformsTo": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*(@[0-9A-Za-z.+-]+)?$",
+          "description": "A folder structure from the Pennsieve format registry that the whole input follows, or that the app writes, with an optional version: e.g. bids or bids@1.9. The input is given as a folder tree with its paths kept."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether a run must give it something."
+        },
         "dataType": {
           "type": "string",
           "deprecated": true,

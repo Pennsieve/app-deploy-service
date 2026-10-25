@@ -62,12 +62,15 @@ type appMaintainer struct {
 
 // appPort mirrors an entry of app.yml's `inputs` or `outputs`: MIME types,
 // EDAM format ids (format_3590, or its http://edamontology.org/ URI), or
-// neither, meaning any file.
+// neither, meaning any file. Container says whether the app wants a folder
+// format as a folder or its zip; ConformsTo names a folder structure (bids@1.9).
 type appPort struct {
 	Name        string   `yaml:"name"`
 	Description string   `yaml:"description"`
 	MediaTypes  []string `yaml:"mediaTypes"`
 	Formats     []string `yaml:"formats"`
+	Container   string   `yaml:"container"`
+	ConformsTo  string   `yaml:"conformsTo"`
 }
 
 // appParameter mirrors a single entry of app.yml's `parameters` list.
@@ -205,7 +208,8 @@ func appPorts(ports []appPort) []store_dynamodb.AppPort {
 		if p.Name == "" {
 			continue
 		}
-		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes, Formats: edamFormats(p.Formats)})
+		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes, Formats: edamFormats(p.Formats),
+			Container: strings.TrimSpace(p.Container), ConformsTo: strings.TrimSpace(p.ConformsTo)})
 	}
 	return out
 }

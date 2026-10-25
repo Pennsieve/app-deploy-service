@@ -85,6 +85,37 @@ outputs:
 	}
 }
 
+func TestAppManifestKeepsFolderFormatsAndStructures(t *testing.T) {
+	yml := []byte(`application:
+  name: Segment
+inputs:
+  - name: images
+    mediaTypes: [application/vnd.pennsieve.ome-zarr]
+    container: directory
+  - name: study
+    conformsTo: bids@1.9
+outputs:
+  - name: labels
+`)
+	if ps := manifestProblems(yml); len(ps) != 0 {
+		t.Fatalf("valid manifest: %v", ps)
+	}
+	c, err := parseAppConfig(yml)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := appManifest(c)
+	if m.Inputs[0].Container != "directory" || m.Inputs[0].ConformsTo != "" {
+		t.Errorf("images = %+v", m.Inputs[0])
+	}
+	if m.Inputs[1].ConformsTo != "bids@1.9" || m.Inputs[1].Container != "" {
+		t.Errorf("study = %+v", m.Inputs[1])
+	}
+	if m.Outputs[0].Container != "" || m.Outputs[0].ConformsTo != "" {
+		t.Errorf("a plain output = %+v", m.Outputs[0])
+	}
+}
+
 func TestManifestProblemsAndMode(t *testing.T) {
 	if ps := manifestProblems([]byte("application:\n  name: a\n")); len(ps) != 0 {
 		t.Errorf("valid manifest: %v", ps)
