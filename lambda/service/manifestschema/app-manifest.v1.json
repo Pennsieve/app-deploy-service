@@ -351,11 +351,10 @@
           "type": "string",
           "enum": [
             "file",
-            "directory",
-            "archive"
+            "directory"
           ],
           "default": "file",
-          "description": "How the app reads or writes it. file: one file per package (the default). directory: the platform unpacks a folder format (e.g. OME-Zarr) into a folder before the step and packs the folder it writes after. archive: the app works with the zipped form (.ozx, .ts.zarr.zip) itself."
+          "description": "How the app gets it, or writes it. file (the default): the package as stored; for a folder format such as OME-Zarr that's its zip (.ozx, .ts.zarr.zip). directory: the platform unpacks the folder before the step, and packs the folder the app writes after it."
         },
         "conformsTo": {
           "type": "string",

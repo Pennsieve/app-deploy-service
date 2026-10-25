@@ -164,7 +164,7 @@ type AppMaintainer struct {
 
 // AppPort is one of a version's declared inputs or outputs: by MIME type,
 // by EDAM format id (format_3590), or neither, meaning any file. Container
-// (file, directory or archive) and ConformsTo (a folder structure such as
+// (file or directory) and ConformsTo (a folder structure such as
 // bids@1.9) are empty when app.yml doesn't set them.
 type AppPort struct {
 	Name        string   `dynamodbav:"name"`
