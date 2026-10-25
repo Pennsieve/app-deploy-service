@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/pennsieve/app-deploy-service/service/mappers"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/stretchr/testify/assert"
 )
@@ -252,6 +253,17 @@ func TestAppManifest_Interactive(t *testing.T) {
 
 	c, _ = parseAppConfig([]byte("runtime:\n  interactive: true\n"))
 	assert.True(t, appManifest(c).Runtime.Interactive)
+}
+
+// A notebook's language is its own field, next to the session type.
+func TestAppManifest_Kernel(t *testing.T) {
+	c, err := parseAppConfig([]byte("runtime:\n  interactive: true\n  sessionType: jupyter\n  kernel: r\n"))
+	assert.NoError(t, err)
+	m := appManifest(c)
+	assert.True(t, m.Runtime.Interactive)
+	assert.Equal(t, "jupyter", m.Runtime.SessionType)
+	assert.Equal(t, "r", m.Runtime.Kernel)
+	assert.Equal(t, "r", mappers.AppManifestToModel(m).Runtime.Kernel, "the API returns it too")
 }
 
 func TestAppManifest_Minimal(t *testing.T) {

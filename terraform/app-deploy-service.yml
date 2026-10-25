@@ -250,7 +250,10 @@ components:
               description: A human-in-the-loop app (e.g. a notebook kernel), run as a live session.
             sessionType:
               type: string
-              description: The session's kind, e.g. "jupyter" or "r".
+              description: The session's kind; "jupyter" is a notebook.
+            kernel:
+              type: string
+              description: A Jupyter session's language, e.g. "python" or "r".
         parameters:
           type: array
           items:

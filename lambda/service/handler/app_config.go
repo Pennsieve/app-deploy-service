@@ -33,10 +33,12 @@ type appConfig struct {
 		Memory         int      `yaml:"memory"`
 		ComputeTypes   []string `yaml:"computeTypes"`
 		TimeoutSeconds int      `yaml:"timeoutSeconds"`
-		// Interactive: a human-in-the-loop app (e.g. a notebook kernel), run
-		// as a live session of SessionType ("jupyter", "r").
+		// Interactive: a human-in-the-loop app, run as a live session of
+		// SessionType ("jupyter" is a notebook); Kernel is a Jupyter
+		// session's language ("python", "r").
 		Interactive bool   `yaml:"interactive"`
 		SessionType string `yaml:"sessionType"`
+		Kernel      string `yaml:"kernel"`
 	} `yaml:"runtime"`
 	Parameters []appParameter `yaml:"parameters"`
 	Inputs     []appPort      `yaml:"inputs"`
@@ -166,6 +168,7 @@ func appManifest(c appConfig) *store_dynamodb.AppManifest {
 			TimeoutSeconds: c.Runtime.TimeoutSeconds,
 			Interactive:    c.Runtime.Interactive || c.Runtime.SessionType != "",
 			SessionType:    c.Runtime.SessionType,
+			Kernel:         c.Runtime.Kernel,
 		},
 		Parameters: appParameters(c),
 		Inputs:     appPorts(c.Inputs),
