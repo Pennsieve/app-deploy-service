@@ -66,7 +66,7 @@ func TestAppManifestKeepsMaintainersAndFormats(t *testing.T) {
     - name: ""
 inputs:
   - name: recording
-    formats: [http://edamontology.org/format_3998, format_3961]
+    formats: [http://edamontology.org/format_3590, format_3549]
 outputs:
   - name: anything
 `))
@@ -77,7 +77,7 @@ outputs:
 	if len(m.Maintainers) != 1 || m.Maintainers[0].Orcid != "0000-0002-1825-0097" || m.Maintainers[0].Email != "ada@example.org" {
 		t.Errorf("maintainers = %+v", m.Maintainers)
 	}
-	if got := m.Inputs[0].Formats; !reflect.DeepEqual(got, []string{"format_3998", "format_3961"}) {
+	if got := m.Inputs[0].Formats; !reflect.DeepEqual(got, []string{"format_3590", "format_3549"}) {
 		t.Errorf("formats = %v", got)
 	}
 	if m.Outputs[0].Formats != nil || m.Outputs[0].MediaTypes != nil {

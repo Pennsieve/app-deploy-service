@@ -163,7 +163,7 @@ type AppMaintainer struct {
 }
 
 // AppPort is one of a version's declared inputs or outputs: by MIME type,
-// by EDAM format id (format_3998), or neither, meaning any file.
+// by EDAM format id (format_3590), or neither, meaning any file.
 type AppPort struct {
 	Name        string   `dynamodbav:"name"`
 	Description string   `dynamodbav:"description,omitempty"`

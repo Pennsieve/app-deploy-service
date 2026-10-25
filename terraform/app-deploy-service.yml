@@ -314,7 +314,7 @@ components:
             type: string
         formats:
           type: array
-          description: EDAM format ids (e.g. format_3998). With no mediaTypes or formats, any file.
+          description: EDAM format ids (e.g. format_3590). With no mediaTypes or formats, any file.
           items:
             type: string
     AppStoreApplication:
