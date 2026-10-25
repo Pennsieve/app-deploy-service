@@ -66,3 +66,20 @@ func TestAppStoreVersionToModel_Manifest(t *testing.T) {
 	assert.Equal(t, []string{}, m.Inputs[0].MediaTypes)
 	assert.Equal(t, []models.AppPort{}, m.Outputs)
 }
+
+func TestAppStoreVersionToModel_LicenseProblemsMaintainersFormats(t *testing.T) {
+	v := store_dynamodb.AppStoreVersion{
+		Uuid:             "v1",
+		License:          "MIT",
+		ManifestProblems: []string{"/runtime: missing property 'kernel'"},
+		Manifest: &store_dynamodb.AppManifest{
+			Maintainers: []store_dynamodb.AppMaintainer{{Name: "Ada", Orcid: "0000-0002-1825-0097"}},
+			Inputs:      []store_dynamodb.AppPort{{Name: "recording", Formats: []string{"format_3998"}}},
+		},
+	}
+	m := AppStoreVersionToModel(v)
+	assert.Equal(t, "MIT", m.License)
+	assert.Equal(t, v.ManifestProblems, m.ManifestProblems)
+	assert.Equal(t, []models.AppMaintainer{{Name: "Ada", Orcid: "0000-0002-1825-0097"}}, m.Manifest.Maintainers)
+	assert.Equal(t, []string{"format_3998"}, m.Manifest.Inputs[0].Formats)
+}

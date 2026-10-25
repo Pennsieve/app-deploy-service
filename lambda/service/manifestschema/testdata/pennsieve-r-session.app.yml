@@ -1,0 +1,23 @@
+# What this app is, for the app store and the workflow builder.
+application:
+  name: R notebook
+  description: A live R session on the files you select. You work in it in your browser; the workflow waits until you close the session.
+  tags: [notebook, interactive, r]
+
+runtime:
+  # A live session, not a batch step: the workflow pauses while it runs and
+  # the user reaches it through the auth proxy.
+  interactive: true
+  # The kind of live session (jupyter: a notebook; this is JupyterLab with
+  # IRkernel), and the notebook's language.
+  sessionType: jupyter
+  kernel: r
+  computeTypes: [standard]
+
+inputs:
+  - name: files
+    description: Files to open in the session, staged under input/
+
+outputs:
+  - name: files
+    description: Whatever the session writes under output/

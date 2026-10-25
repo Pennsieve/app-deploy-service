@@ -54,6 +54,9 @@ resource "aws_lambda_function" "service_lambda" {
       // wrapped in try(): a missing output must fail the plan, not every
       // workspace check.
       DIRECT_AUTHORIZER_LAMBDA_NAME = data.terraform_remote_state.api_gateway.outputs.direct_authorizer_lambda_name
+      // How a release whose app.yml doesn't follow its schema is treated:
+      // warn (record the problems on the version) or enforce (refuse it).
+      APP_MANIFEST_VALIDATION = var.app_manifest_validation
     }
   }
 }

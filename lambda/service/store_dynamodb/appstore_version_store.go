@@ -3,6 +3,7 @@ package store_dynamodb
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -27,6 +28,7 @@ type AppStoreVersionDBStore interface {
 	Insert(context.Context, AppStoreVersion) error
 	UpdateStatus(ctx context.Context, newStatus string, uuid string) error
 	SetManifest(ctx context.Context, uuid string, manifest *AppManifest) error
+	SetRegistrationDetails(ctx context.Context, uuid string, license string, manifestProblems []string) error
 }
 
 type AppStoreVersionDatabaseStore struct {
@@ -149,6 +151,53 @@ func (r *AppStoreVersionDatabaseStore) UpdateStatus(ctx context.Context, newStat
 		return fmt.Errorf("error updating appstore version status: %w", err)
 	}
 
+	return nil
+}
+
+// SetRegistrationDetails records what registration learned about a version
+// besides its manifest: the repository's license and how its app.yml doesn't
+// follow the schema. Empty values remove the attributes.
+func (r *AppStoreVersionDatabaseStore) SetRegistrationDetails(ctx context.Context, uuid string, license string, manifestProblems []string) error {
+	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: uuid})
+	if err != nil {
+		return fmt.Errorf("error marshaling key for appstore version details: %w", err)
+	}
+	values := map[string]types.AttributeValue{}
+	var set, remove []string
+	if license != "" {
+		values[":l"] = &types.AttributeValueMemberS{Value: license}
+		set = append(set, "license = :l")
+	} else {
+		remove = append(remove, "license")
+	}
+	if len(manifestProblems) > 0 {
+		v, err := attributevalue.Marshal(manifestProblems)
+		if err != nil {
+			return fmt.Errorf("error marshaling manifest problems: %w", err)
+		}
+		values[":p"] = v
+		set = append(set, "manifestProblems = :p")
+	} else {
+		remove = append(remove, "manifestProblems")
+	}
+	expr := ""
+	if len(set) > 0 {
+		expr = "set " + strings.Join(set, ", ")
+	}
+	if len(remove) > 0 {
+		expr = strings.TrimSpace(expr + " remove " + strings.Join(remove, ", "))
+	}
+	in := &dynamodb.UpdateItemInput{
+		TableName:        aws.String(r.TableName),
+		Key:              key,
+		UpdateExpression: aws.String(expr),
+	}
+	if len(values) > 0 {
+		in.ExpressionAttributeValues = values
+	}
+	if _, err := r.api.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("error setting appstore version details: %w", err)
+	}
 	return nil
 }
 

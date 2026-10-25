@@ -18,7 +18,9 @@ require (
 	github.com/pennsieve/github-client v0.0.1
 	github.com/pennsieve/pennsieve-go-core v1.21.0
 	github.com/pusher/pusher-http-go/v5 v5.1.1
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/stretchr/testify v1.12.1
+	golang.org/x/text v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

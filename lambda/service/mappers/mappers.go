@@ -130,13 +130,15 @@ func AppStoreAppsToModels(apps []store_dynamodb.AppStoreApplication) []models.Ap
 
 func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVersion {
 	return models.AppStoreVersion{
-		Uuid:          v.Uuid,
-		ApplicationId: v.ApplicationId,
-		Version:       v.Version,
-		ReleaseId:     v.ReleaseId,
-		CreatedAt:     v.CreatedAt,
-		Status:        v.Status,
-		Manifest:      AppManifestToModel(v.Manifest),
+		Uuid:             v.Uuid,
+		ApplicationId:    v.ApplicationId,
+		Version:          v.Version,
+		ReleaseId:        v.ReleaseId,
+		CreatedAt:        v.CreatedAt,
+		Status:           v.Status,
+		Manifest:         AppManifestToModel(v.Manifest),
+		ManifestProblems: v.ManifestProblems,
+		License:          v.License,
 	}
 }
 
@@ -152,6 +154,7 @@ func AppManifestToModel(m *store_dynamodb.AppManifest) *models.AppManifest {
 		Name:        m.Name,
 		Description: m.Description,
 		Tags:        m.Tags,
+		Maintainers: appMaintainersToModels(m.Maintainers),
 		Runtime: models.AppRuntime{
 			CPU:            m.Runtime.CPU,
 			Memory:         m.Runtime.Memory,
@@ -174,7 +177,18 @@ func appPortsToModels(ports []store_dynamodb.AppPort) []models.AppPort {
 		if media == nil {
 			media = []string{}
 		}
-		out = append(out, models.AppPort{Name: p.Name, Description: p.Description, MediaTypes: media})
+		out = append(out, models.AppPort{Name: p.Name, Description: p.Description, MediaTypes: media, Formats: p.Formats})
+	}
+	return out
+}
+
+func appMaintainersToModels(ms []store_dynamodb.AppMaintainer) []models.AppMaintainer {
+	if len(ms) == 0 {
+		return nil
+	}
+	out := make([]models.AppMaintainer, 0, len(ms))
+	for _, m := range ms {
+		out = append(out, models.AppMaintainer{Name: m.Name, Email: m.Email, Orcid: m.Orcid})
 	}
 	return out
 }

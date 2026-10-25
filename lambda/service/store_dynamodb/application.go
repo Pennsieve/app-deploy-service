@@ -119,17 +119,24 @@ type AppStoreVersion struct {
 	// Manifest is this version's app.yml, parsed at registration; nil for an
 	// app without one, or a version registered before manifests were kept.
 	Manifest *AppManifest `dynamodbav:"manifest,omitempty"`
+	// ManifestProblems is how the app.yml doesn't follow its schema
+	// (manifestschema), one "path: reason" each, as found at registration.
+	ManifestProblems []string `dynamodbav:"manifestProblems,omitempty"`
+	// License is the repository's license (its SPDX id) at this version, as
+	// GitHub reads its LICENSE file; empty when there's none or it's unknown.
+	License string `dynamodbav:"license,omitempty"`
 }
 
 // AppManifest is a version's app.yml as stored.
 type AppManifest struct {
-	Name        string         `dynamodbav:"name,omitempty"`
-	Description string         `dynamodbav:"description,omitempty"`
-	Tags        []string       `dynamodbav:"tags,omitempty"`
-	Runtime     AppRuntime     `dynamodbav:"runtime"`
-	Parameters  []AppParameter `dynamodbav:"parameters,omitempty"`
-	Inputs      []AppPort      `dynamodbav:"inputs,omitempty"`
-	Outputs     []AppPort      `dynamodbav:"outputs,omitempty"`
+	Name        string          `dynamodbav:"name,omitempty"`
+	Description string          `dynamodbav:"description,omitempty"`
+	Tags        []string        `dynamodbav:"tags,omitempty"`
+	Maintainers []AppMaintainer `dynamodbav:"maintainers,omitempty"`
+	Runtime     AppRuntime      `dynamodbav:"runtime"`
+	Parameters  []AppParameter  `dynamodbav:"parameters,omitempty"`
+	Inputs      []AppPort       `dynamodbav:"inputs,omitempty"`
+	Outputs     []AppPort       `dynamodbav:"outputs,omitempty"`
 }
 
 // AppRuntime is what a version asks for to run: CPU units and MiB, the
@@ -147,11 +154,21 @@ type AppRuntime struct {
 	Kernel      string `dynamodbav:"kernel,omitempty"`
 }
 
-// AppPort is one of a version's declared inputs or outputs.
+// AppMaintainer is one of the people maintaining an app; Orcid is the bare
+// iD (0000-0002-1825-0097).
+type AppMaintainer struct {
+	Name  string `dynamodbav:"name"`
+	Email string `dynamodbav:"email,omitempty"`
+	Orcid string `dynamodbav:"orcid,omitempty"`
+}
+
+// AppPort is one of a version's declared inputs or outputs: by MIME type,
+// by EDAM format id (format_3998), or neither, meaning any file.
 type AppPort struct {
 	Name        string   `dynamodbav:"name"`
 	Description string   `dynamodbav:"description,omitempty"`
 	MediaTypes  []string `dynamodbav:"mediaTypes,omitempty"`
+	Formats     []string `dynamodbav:"formats,omitempty"`
 }
 
 func (i AppStoreVersion) GetKey() map[string]types.AttributeValue {
