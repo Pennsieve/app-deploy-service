@@ -161,18 +161,25 @@ type AppStoreVersion struct {
 	Deployments   []Deployment `json:"deployments"`
 	// Manifest is this version's app.yml; absent for an app without one.
 	Manifest *AppManifest `json:"manifest,omitempty"`
+	// ManifestProblems: how its app.yml doesn't follow the schema, as found
+	// at registration ("path: reason" each).
+	ManifestProblems []string `json:"manifestProblems,omitempty"`
+	// License: the repository's license at this version (an SPDX id, from its
+	// LICENSE file); absent when there's none or it's unknown.
+	License string `json:"license,omitempty"`
 }
 
 // AppManifest is a version's app.yml: what the app is, what it asks for, its
 // parameters, and what goes in and out.
 type AppManifest struct {
-	Name        string         `json:"name,omitempty"`
-	Description string         `json:"description,omitempty"`
-	Tags        []string       `json:"tags,omitempty"`
-	Runtime     AppRuntime     `json:"runtime"`
-	Parameters  []AppParameter `json:"parameters"`
-	Inputs      []AppPort      `json:"inputs"`
-	Outputs     []AppPort      `json:"outputs"`
+	Name        string          `json:"name,omitempty"`
+	Description string          `json:"description,omitempty"`
+	Tags        []string        `json:"tags,omitempty"`
+	Maintainers []AppMaintainer `json:"maintainers,omitempty"`
+	Runtime     AppRuntime      `json:"runtime"`
+	Parameters  []AppParameter  `json:"parameters"`
+	Inputs      []AppPort       `json:"inputs"`
+	Outputs     []AppPort       `json:"outputs"`
 }
 
 // AppRuntime: CPU units and MiB, compute types and timeout; 0 or empty when
@@ -190,10 +197,19 @@ type AppRuntime struct {
 	Kernel      string `json:"kernel,omitempty"`
 }
 
+type AppMaintainer struct {
+	Name  string `json:"name"`
+	Email string `json:"email,omitempty"`
+	Orcid string `json:"orcid,omitempty"`
+}
+
+// AppPort is an input or output: MIME types, EDAM format ids, or neither
+// (any file).
 type AppPort struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description,omitempty"`
 	MediaTypes  []string `json:"mediaTypes"`
+	Formats     []string `json:"formats,omitempty"`
 }
 
 type AppStoreApplicationDetail struct {

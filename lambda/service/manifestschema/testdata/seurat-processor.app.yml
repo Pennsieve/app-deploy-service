@@ -1,0 +1,55 @@
+schemaVersion: 1.0.0
+application:
+  name: Seurat Processor
+  description: Processes Seurat Objects (.rds) and exports UMAP embeddings, metadata, and gene expression data to Parquet files for web visualization.
+  type: processor
+  tags:
+    - single-cell
+    - scrna-seq
+    - visualization
+    - seurat
+runtime:
+  cpu: 4096
+  memory: 65536
+  computeTypes:
+    - standard
+parameters:
+  - name: OUTPUT_MODE
+    type: string
+    description: Output mode - "expanded" for multi-file parquet (PrecisionDashWidgets) or "consolidated" for single results.parquet (legacy)
+    defaultValue: expanded
+  - name: CHUNK_SIZE
+    type: number
+    description: Number of genes per chunk file
+    defaultValue: 500
+  - name: LINK_PEAKS
+    type: string
+    description: Compute peak-gene links for multiome datasets ("true" or "false")
+    defaultValue: "true"
+  - name: LINK_GENES
+    type: string
+    description: Genes to always link, comma-separated (e.g. SCN10A,TAC1). These are linked first
+    defaultValue: ""
+    required: false
+  - name: LINK_MAX_GENES
+    type: number
+    description: Link the N most variable genes (0 = all). About 50 minutes per 1000 genes on a large dataset
+    defaultValue: 5000
+  - name: LINK_BATCH_SIZE
+    type: number
+    description: Genes per linking batch (progress is logged after each batch)
+    defaultValue: 1000
+  - name: LINK_MAX_MINUTES
+    type: number
+    description: Stop linking after this many minutes and keep the links found so far (0 = no limit)
+    defaultValue: 0
+inputs:
+  - name: seurat-object
+    description: A Seurat object saved with saveRDS (.rds).
+    mediaTypes:
+      - application/x-rds
+outputs:
+  - name: parquet
+    description: UMAP embeddings, cell metadata and gene expression as Parquet files, for the UMAP viewer.
+    mediaTypes:
+      - application/vnd.apache.parquet

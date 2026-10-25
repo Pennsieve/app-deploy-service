@@ -61,6 +61,9 @@ func (f *fakeVersions) SetManifest(_ context.Context, uuid string, m *store_dyna
 	f.manifests[uuid] = m
 	return nil
 }
+func (f *fakeVersions) SetRegistrationDetails(context.Context, string, string, []string) error {
+	return nil
+}
 
 func TestBackfillManifests(t *testing.T) {
 	apps := &fakeApps{

@@ -47,16 +47,27 @@ type appConfig struct {
 
 // appInfo is what the app is, under `application:`.
 type appInfo struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description"`
-	Tags        []string `yaml:"tags"`
+	Name        string          `yaml:"name"`
+	Description string          `yaml:"description"`
+	Tags        []string        `yaml:"tags"`
+	Maintainers []appMaintainer `yaml:"maintainers"`
 }
 
-// appPort mirrors an entry of app.yml's `inputs` or `outputs`.
+// appMaintainer is one of `application.maintainers`.
+type appMaintainer struct {
+	Name  string `yaml:"name"`
+	Email string `yaml:"email"`
+	Orcid string `yaml:"orcid"`
+}
+
+// appPort mirrors an entry of app.yml's `inputs` or `outputs`: MIME types,
+// EDAM format ids (format_3998, or its http://edamontology.org/ URI), or
+// neither, meaning any file.
 type appPort struct {
 	Name        string   `yaml:"name"`
 	Description string   `yaml:"description"`
 	MediaTypes  []string `yaml:"mediaTypes"`
+	Formats     []string `yaml:"formats"`
 }
 
 // appParameter mirrors a single entry of app.yml's `parameters` list.
@@ -101,9 +112,24 @@ func buildStorageGiB(c appConfig) int32 {
 // or malformed YAML — so a missing or malformed app.yml never blocks a
 // deployment nor overwrites previously stored values.
 func readSyncedAppConfig(ctx context.Context, cfg aws.Config, sourceUrl string, tag string) (appConfig, bool) {
+	data, ok := readSyncedAppYml(ctx, cfg, sourceUrl, tag)
+	if !ok {
+		return appConfig{}, false
+	}
+	c, err := parseAppConfig(data)
+	if err != nil {
+		log.Printf("warning: unable to parse the app.yml of %s %s: %v", sourceUrl, tag, err)
+		return appConfig{}, false
+	}
+	return c, true
+}
+
+// readSyncedAppYml reads the synced app.yml's text from S3; false when there's
+// none (or it can't be read).
+func readSyncedAppYml(ctx context.Context, cfg aws.Config, sourceUrl string, tag string) ([]byte, bool) {
 	bucket := os.Getenv("CONTENT_SYNC_BUCKET")
 	if bucket == "" {
-		return appConfig{}, false
+		return nil, false
 	}
 	if tag == "" {
 		tag = "main"
@@ -117,16 +143,9 @@ func readSyncedAppConfig(ctx context.Context, cfg aws.Config, sourceUrl string, 
 	data, _, err := dest.Read(ctx, key)
 	if err != nil {
 		log.Printf("warning: unable to read %s: %v", key, err)
-		return appConfig{}, false
+		return nil, false
 	}
-
-	c, err := parseAppConfig(data)
-	if err != nil {
-		log.Printf("warning: unable to parse %s: %v", key, err)
-		return appConfig{}, false
-	}
-
-	return c, true
+	return data, true
 }
 
 // appParameters maps the parsed app.yml parameter declarations onto the stored
@@ -161,6 +180,7 @@ func appManifest(c appConfig) *store_dynamodb.AppManifest {
 		Name:        c.Application.Name,
 		Description: c.Application.Description,
 		Tags:        c.Application.Tags,
+		Maintainers: appMaintainers(c.Application.Maintainers),
 		Runtime: store_dynamodb.AppRuntime{
 			CPU:            c.Runtime.CPU,
 			Memory:         c.Runtime.Memory,
@@ -185,7 +205,38 @@ func appPorts(ports []appPort) []store_dynamodb.AppPort {
 		if p.Name == "" {
 			continue
 		}
-		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes})
+		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes, Formats: edamFormats(p.Formats)})
+	}
+	return out
+}
+
+// appMaintainers keeps the named maintainers, each ORCID as its bare iD.
+func appMaintainers(ms []appMaintainer) []store_dynamodb.AppMaintainer {
+	var out []store_dynamodb.AppMaintainer
+	for _, m := range ms {
+		if strings.TrimSpace(m.Name) == "" {
+			continue
+		}
+		out = append(out, store_dynamodb.AppMaintainer{
+			Name:  strings.TrimSpace(m.Name),
+			Email: strings.TrimSpace(m.Email),
+			Orcid: strings.TrimPrefix(strings.TrimSpace(m.Orcid), "https://orcid.org/"),
+		})
+	}
+	return out
+}
+
+// edamFormats keeps EDAM format ids short (format_3998), whether written so
+// or as their http://edamontology.org/ URI.
+func edamFormats(fs []string) []string {
+	if len(fs) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(fs))
+	for _, f := range fs {
+		if f = strings.TrimPrefix(strings.TrimSpace(f), "http://edamontology.org/"); f != "" {
+			out = append(out, f)
+		}
 	}
 	return out
 }

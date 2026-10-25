@@ -321,3 +321,16 @@ func TestAppStoreVersion_ManifestRoundTrip(t *testing.T) {
 	_, has := noManifest["manifest"]
 	assert.False(t, has, "a version without app.yml stores no manifest")
 }
+
+func TestAppStoreVersionDatabaseStore_SetRegistrationDetails(t *testing.T) {
+	api := &ArgCaptureAppStoreVersionTableAPI{}
+	store := NewAppStoreVersionDatabaseStore(api, "versions")
+
+	assert.NoError(t, store.SetRegistrationDetails(context.Background(), "v1", "MIT", []string{"/runtime: x"}))
+	assert.Equal(t, "set license = :l, manifestProblems = :p", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "MIT"}, api.UpdateItemInput.ExpressionAttributeValues[":l"])
+
+	assert.NoError(t, store.SetRegistrationDetails(context.Background(), "v1", "", nil))
+	assert.Equal(t, "remove license, manifestProblems", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	assert.Nil(t, api.UpdateItemInput.ExpressionAttributeValues)
+}

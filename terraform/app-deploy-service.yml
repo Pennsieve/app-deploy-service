@@ -218,6 +218,14 @@ components:
             $ref: '#/components/schemas/Deployment'
         manifest:
           $ref: '#/components/schemas/AppManifest'
+        manifestProblems:
+          type: array
+          description: "How the version's app.yml doesn't follow https://schemas.pennsieve.io/app-manifest/v1.json, as found at registration, one 'path: reason' each. Absent when it follows it."
+          items:
+            type: string
+        license:
+          type: string
+          description: The repository's license at this version, an SPDX id (e.g. "MIT"), as GitHub reads its LICENSE file. Absent when there's none or it's unknown.
     AppManifest:
       type: object
       description: The version's app.yml, parsed when it was registered. Absent for an app without an app.yml.
@@ -230,6 +238,18 @@ components:
           type: array
           items:
             type: string
+        maintainers:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              email:
+                type: string
+              orcid:
+                type: string
+                description: The bare ORCID iD, e.g. 0000-0002-1825-0097.
         runtime:
           type: object
           properties:
@@ -290,6 +310,11 @@ components:
           type: string
         mediaTypes:
           type: array
+          items:
+            type: string
+        formats:
+          type: array
+          description: EDAM format ids (e.g. format_3998). With no mediaTypes or formats, any file.
           items:
             type: string
     AppStoreApplication:
