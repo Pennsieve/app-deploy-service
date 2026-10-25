@@ -159,6 +159,7 @@ func AppManifestToModel(m *store_dynamodb.AppManifest) *models.AppManifest {
 			TimeoutSeconds: m.Runtime.TimeoutSeconds,
 			Interactive:    m.Runtime.Interactive,
 			SessionType:    m.Runtime.SessionType,
+			Kernel:         m.Runtime.Kernel,
 		},
 		Parameters: params,
 		Inputs:     appPortsToModels(m.Inputs),
