@@ -56,6 +56,7 @@ func TestProblems(t *testing.T) {
 		{"a bad ORCID", "application:\n  name: a\n  maintainers:\n    - name: b\n      orcid: 1234\n", "/application/maintainers/0/orcid"},
 		{"a bad media type", "application:\n  name: a\ninputs:\n  - name: x\n    mediaTypes: [parquet]\n", "/inputs/0/mediaTypes/0"},
 		{"an unknown container", "application:\n  name: a\ninputs:\n  - name: x\n    container: folder\n", "/inputs/0/container"},
+		{"a structure given as a file", "application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: bids\n    container: file\n", "/inputs/0/container"},
 		{"a structure that isn't a registry id", "application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: BIDS 1.9\n", "/inputs/0/conformsTo"},
 		{"a bad EDAM format", "application:\n  name: a\noutputs:\n  - name: x\n    formats: [edf]\n", "/outputs/0/formats/0"},
 		{"an unknown parameter type", "application:\n  name: a\nparameters:\n  - name: p\n    type: file\n", "/parameters/0/type"},

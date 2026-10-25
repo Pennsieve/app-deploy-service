@@ -94,6 +94,9 @@ inputs:
     container: directory
   - name: study
     conformsTo: bids@1.9
+  - name: spelled-out
+    conformsTo: bids
+    container: directory
 outputs:
   - name: labels
 `)
