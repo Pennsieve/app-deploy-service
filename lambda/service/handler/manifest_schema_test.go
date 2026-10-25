@@ -97,6 +97,12 @@ inputs:
   - name: spelled-out
     conformsTo: bids
     container: directory
+  - name: published
+    conformsTo: [pennsieve-published-dataset, bids]
+    mediaTypes: [application/vnd.pennsieve.ome-zarr]
+    container: file
+  - name: elsewhere
+    conformsTo: https://example.org/lab-layout/v2
 outputs:
   - name: labels
 `)
@@ -108,13 +114,19 @@ outputs:
 		t.Fatal(err)
 	}
 	m := appManifest(c)
-	if m.Inputs[0].Container != "directory" || m.Inputs[0].ConformsTo != "" {
+	if m.Inputs[0].Container != "directory" || m.Inputs[0].ConformsTo != nil {
 		t.Errorf("images = %+v", m.Inputs[0])
 	}
-	if m.Inputs[1].ConformsTo != "bids@1.9" || m.Inputs[1].Container != "" {
+	if !reflect.DeepEqual(m.Inputs[1].ConformsTo, []string{"bids@1.9"}) || m.Inputs[1].Container != "" {
 		t.Errorf("study = %+v", m.Inputs[1])
 	}
-	if m.Outputs[0].Container != "" || m.Outputs[0].ConformsTo != "" {
+	if got := m.Inputs[3]; !reflect.DeepEqual(got.ConformsTo, []string{"pennsieve-published-dataset", "bids"}) || got.Container != "file" || len(got.MediaTypes) != 1 {
+		t.Errorf("published = %+v", got)
+	}
+	if got := m.Inputs[4].ConformsTo; !reflect.DeepEqual(got, []string{"https://example.org/lab-layout/v2"}) {
+		t.Errorf("elsewhere = %v", got)
+	}
+	if m.Outputs[0].Container != "" || m.Outputs[0].ConformsTo != nil {
 		t.Errorf("a plain output = %+v", m.Outputs[0])
 	}
 }

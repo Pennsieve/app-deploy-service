@@ -212,7 +212,7 @@ type AppPort struct {
 	MediaTypes  []string `json:"mediaTypes"`
 	Formats     []string `json:"formats,omitempty"`
 	Container   string   `json:"container,omitempty"`
-	ConformsTo  string   `json:"conformsTo,omitempty"`
+	ConformsTo  []string `json:"conformsTo,omitempty"`
 }
 
 type AppStoreApplicationDetail struct {
