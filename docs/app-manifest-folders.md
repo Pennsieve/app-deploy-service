@@ -84,7 +84,10 @@ Where an input's data is placed in `INPUT_DIR`.
   would otherwise mix, e.g. two BIDS trees, each with a
   `dataset_description.json` at its root. The name is then a folder name:
   lowercase letters, numbers and dashes.
-- At most one input may be at the root.
+- Several inputs can share the root when the app can tell them apart by
+  media type (PDFs and Open Ephys recordings side by side). They need their
+  own folders when they'd mix: two inputs with the same media type, an input
+  that takes any file, or a layout (a BIDS tree fills the root).
 
 Names are identifiers either way (`study`, `recordings`): lowercase letters,
 numbers and dashes keep them usable as folder names later.
