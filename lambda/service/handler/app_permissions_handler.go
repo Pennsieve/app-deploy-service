@@ -16,7 +16,6 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/pennsieve/pennsieve-go-core/pkg/authorizer"
-	"github.com/pennsieve/pennsieve-go-core/pkg/models/role"
 )
 
 func GetAppPermissionsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
@@ -24,13 +23,10 @@ func GetAppPermissionsHandler(ctx context.Context, request events.APIGatewayV2HT
 
 	appId := request.PathParameters["id"]
 
+	// No workspace role is required: the workspace, when there is one, comes
+	// from the request and is verified below (workspaceFromRequest); the
+	// token's active-organization claim is never used.
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, ErrNotPermitted),
-		}, nil
-	}
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -99,13 +95,10 @@ func PutAppPermissionsHandler(ctx context.Context, request events.APIGatewayV2HT
 
 	appId := request.PathParameters["id"]
 
+	// Sharing is the owner's, wherever they are (a workspace or My
+	// Workspace): IsAppOwner below is the check. The token's active-
+	// organization claim is never used.
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnauthorized,
-			Body:       handlerError(handlerName, ErrNotPermitted),
-		}, nil
-	}
 
 	var req models.SetPermissionsRequest
 	if err := json.Unmarshal([]byte(request.Body), &req); err != nil {
