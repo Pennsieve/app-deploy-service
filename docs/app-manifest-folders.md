@@ -73,6 +73,31 @@ The structures in the registry (`GET /packages/formats`, `structures`; also
 
 Adding one is a PR to packages-service's format registry.
 
+### `placement: root | subfolder` (inputs)
+
+Where an input's data is placed in `INPUT_DIR`.
+
+- `root` (the default): at the root of `INPUT_DIR`. With one input, that's
+  today's behaviour: `$INPUT_DIR` is the data, and with `conformsTo: bids`
+  it is the BIDS root.
+- `subfolder`: in its own folder, `INPUT_DIR/<name>/`. Use it when inputs
+  would otherwise mix, e.g. two BIDS trees, each with a
+  `dataset_description.json` at its root. The name is then a folder name:
+  lowercase letters, numbers and dashes.
+- At most one input may be at the root.
+
+Names are identifiers either way (`study`, `recordings`): lowercase letters,
+numbers and dashes keep them usable as folder names later.
+
+Locally it's the same: set `INPUT_DIR` to a folder laid out as the app.yml
+says, e.g. a BIDS tree at its root and `recordings/` beside it. Nothing
+Pennsieve-specific is in the paths.
+
+Elsewhere: Flywheel gears and DNAnexus apps always give each input its own
+folder (`/flywheel/v0/input/<name>/`, `~/in/<name>/`); CWL and WDL pass each
+input's path on the command line. `placement` keeps today's root as the
+default and offers the Flywheel-style folder when an app needs it.
+
 ## Examples
 
 ```yaml
@@ -87,6 +112,16 @@ inputs:
   - name: study
     conformsTo: bids
     mediaTypes: [application/vnd.pennsieve.ome-zarr]
+
+# Two BIDS studies: each in its own folder, INPUT_DIR/patients/ and
+# INPUT_DIR/controls/.
+inputs:
+  - name: patients
+    conformsTo: bids
+    placement: subfolder
+  - name: controls
+    conformsTo: bids
+    placement: subfolder
 
   # A published dataset whose files/ folder is BIDS.
   - name: published
@@ -109,12 +144,12 @@ outputs:
 
 ## What the app sees
 
-A step has one `INPUT_DIR` and one `OUTPUT_DIR`. Port names are labels, not
-folders.
+A step has one `INPUT_DIR` and one `OUTPUT_DIR`. With one input, `INPUT_DIR`
+is that input's data; with several, they're merged side by side, unless
+`placement: subfolder` puts one in its own folder.
 
 - **Inputs:**
-  - files land in `INPUT_DIR/<picked source>/<subfolders…>/<file>`, with
-    paths kept;
+  - files keep their paths below the picked folder;
   - with `container: directory`, each folder-format item is a folder at its
     place in that tree;
   - with `conformsTo`, the tree under the picked folder is the structure.
@@ -162,5 +197,6 @@ These are declared in app.yml now and acted on later:
   dataset;
 - how folder formats are uploaded and stored;
 - running validators (bids-validator) on structured inputs and outputs;
-- a folder per port (`INPUT_DIR/<name>/`);
+- `placement: subfolder` (the merge step placing an input in its own folder)
+  and the run dialog asking for data per input;
 - matching views to inputs through their RO-Crate `conformsTo`.

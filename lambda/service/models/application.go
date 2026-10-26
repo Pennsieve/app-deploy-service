@@ -213,6 +213,7 @@ type AppPort struct {
 	Formats     []string `json:"formats,omitempty"`
 	Container   string   `json:"container,omitempty"`
 	ConformsTo  []string `json:"conformsTo,omitempty"`
+	Placement   string   `json:"placement,omitempty"`
 }
 
 type AppStoreApplicationDetail struct {
