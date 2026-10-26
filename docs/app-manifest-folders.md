@@ -73,6 +73,34 @@ The structures in the registry (`GET /packages/formats`, `structures`; also
 
 Adding one is a PR to packages-service's format registry.
 
+### `placement: root | subfolder` (inputs)
+
+Where an input's data is placed in `INPUT_DIR`.
+
+- `root` (the default): at the root of `INPUT_DIR`. With one input, that's
+  today's behaviour: `$INPUT_DIR` is the data, and with `conformsTo: bids`
+  it is the BIDS root.
+- `subfolder`: in its own folder, `INPUT_DIR/<name>/`. Use it when inputs
+  would otherwise mix, e.g. two BIDS trees, each with a
+  `dataset_description.json` at its root. The name is then a folder name:
+  lowercase letters, numbers and dashes.
+- Several inputs can share the root when the app can tell them apart by
+  media type (PDFs and Open Ephys recordings side by side). They need their
+  own folders when they'd mix: two inputs with the same media type, an input
+  that takes any file, or a layout (a BIDS tree fills the root).
+
+Names are identifiers either way (`study`, `recordings`): lowercase letters,
+numbers and dashes keep them usable as folder names later.
+
+Locally it's the same: set `INPUT_DIR` to a folder laid out as the app.yml
+says, e.g. a BIDS tree at its root and `recordings/` beside it. Nothing
+Pennsieve-specific is in the paths.
+
+Elsewhere: Flywheel gears and DNAnexus apps always give each input its own
+folder (`/flywheel/v0/input/<name>/`, `~/in/<name>/`); CWL and WDL pass each
+input's path on the command line. `placement` keeps today's root as the
+default and offers the Flywheel-style folder when an app needs it.
+
 ## Examples
 
 ```yaml
@@ -87,6 +115,16 @@ inputs:
   - name: study
     conformsTo: bids
     mediaTypes: [application/vnd.pennsieve.ome-zarr]
+
+# Two BIDS studies: each in its own folder, INPUT_DIR/patients/ and
+# INPUT_DIR/controls/.
+inputs:
+  - name: patients
+    conformsTo: bids
+    placement: subfolder
+  - name: controls
+    conformsTo: bids
+    placement: subfolder
 
   # A published dataset whose files/ folder is BIDS.
   - name: published
@@ -109,17 +147,23 @@ outputs:
 
 ## What the app sees
 
-A step has one `INPUT_DIR` and one `OUTPUT_DIR`. Port names are labels, not
-folders.
+A step has one `INPUT_DIR` and one `OUTPUT_DIR`. With one input, `INPUT_DIR`
+is that input's data; with several, they're merged side by side, unless
+`placement: subfolder` puts one in its own folder.
 
 - **Inputs:**
-  - files land in `INPUT_DIR/<picked source>/<subfolders…>/<file>`, with
-    paths kept;
+  - files keep their paths below the picked folder;
   - with `container: directory`, each folder-format item is a folder at its
     place in that tree;
   - with `conformsTo`, the tree under the picked folder is the structure.
 - **Outputs:**
-  - the app writes into `OUTPUT_DIR`, and paths are kept;
+  - with **one** output, it is the whole of `OUTPUT_DIR`;
+  - with **two or more**, each is written to its own folder,
+    `OUTPUT_DIR/<name>/`, and its name must be folder-safe. In a workflow,
+    each output then has its own connection point, and a link from it to a
+    data target sends only that output there (the target's path prefix is
+    set to the output's folder);
+  - paths are kept;
   - folder-format items are written as folders with the format's folder
     ending. They're recognised by that ending, not by port, so apps that
     declare no outputs work too;
@@ -157,10 +201,14 @@ structure.
 
 These are declared in app.yml now and acted on later:
 
+- linking an output port to an app's input port (today an output port
+  connects to a data target; apps connect through a step's single point);
+
 - the runner unpacking folder-format inputs and packing folder outputs
   (`container`), and handing a BIDS app the `files/` folder of a published
   dataset;
 - how folder formats are uploaded and stored;
 - running validators (bids-validator) on structured inputs and outputs;
-- a folder per port (`INPUT_DIR/<name>/`);
+- `placement: subfolder` (the merge step placing an input in its own folder)
+  and the run dialog asking for data per input;
 - matching views to inputs through their RO-Crate `conformsTo`.

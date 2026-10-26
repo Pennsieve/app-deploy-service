@@ -179,7 +179,7 @@ func appPortsToModels(ports []store_dynamodb.AppPort) []models.AppPort {
 			media = []string{}
 		}
 		out = append(out, models.AppPort{Name: p.Name, Description: p.Description, MediaTypes: media, Formats: p.Formats,
-			Container: p.Container, ConformsTo: p.ConformsTo})
+			Container: p.Container, ConformsTo: p.ConformsTo, Placement: p.Placement})
 	}
 	return out
 }

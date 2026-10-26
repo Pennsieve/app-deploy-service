@@ -179,6 +179,7 @@ type AppPort struct {
 	Formats     []string `dynamodbav:"formats,omitempty"`
 	Container   string   `dynamodbav:"container,omitempty"`
 	ConformsTo  []string `dynamodbav:"conformsTo,omitempty"`
+	Placement   string   `dynamodbav:"placement,omitempty"`
 }
 
 func (i AppStoreVersion) GetKey() map[string]types.AttributeValue {

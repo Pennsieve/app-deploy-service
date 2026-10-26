@@ -72,6 +72,7 @@ type appPort struct {
 	Formats     []string   `yaml:"formats"`
 	Container   string     `yaml:"container"`
 	ConformsTo  stringList `yaml:"conformsTo"`
+	Placement   string     `yaml:"placement"`
 }
 
 // stringList reads one string or a list of them (conformsTo: bids, or
@@ -238,7 +239,8 @@ func appPorts(ports []appPort) []store_dynamodb.AppPort {
 			continue
 		}
 		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes, Formats: edamFormats(p.Formats),
-			Container: strings.TrimSpace(p.Container), ConformsTo: p.ConformsTo.trimmed()})
+			Container: strings.TrimSpace(p.Container), ConformsTo: p.ConformsTo.trimmed(),
+			Placement: strings.TrimSpace(p.Placement)})
 	}
 	return out
 }
