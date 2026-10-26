@@ -157,7 +157,13 @@ is that input's data; with several, they're merged side by side, unless
     place in that tree;
   - with `conformsTo`, the tree under the picked folder is the structure.
 - **Outputs:**
-  - the app writes into `OUTPUT_DIR`, and paths are kept;
+  - with **one** output, it is the whole of `OUTPUT_DIR`;
+  - with **two or more**, each is written to its own folder,
+    `OUTPUT_DIR/<name>/`, and its name must be folder-safe. In a workflow,
+    each output then has its own connection point, and a link from it to a
+    data target sends only that output there (the target's path prefix is
+    set to the output's folder);
+  - paths are kept;
   - folder-format items are written as folders with the format's folder
     ending. They're recognised by that ending, not by port, so apps that
     declare no outputs work too;
@@ -194,6 +200,9 @@ structure.
 ## Not yet
 
 These are declared in app.yml now and acted on later:
+
+- linking an output port to an app's input port (today an output port
+  connects to a data target; apps connect through a step's single point);
 
 - the runner unpacking folder-format inputs and packing folder outputs
   (`container`), and handing a BIDS app the `files/` folder of a published

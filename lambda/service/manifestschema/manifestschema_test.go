@@ -58,6 +58,7 @@ func TestProblems(t *testing.T) {
 		{"an unknown container", "application:\n  name: a\ninputs:\n  - name: x\n    container: folder\n", "/inputs/0/container"},
 		{"a subfolder named with spaces", "application:\n  name: a\ninputs:\n  - name: My recordings\n    placement: subfolder\n", "/inputs/0/name"},
 		{"folders of no format", "application:\n  name: a\ninputs:\n  - name: x\n    container: directory\n", "mediaTypes"},
+		{"two outputs, one not folder-safe", "application:\n  name: a\noutputs:\n  - name: labels\n  - name: My Figures\n", "/outputs/1/name"},
 		{"an unknown placement", "application:\n  name: a\ninputs:\n  - name: x\n    placement: nested\n", "/inputs/0/placement"},
 		{"a link that isn't https", "application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: [pennsieve-published-dataset, http://example.org/layout]\n", "/inputs/0/conformsTo"},
 		{"a structure that isn't a registry id", "application:\n  name: a\ninputs:\n  - name: x\n    conformsTo: BIDS 1.9\n", "/inputs/0/conformsTo"},
