@@ -62,12 +62,44 @@ type appMaintainer struct {
 
 // appPort mirrors an entry of app.yml's `inputs` or `outputs`: MIME types,
 // EDAM format ids (format_3590, or its http://edamontology.org/ URI), or
-// neither, meaning any file.
+// neither, meaning any file. Container says whether folder-format items are
+// given as folders or as stored; ConformsTo names the folder structure(s) the
+// whole port follows (bids@1.9), outermost first.
 type appPort struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description"`
-	MediaTypes  []string `yaml:"mediaTypes"`
-	Formats     []string `yaml:"formats"`
+	Name        string     `yaml:"name"`
+	Description string     `yaml:"description"`
+	MediaTypes  []string   `yaml:"mediaTypes"`
+	Formats     []string   `yaml:"formats"`
+	Container   string     `yaml:"container"`
+	ConformsTo  stringList `yaml:"conformsTo"`
+}
+
+// stringList reads one string or a list of them (conformsTo: bids, or
+// conformsTo: [pennsieve-published-dataset, bids]).
+type stringList []string
+
+func (l *stringList) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		*l = stringList{value.Value}
+		return nil
+	}
+	var list []string
+	if err := value.Decode(&list); err != nil {
+		return err
+	}
+	*l = list
+	return nil
+}
+
+// trimmed drops blank entries and surrounding space; nil when nothing is left.
+func (l stringList) trimmed() []string {
+	var out []string
+	for _, s := range l {
+		if s = strings.TrimSpace(s); s != "" {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // appParameter mirrors a single entry of app.yml's `parameters` list.
@@ -205,7 +237,8 @@ func appPorts(ports []appPort) []store_dynamodb.AppPort {
 		if p.Name == "" {
 			continue
 		}
-		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes, Formats: edamFormats(p.Formats)})
+		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes, Formats: edamFormats(p.Formats),
+			Container: strings.TrimSpace(p.Container), ConformsTo: p.ConformsTo.trimmed()})
 	}
 	return out
 }

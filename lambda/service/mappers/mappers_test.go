@@ -74,7 +74,7 @@ func TestAppStoreVersionToModel_LicenseProblemsMaintainersFormats(t *testing.T) 
 		ManifestProblems: []string{"/runtime: missing property 'kernel'"},
 		Manifest: &store_dynamodb.AppManifest{
 			Maintainers: []store_dynamodb.AppMaintainer{{Name: "Ada", Orcid: "0000-0002-1825-0097"}},
-			Inputs:      []store_dynamodb.AppPort{{Name: "recording", Formats: []string{"format_3590"}}},
+			Inputs:      []store_dynamodb.AppPort{{Name: "recording", Formats: []string{"format_3590"}}, {Name: "study", ConformsTo: []string{"pennsieve-published-dataset", "bids@1.9"}, Container: "directory"}},
 		},
 	}
 	m := AppStoreVersionToModel(v)
@@ -82,4 +82,6 @@ func TestAppStoreVersionToModel_LicenseProblemsMaintainersFormats(t *testing.T) 
 	assert.Equal(t, v.ManifestProblems, m.ManifestProblems)
 	assert.Equal(t, []models.AppMaintainer{{Name: "Ada", Orcid: "0000-0002-1825-0097"}}, m.Manifest.Maintainers)
 	assert.Equal(t, []string{"format_3590"}, m.Manifest.Inputs[0].Formats)
+	assert.Equal(t, []string{"pennsieve-published-dataset", "bids@1.9"}, m.Manifest.Inputs[1].ConformsTo)
+	assert.Equal(t, "directory", m.Manifest.Inputs[1].Container)
 }

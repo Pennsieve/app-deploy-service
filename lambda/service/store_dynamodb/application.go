@@ -163,12 +163,16 @@ type AppMaintainer struct {
 }
 
 // AppPort is one of a version's declared inputs or outputs: by MIME type,
-// by EDAM format id (format_3590), or neither, meaning any file.
+// by EDAM format id (format_3590), or neither, meaning any file. Container
+// (file or directory) and ConformsTo (folder structures such as bids@1.9,
+// outermost first) are empty when app.yml doesn't set them.
 type AppPort struct {
 	Name        string   `dynamodbav:"name"`
 	Description string   `dynamodbav:"description,omitempty"`
 	MediaTypes  []string `dynamodbav:"mediaTypes,omitempty"`
 	Formats     []string `dynamodbav:"formats,omitempty"`
+	Container   string   `dynamodbav:"container,omitempty"`
+	ConformsTo  []string `dynamodbav:"conformsTo,omitempty"`
 }
 
 func (i AppStoreVersion) GetKey() map[string]types.AttributeValue {
