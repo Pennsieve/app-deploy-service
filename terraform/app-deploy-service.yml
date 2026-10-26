@@ -844,6 +844,14 @@ paths:
           description: >
             When false (default), archived applications are excluded from the
             response. Set to true to include archived applications.
+        - in: query
+          name: include
+          required: false
+          schema:
+            type: string
+          description: >
+            include=deployments adds each version's deployment history. Left
+            out by default: lists don't show it, and it grows with every release.
       responses:
         '200':
           description: List of app store applications
@@ -893,6 +901,14 @@ paths:
           description: >
             When false (default), archived applications are excluded from the
             response. Set to true to include archived applications.
+        - in: query
+          name: include
+          required: false
+          schema:
+            type: string
+          description: >
+            include=deployments adds each version's deployment history. Left
+            out by default: lists don't show it, and it grows with every release.
       responses:
         '200':
           description: List of app store applications

@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
+	"sync"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -30,6 +32,9 @@ func GetAppstoreApplicationsHandler(ctx context.Context, request events.APIGatew
 func GetMyAppstoreApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	return listAppstoreApplications(ctx, request, "GetMyAppstoreApplicationsHandler", CanAccessAppPersonally)
 }
+
+// listConcurrency bounds the apps worked on at once when listing.
+const listConcurrency = 10
 
 type appAccessCheck func(context.Context, *authorizer.Claims, *store_dynamodb.AppStoreApplication, *store_dynamodb.AppAccessDatabaseStore) bool
 
@@ -87,39 +92,76 @@ func listAppstoreApplications(ctx context.Context, request events.APIGatewayV2HT
 		}
 	}
 
-	var filteredApps []store_dynamodb.AppStoreApplication
+	// Deployment histories only on request (?include=deployments): the
+	// Apps tab doesn't show them, and they grow with every release.
+	includeDeployments := strings.Contains(queryParams["include"], "deployments")
+
+	var candidates []store_dynamodb.AppStoreApplication
 	for _, app := range dynamoApps {
 		if !includeArchived && app.Status == models.AppStoreStatusArchived {
 			continue
 		}
-		if canAccess(ctx, claims, &app, appAccessStore) {
-			filteredApps = append(filteredApps, app)
-		}
+		candidates = append(candidates, app)
 	}
 
-	applications := mappers.AppStoreAppsToModels(filteredApps)
-
-	// For each app, fetch its versions and their deployments
-	for i := range applications {
-		dynamoVersions, err := versionStore.GetByApplicationId(ctx, applications[i].Uuid)
-		if err != nil {
-			log.Printf("error fetching versions for application %s: %v", applications[i].Uuid, err)
-			continue
-		}
-		versions := mappers.AppStoreVersionsToModels(dynamoVersions)
-
-		// Fetch deployments for each version (keyed by version uuid)
-		for j := range versions {
-			deployments, err := deploymentsStore.GetHistory(ctx, versions[j].Uuid)
-			if err != nil {
-				log.Printf("error fetching deployments for version %s: %v", versions[j].Uuid, err)
-				continue
+	// Per app, in parallel (a bounded pool): the access check, its versions,
+	// optionally their deployments, and its README summary when the latest
+	// release hasn't been summarized yet. Done one after another, this was
+	// hundreds of DynamoDB round trips in a row.
+	type listed struct {
+		ok  bool
+		app models.AppStoreApplication
+	}
+	results := make([]listed, len(candidates))
+	sem := make(chan struct{}, listConcurrency)
+	var wg sync.WaitGroup
+	for i := range candidates {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(i int) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			app := candidates[i]
+			if !canAccess(ctx, claims, &app, appAccessStore) {
+				return
 			}
-			versions[j].Deployments = mappers.DeploymentItemsToModels(deployments)
-		}
+			out := mappers.AppStoreAppToModel(app)
+			dynamoVersions, err := versionStore.GetByApplicationId(ctx, app.Uuid)
+			if err != nil {
+				log.Printf("error fetching versions for application %s: %v", app.Uuid, err)
+				results[i] = listed{ok: true, app: out}
+				return
+			}
+			versions := mappers.AppStoreVersionsToModels(dynamoVersions)
+			if includeDeployments {
+				for j := range versions {
+					deployments, err := deploymentsStore.GetHistory(ctx, versions[j].Uuid)
+					if err != nil {
+						log.Printf("error fetching deployments for version %s: %v", versions[j].Uuid, err)
+						continue
+					}
+					versions[j].Deployments = mappers.DeploymentItemsToModels(deployments)
+				}
+			}
+			out.Versions = versions
+			out.LatestVersionTag = latestVersionTag(versions)
+			// Apps released before summaries existed: summarize once, store.
+			if out.LatestVersionTag != "" && app.SummaryTag != out.LatestVersionTag {
+				out.Summary = syncedReadmeSummary(ctx, cfg, app.SourceUrl, out.LatestVersionTag)
+				if err := appStoreStore.UpdateSummary(ctx, app.Uuid, out.Summary, out.LatestVersionTag); err != nil {
+					log.Printf("warning: unable to store the README summary of %s: %v", app.Uuid, err)
+				}
+			}
+			results[i] = listed{ok: true, app: out}
+		}(i)
+	}
+	wg.Wait()
 
-		applications[i].Versions = versions
-		applications[i].LatestVersionTag = latestVersionTag(versions)
+	applications := []models.AppStoreApplication{}
+	for _, r := range results {
+		if r.ok {
+			applications = append(applications, r.app)
+		}
 	}
 
 	m, err := json.Marshal(applications)

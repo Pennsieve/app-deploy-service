@@ -34,6 +34,9 @@ func (f *fakeApps) UpdateParams(_ context.Context, uuid string, p []store_dynamo
 	f.params[uuid] = p
 	return nil
 }
+func (f *fakeApps) UpdateSummary(_ context.Context, uuid string, summary string, tag string) error {
+	return nil
+}
 
 type fakeVersions struct {
 	versions  []store_dynamodb.AppStoreVersion
