@@ -12,9 +12,9 @@ resource "aws_lambda_function" "service_lambda" {
   # Lambda's CPU scales with memory: at 128 MB (~1/14 vCPU) the API, the app
   # list most of all, spent ~0.8 s on CPU. 1024 MB is ~8x the CPU at about
   # the same cost per request, since billing is memory x duration.
-  memory_size   = 1024
-  s3_bucket     = var.lambda_bucket
-  s3_key        = "${var.service_name}/${var.service_name}-${var.image_tag}.zip"
+  memory_size = 1024
+  s3_bucket   = var.lambda_bucket
+  s3_key      = "${var.service_name}/${var.service_name}-${var.image_tag}.zip"
 
   # Resource tag: discoverable in the Console (Tags tab) and fleet-wide via the
   # Resource Groups Tagging API (get-resources --tag-filters Key=ImageTag).
