@@ -255,6 +255,16 @@ func TestAppManifest_Interactive(t *testing.T) {
 	assert.True(t, appManifest(c).Runtime.Interactive)
 }
 
+// LLM access is opt-in: only an app that declares runtime.llm gets it.
+func TestAppManifest_LLM(t *testing.T) {
+	c, err := parseAppConfig([]byte("runtime:\n  llm: true\n"))
+	assert.NoError(t, err)
+	assert.True(t, appManifest(c).Runtime.LLM)
+
+	c, _ = parseAppConfig([]byte("runtime:\n  cpu: 1024\n"))
+	assert.False(t, appManifest(c).Runtime.LLM, "undeclared is no LLM access")
+}
+
 // A notebook's language is its own field, next to the session type.
 func TestAppManifest_Kernel(t *testing.T) {
 	c, err := parseAppConfig([]byte("runtime:\n  interactive: true\n  sessionType: jupyter\n  kernel: r\n"))

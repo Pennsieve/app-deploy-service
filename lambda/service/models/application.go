@@ -192,6 +192,9 @@ type AppRuntime struct {
 	Memory         int      `json:"memory,omitempty"`
 	ComputeTypes   []string `json:"computeTypes,omitempty"`
 	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+	// LLM: the app calls language models through Pennsieve (opt-in to the
+	// LLM proxy sidecar).
+	LLM bool `json:"llm,omitempty"`
 	// Interactive: a human-in-the-loop app, run as a live session of
 	// SessionType ("jupyter" is a notebook); Kernel is a Jupyter session's
 	// language ("python", "r").

@@ -65,6 +65,7 @@ func TestProblems(t *testing.T) {
 		{"a bad EDAM format", "application:\n  name: a\noutputs:\n  - name: x\n    formats: [edf]\n", "/outputs/0/formats/0"},
 		{"an unknown parameter type", "application:\n  name: a\nparameters:\n  - name: p\n    type: file\n", "/parameters/0/type"},
 		{"a license, which comes from the repository", "application:\n  name: a\n  license: MIT\n", "license"},
+		{"llm that isn't a boolean", "application:\n  name: a\nruntime:\n  llm: claude\n", "/runtime/llm"},
 	}
 	for _, c := range cases {
 		ps, err := Validate([]byte(c.yml))
@@ -89,6 +90,7 @@ func TestOptionalVocabularyIsValid(t *testing.T) {
   tags: [eeg, spikes]
 runtime:
   computeTypes: [standard, gpu]
+  llm: true
 parameters:
   - name: THRESHOLD
     type: number
