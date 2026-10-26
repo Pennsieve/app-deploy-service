@@ -31,6 +31,7 @@ type AppStoreDBStore interface {
 	UpdateStatus(context.Context, string, models.AppStoreStatus) error
 	UpdateGithubVisibility(ctx context.Context, uuid string, isPrivate bool) error
 	UpdateParams(ctx context.Context, uuid string, params []AppParameter) error
+	UpdateSummary(ctx context.Context, uuid string, summary string, tag string) error
 }
 
 type AppStoreDatabaseStore struct {
@@ -225,5 +226,30 @@ func (r *AppStoreDatabaseStore) Insert(ctx context.Context, application AppStore
 		return fmt.Errorf("error inserting appstore application: %w", err)
 	}
 
+	return nil
+}
+
+// UpdateSummary stores the README summary and the release tag it came from.
+func (r *AppStoreDatabaseStore) UpdateSummary(ctx context.Context, uuid string, summary string, tag string) error {
+	uuidAv, err := attributevalue.Marshal(uuid)
+	if err != nil {
+		return fmt.Errorf("error marshaling uuid: %w", err)
+	}
+	update := expression.Set(expression.Name("summary"), expression.Value(summary)).
+		Set(expression.Name("summaryTag"), expression.Value(tag))
+	expr, err := expression.NewBuilder().WithUpdate(update).Build()
+	if err != nil {
+		return fmt.Errorf("error building update expression: %w", err)
+	}
+	_, err = r.api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(r.TableName),
+		Key:                       map[string]dynamodbTypes.AttributeValue{"uuid": uuidAv},
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+	})
+	if err != nil {
+		return fmt.Errorf("error updating summary: %w", err)
+	}
 	return nil
 }

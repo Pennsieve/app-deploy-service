@@ -77,6 +77,7 @@ func AppStoreAppToModel(a store_dynamodb.AppStoreApplication) models.AppStoreApp
 		CreatedAt:  a.CreatedAt,
 		Status:     status,
 		Params:     AppParametersToModels(a.Params),
+		Summary:    a.Summary,
 	}
 }
 

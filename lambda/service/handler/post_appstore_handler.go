@@ -182,6 +182,11 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 
 	syncRepoContent(ctx, application.Source.Url, application.Source.Tag, application.Source.AuthToken)
 
+	// The README's first paragraph, for the app's card in lists (best effort).
+	if err := appStoreStore.UpdateSummary(ctx, applicationId, syncedReadmeSummary(ctx, cfg, application.Source.Url, application.Source.Tag), application.Source.Tag); err != nil {
+		log.Printf("warning: unable to store the README summary of %s: %v", application.Source.Url, err)
+	}
+
 	// Read the synced app.yml once and reuse it for build sizing and parameter
 	// persistence. A missing or malformed app.yml yields haveAppCfg=false so
 	// neither step blocks the deployment.

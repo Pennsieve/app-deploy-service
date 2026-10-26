@@ -98,6 +98,9 @@ type AppStoreApplication struct {
 	LatestVersionTag string            `json:"latestVersionTag,omitempty"`
 	Versions         []AppStoreVersion `json:"versions"`
 	Params           []AppParameter    `json:"params,omitempty"`
+	// Summary is the README's first paragraph as plain text, for cards when
+	// app.yml has no description.
+	Summary string `json:"summary,omitempty"`
 }
 
 // AppParameter is a processor parameter declaration parsed from the app's

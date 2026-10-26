@@ -72,6 +72,12 @@ type AppStoreApplication struct {
 	// app.yml at publish time. app.yml is the source of truth; downstream
 	// services (e.g. workflow-service) read these as parameter defaults.
 	Params []AppParameter `dynamodbav:"params,omitempty"`
+	// Summary is the first paragraph of the README at SummaryTag, as plain
+	// text: what the app's card shows without an app.yml description.
+	// SummaryTag records which release it came from (also when the README
+	// had none), so it's computed once per release.
+	Summary    string `dynamodbav:"summary,omitempty"`
+	SummaryTag string `dynamodbav:"summaryTag,omitempty"`
 }
 
 // AppParameter is a single processor parameter declaration from app.yml. The
