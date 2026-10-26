@@ -152,6 +152,9 @@ type AppRuntime struct {
 	Memory         int      `dynamodbav:"memory,omitempty"`
 	ComputeTypes   []string `dynamodbav:"computeTypes,omitempty"`
 	TimeoutSeconds int      `dynamodbav:"timeoutSeconds,omitempty"`
+	// LLM: the app calls language models through Pennsieve (opt-in to the
+	// LLM proxy sidecar); workflow-service reads it at run start.
+	LLM bool `dynamodbav:"llm,omitempty"`
 	// Interactive: a human-in-the-loop app, run as a live session of
 	// SessionType ("jupyter" is a notebook); Kernel is a Jupyter session's
 	// language ("python", "r").

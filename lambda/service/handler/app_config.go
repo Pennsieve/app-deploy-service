@@ -33,6 +33,9 @@ type appConfig struct {
 		Memory         int      `yaml:"memory"`
 		ComputeTypes   []string `yaml:"computeTypes"`
 		TimeoutSeconds int      `yaml:"timeoutSeconds"`
+		// LLM: the app calls language models through Pennsieve, so its runs
+		// get the LLM proxy sidecar (opt-in).
+		LLM bool `yaml:"llm"`
 		// Interactive: a human-in-the-loop app, run as a live session of
 		// SessionType ("jupyter" is a notebook); Kernel is a Jupyter
 		// session's language ("python", "r").
@@ -219,6 +222,7 @@ func appManifest(c appConfig) *store_dynamodb.AppManifest {
 			Memory:         c.Runtime.Memory,
 			ComputeTypes:   c.Runtime.ComputeTypes,
 			TimeoutSeconds: c.Runtime.TimeoutSeconds,
+			LLM:            c.Runtime.LLM,
 			Interactive:    c.Runtime.Interactive || c.Runtime.SessionType != "",
 			SessionType:    c.Runtime.SessionType,
 			Kernel:         c.Runtime.Kernel,
