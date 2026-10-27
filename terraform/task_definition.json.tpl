@@ -12,7 +12,8 @@
       { "name" : "APPSTORE_PRIVATE_ECR_URL", "value": "${appstore_private_ecr_url}" },
       { "name" : "ENVIRONMENT", "value": "${environment_name}" },
       { "name" : "ENV", "value": "${environment_name}" },
-      { "name" : "REGION", "value": "${aws_region}" }
+      { "name" : "REGION", "value": "${aws_region}" },
+      { "name" : "REALTIME_EVENTS_ENDPOINT", "value": "${realtime_events_endpoint}" }
     ],
     "name": "${tier}",
     "image": "${image_url}:${image_tag}",

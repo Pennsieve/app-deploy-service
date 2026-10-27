@@ -60,6 +60,9 @@ resource "aws_lambda_function" "service_lambda" {
       // How a release whose app.yml doesn't follow its schema is treated:
       // warn (record the problems on the version) or enforce (refuse it).
       APP_MANIFEST_VALIDATION = var.app_manifest_validation
+      // Live updates: the Event API's publish host where realtime is on
+      // (realtime.tf); empty keeps Pusher.
+      REALTIME_EVENTS_ENDPOINT = local.realtime_events_endpoint
     }
   }
 }
