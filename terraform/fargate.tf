@@ -14,6 +14,7 @@ data "template_file" "app_provisioner_ecs_task_definition" {
     image_url                 = var.image_url
     service_name              = var.service_name
     tier                      = var.tier
+    realtime_events_endpoint  = local.realtime_events_endpoint
   }
 }
 
