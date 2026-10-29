@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/pennsieve/app-deploy-service/service/manifestschema"
 	"log"
 	"net/http"
 	"os"
@@ -176,18 +178,68 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 
 	syncRepoContent(ctx, application.Source.Url, application.Source.Tag, application.Source.AuthToken)
 
-	// Read the synced app.yml once and reuse it for build sizing and parameter
-	// persistence. A missing or malformed app.yml yields ok=false so neither
-	// step blocks the deployment.
-	appCfg, haveAppCfg := readSyncedAppConfig(ctx, cfg, application.Source.Url, application.Source.Tag)
+	// The README's first paragraph, for the app's card in lists (best effort).
+	if err := appStoreStore.UpdateSummary(ctx, applicationId, syncedReadmeSummary(ctx, cfg, application.Source.Url, application.Source.Tag), application.Source.Tag); err != nil {
+		log.Printf("warning: unable to store the README summary of %s: %v", application.Source.Url, err)
+	}
 
-	// Persist the app's declared parameters (with defaults) onto the appstore
-	// record. app.yml is the source of truth, so a successful parse overwrites
-	// any previously stored params (including clearing them when the app
-	// declares none). Advisory: a failure here never blocks the deployment.
+	// Read the synced app.yml once and reuse it for build sizing and parameter
+	// persistence. A missing or malformed app.yml yields haveAppCfg=false so
+	// neither step blocks the deployment.
+	appYml, haveAppYml := readSyncedAppYml(ctx, cfg, application.Source.Url, application.Source.Tag)
+	var appCfg appConfig
+	haveAppCfg := false
+	var problems []string
+	if haveAppYml {
+		// Checked against its schema (manifestschema): recorded on the version
+		// in "warn" mode, the release refused in "enforce" mode.
+		problems = manifestProblems(appYml)
+		if c, err := parseAppConfig(appYml); err == nil {
+			appCfg, haveAppCfg = c, true
+		} else {
+			log.Printf("warning: unable to parse the app.yml of %s %s: %v", application.Source.Url, application.Source.Tag, err)
+		}
+	}
+	if len(problems) > 0 {
+		log.Printf("app.yml of %s %s doesn't follow %s: %s", application.Source.Url, application.Source.Tag, manifestschema.URL, strings.Join(problems, "; "))
+		if manifestValidationMode() == manifestValidationEnforce {
+			if err := versionStore.SetRegistrationDetails(ctx, versionUuid, "", problems); err != nil {
+				log.Printf("warning: unable to record the manifest problems of %s: %v", versionUuid, err)
+			}
+			refusal := withLiveUpdates(ctx, NewAppStoreStatusManager(handlerName, versionStore, versionUuid), cfg)
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusUnprocessableEntity,
+				Body: refusal.SetErrorStatus(ctx, fmt.Errorf("app.yml doesn't follow %s: %s",
+					manifestschema.URL, strings.Join(problems, "; "))),
+			}, nil
+		}
+	}
+
+	// The repository's license at this tag (from its LICENSE file, as GitHub
+	// reads it), kept with the version. A failed lookup only logs.
+	license, err := repoLicense(ctx, application.Source.Url, application.Source.Tag, application.Source.AuthToken)
+	if err != nil {
+		log.Printf("warning: unable to read the license of %s %s: %v", application.Source.Url, application.Source.Tag, err)
+	}
+	if license != "" || len(problems) > 0 {
+		if err := versionStore.SetRegistrationDetails(ctx, versionUuid, license, problems); err != nil {
+			log.Printf("warning: unable to record the license and manifest problems of %s: %v", versionUuid, err)
+		}
+	}
+
+	// Record the version's app.yml on the version, and, when this is the
+	// app's newest version, its parameters on the app (what consumers of the
+	// app's top-level params read). Registering an older tag again doesn't
+	// roll the app back. Advisory: a failure here never blocks the deployment,
+	// and an app without an app.yml simply has no manifest.
 	if haveAppCfg {
-		if err := appStoreStore.UpdateParams(ctx, applicationId, appParameters(appCfg)); err != nil {
-			log.Printf("warning: unable to persist app parameters for %s: %v", applicationId, err)
+		if err := versionStore.SetManifest(ctx, versionUuid, appManifest(appCfg)); err != nil {
+			log.Printf("warning: unable to persist the manifest of %s %s: %v", applicationId, application.Source.Tag, err)
+		}
+		if isNewestVersion(ctx, versionStore, applicationId, application.Source.Tag) {
+			if err := appStoreStore.UpdateParams(ctx, applicationId, appParameters(appCfg)); err != nil {
+				log.Printf("warning: unable to persist app parameters for %s: %v", applicationId, err)
+			}
 		}
 	}
 

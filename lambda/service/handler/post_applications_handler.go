@@ -71,14 +71,20 @@ func PostApplicationsHandler(ctx context.Context, request events.APIGatewayV2HTT
 	// Maybe we should check for role.Writer instead here, but I'm not
 	// sure if there is a difference for org roles.
 	// So just making sure the user is not a guest
-	if !authorizer.HasOrgRole(claims, role.Viewer) {
-		log.Printf("user not permitted to create application with claims: %+v", claims)
+	// token_auth: the workspace comes from the request, verified here, never
+	// from claims.OrgClaim (see workspace_access.go).
+	ws, errResp := requireWorkspaceFromRequest(ctx, request, claims, handlerName)
+	if errResp != nil {
+		return *errResp, nil
+	}
+	if !authorizer.HasOrgRole(ws.Claims, role.Viewer) {
+		log.Printf("user not permitted to create application in %s with claims: %+v", ws.OrgNodeId, ws.Claims)
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusUnauthorized,
 			Body:       handlerError(handlerName, ErrNotPermitted),
 		}, nil
 	}
-	organizationId := claims.OrgClaim.NodeId
+	organizationId := ws.OrgNodeId
 	userId := claims.UserClaim.NodeId
 
 	cfg, err := config.LoadDefaultConfig(ctx)

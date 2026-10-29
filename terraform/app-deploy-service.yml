@@ -216,6 +216,107 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Deployment'
+        manifest:
+          $ref: '#/components/schemas/AppManifest'
+        manifestProblems:
+          type: array
+          description: "How the version's app.yml doesn't follow https://schemas.pennsieve.io/app-manifest/v1.json, as found at registration, one 'path: reason' each. Absent when it follows it."
+          items:
+            type: string
+        license:
+          type: string
+          description: The repository's license at this version, an SPDX id (e.g. "MIT"), as GitHub reads its LICENSE file. Absent when there's none or it's unknown.
+    AppManifest:
+      type: object
+      description: The version's app.yml, parsed when it was registered. Absent for an app without an app.yml.
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        maintainers:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              email:
+                type: string
+              orcid:
+                type: string
+                description: The bare ORCID iD, e.g. 0000-0002-1825-0097.
+        runtime:
+          type: object
+          properties:
+            cpu:
+              type: integer
+              description: CPU units (1024 = 1 vCPU).
+            memory:
+              type: integer
+              description: MiB.
+            computeTypes:
+              type: array
+              items:
+                type: string
+            timeoutSeconds:
+              type: integer
+            interactive:
+              type: boolean
+              description: A human-in-the-loop app (e.g. a notebook kernel), run as a live session.
+            sessionType:
+              type: string
+              description: The session's kind; "jupyter" is a notebook.
+            kernel:
+              type: string
+              description: A Jupyter session's language, e.g. "python" or "r".
+        parameters:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              type:
+                type: string
+              required:
+                type: boolean
+              description:
+                type: string
+              defaultValue:
+                type: string
+              validValues:
+                type: array
+                items:
+                  type: string
+        inputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppPort'
+        outputs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppPort'
+    AppPort:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        mediaTypes:
+          type: array
+          items:
+            type: string
+        formats:
+          type: array
+          description: EDAM format ids (e.g. format_3590). With no mediaTypes or formats, any file.
+          items:
+            type: string
     AppStoreApplication:
       type: object
       properties:
@@ -447,6 +548,13 @@ paths:
         - token_auth: []
       tags:
         - Applications
+      parameters:
+        - in: query
+          name: organization_id
+          required: true
+          schema:
+            type: string
+          description: The workspace to act in. Membership is verified.
       responses:
         '201':
           description: Application created
@@ -546,6 +654,12 @@ paths:
       tags:
         - Applications
       parameters:
+        - in: query
+          name: organization_id
+          required: true
+          schema:
+            type: string
+          description: The workspace to act in. Membership is verified.
         - in: path
           name: id
           required: true
@@ -647,6 +761,13 @@ paths:
         - token_auth: []
       tags:
         - Deployments
+      parameters:
+        - in: query
+          name: organization_id
+          required: true
+          schema:
+            type: string
+          description: The workspace to act in. Membership is verified.
       responses:
         '200':
           description: Deployment triggered
@@ -723,6 +844,14 @@ paths:
           description: >
             When false (default), archived applications are excluded from the
             response. Set to true to include archived applications.
+        - in: query
+          name: include
+          required: false
+          schema:
+            type: string
+          description: >
+            include=deployments adds each version's deployment history. Left
+            out by default: lists don't show it, and it grows with every release.
       responses:
         '200':
           description: List of app store applications
@@ -736,6 +865,61 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '4XX':
+          $ref: '#/components/responses/Unauthorized'
+        '5XX':
+          $ref: '#/components/responses/Error'
+  /store/me:
+    get:
+      summary: List app store applications outside a workspace
+      description: >
+        The applications the caller can use outside any workspace (My
+        Workspace): public applications, applications the caller owns, and
+        applications shared with the caller directly. Applications shared with
+        a workspace or team are not included; GET /store lists those for a
+        workspace.
+      x-amazon-apigateway-integration:
+        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
+      operationId: getMyAppStoreApplications
+      security:
+        - token_auth: []
+      tags:
+        - App Store
+      parameters:
+        - in: query
+          name: sourceUrl
+          required: false
+          schema:
+            type: string
+          description: Filter applications by source URL
+        - in: query
+          name: includeArchived
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: >
+            When false (default), archived applications are excluded from the
+            response. Set to true to include archived applications.
+        - in: query
+          name: include
+          required: false
+          schema:
+            type: string
+          description: >
+            include=deployments adds each version's deployment history. Left
+            out by default: lists don't show it, and it grows with every release.
+      responses:
+        '200':
+          description: List of app store applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppStoreApplication'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '4XX':
           $ref: '#/components/responses/Unauthorized'
         '5XX':
@@ -755,6 +939,16 @@ paths:
       tags:
         - App Store
       parameters:
+        - in: query
+          name: organization_id
+          required: false
+          schema:
+            type: string
+          description: >
+            The workspace the request is made in. Membership is verified. With
+            it, apps shared with that workspace or your teams in it count;
+            without it, only public apps, your own, and apps shared with you
+            directly.
         - in: path
           name: id
           required: true
@@ -844,6 +1038,16 @@ paths:
         - App Store
       parameters:
         - in: query
+          name: organization_id
+          required: false
+          schema:
+            type: string
+          description: >
+            The workspace the request is made in. Membership is verified. With
+            it, apps shared with that workspace or your teams in it count;
+            without it, only public apps, your own, and apps shared with you
+            directly.
+        - in: query
           name: sourceUrl
           required: true
           schema:
@@ -930,6 +1134,16 @@ paths:
       tags:
         - App Store
       parameters:
+        - in: query
+          name: organization_id
+          required: false
+          schema:
+            type: string
+          description: >
+            The workspace the request is made in. Membership is verified. With
+            it, apps shared with that workspace or your teams in it count;
+            without it, only public apps, your own, and apps shared with you
+            directly.
         - in: path
           name: id
           required: true
@@ -980,6 +1194,16 @@ paths:
       tags:
         - App Store
       parameters:
+        - in: query
+          name: organization_id
+          required: false
+          schema:
+            type: string
+          description: >
+            The workspace the request is made in. Membership is verified. With
+            it, apps shared with that workspace or your teams in it count;
+            without it, only public apps, your own, and apps shared with you
+            directly.
         - in: path
           name: id
           required: true

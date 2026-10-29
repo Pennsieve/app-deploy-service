@@ -9,9 +9,12 @@ resource "aws_lambda_function" "service_lambda" {
   architectures = ["arm64"]
   role          = aws_iam_role.service_lambda_role.arn
   timeout       = 300
-  memory_size   = 128
-  s3_bucket     = var.lambda_bucket
-  s3_key        = "${var.service_name}/${var.service_name}-${var.image_tag}.zip"
+  # Lambda's CPU scales with memory: at 128 MB (~1/14 vCPU) the API, the app
+  # list most of all, spent ~0.8 s on CPU. 1024 MB is ~8x the CPU at about
+  # the same cost per request, since billing is memory x duration.
+  memory_size = 1024
+  s3_bucket   = var.lambda_bucket
+  s3_key      = "${var.service_name}/${var.service_name}-${var.image_tag}.zip"
 
   # Resource tag: discoverable in the Console (Tags tab) and fleet-wide via the
   # Resource Groups Tagging API (get-resources --tag-filters Key=ImageTag).
@@ -49,6 +52,17 @@ resource "aws_lambda_function" "service_lambda" {
       APP_ACCESS_TABLE                 = aws_dynamodb_table.app_access_table.name,
       ACCOUNTS_TABLE                   = data.terraform_remote_state.account_service.outputs.accounts_table_name
       CONTENT_SYNC_BUCKET              = aws_s3_bucket.content_sync_bucket.id
+      // token_auth routes verify the request's organization_id through the
+      // platform's direct authorizer (handler/workspace_access.go). Not
+      // wrapped in try(): a missing output must fail the plan, not every
+      // workspace check.
+      DIRECT_AUTHORIZER_LAMBDA_NAME = data.terraform_remote_state.api_gateway.outputs.direct_authorizer_lambda_name
+      // How a release whose app.yml doesn't follow its schema is treated:
+      // warn (record the problems on the version) or enforce (refuse it).
+      APP_MANIFEST_VALIDATION = var.app_manifest_validation
+      // Live updates: the Event API's publish host where realtime is on
+      // (realtime.tf); empty keeps Pusher.
+      REALTIME_EVENTS_ENDPOINT = local.realtime_events_endpoint
     }
   }
 }

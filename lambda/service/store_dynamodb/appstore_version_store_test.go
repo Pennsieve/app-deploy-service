@@ -286,3 +286,51 @@ func TestAppStoreVersionDatabaseStore_GetById_NotFound(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, got)
 }
+
+func TestAppStoreVersionDatabaseStore_SetManifest(t *testing.T) {
+	mock := &ArgCaptureAppStoreVersionTableAPI{}
+	store := NewAppStoreVersionDatabaseStore(mock, "test-versions-table")
+	versionUuid := uuid.NewString()
+
+	manifest := &AppManifest{
+		Name:    "spike-detect",
+		Runtime: AppRuntime{CPU: 2048, ComputeTypes: []string{"standard"}},
+		Inputs:  []AppPort{{Name: "recording", MediaTypes: []string{"application/edf"}}},
+	}
+	require.NoError(t, store.SetManifest(context.Background(), versionUuid, manifest))
+
+	require.NotNil(t, mock.UpdateItemInput)
+	assert.Equal(t, &types.AttributeValueMemberS{Value: versionUuid}, mock.UpdateItemInput.Key["uuid"])
+	assert.Equal(t, "set manifest = :m", aws.ToString(mock.UpdateItemInput.UpdateExpression))
+
+	var got AppManifest
+	require.NoError(t, attributevalue.Unmarshal(mock.UpdateItemInput.ExpressionAttributeValues[":m"], &got))
+	assert.Equal(t, *manifest, got)
+}
+
+func TestAppStoreVersion_ManifestRoundTrip(t *testing.T) {
+	v := AppStoreVersion{Uuid: "u", Version: "v1", Manifest: &AppManifest{Name: "x", Outputs: []AppPort{{Name: "out"}}}}
+	item, err := attributevalue.MarshalMap(v)
+	require.NoError(t, err)
+	var back AppStoreVersion
+	require.NoError(t, attributevalue.UnmarshalMap(item, &back))
+	assert.Equal(t, v, back)
+
+	noManifest, err := attributevalue.MarshalMap(AppStoreVersion{Uuid: "u"})
+	require.NoError(t, err)
+	_, has := noManifest["manifest"]
+	assert.False(t, has, "a version without app.yml stores no manifest")
+}
+
+func TestAppStoreVersionDatabaseStore_SetRegistrationDetails(t *testing.T) {
+	api := &ArgCaptureAppStoreVersionTableAPI{}
+	store := NewAppStoreVersionDatabaseStore(api, "versions")
+
+	assert.NoError(t, store.SetRegistrationDetails(context.Background(), "v1", "MIT", []string{"/runtime: x"}))
+	assert.Equal(t, "set license = :l, manifestProblems = :p", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "MIT"}, api.UpdateItemInput.ExpressionAttributeValues[":l"])
+
+	assert.NoError(t, store.SetRegistrationDetails(context.Background(), "v1", "", nil))
+	assert.Equal(t, "remove license, manifestProblems", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	assert.Nil(t, api.UpdateItemInput.ExpressionAttributeValues)
+}

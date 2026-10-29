@@ -72,6 +72,12 @@ type AppStoreApplication struct {
 	// app.yml at publish time. app.yml is the source of truth; downstream
 	// services (e.g. workflow-service) read these as parameter defaults.
 	Params []AppParameter `dynamodbav:"params,omitempty"`
+	// Summary is the first paragraph of the README at SummaryTag, as plain
+	// text: what the app's card shows without an app.yml description.
+	// SummaryTag records which release it came from (also when the README
+	// had none), so it's computed once per release.
+	Summary    string `dynamodbav:"summary,omitempty"`
+	SummaryTag string `dynamodbav:"summaryTag,omitempty"`
 }
 
 // AppParameter is a single processor parameter declaration from app.yml. The
@@ -116,6 +122,67 @@ type AppStoreVersion struct {
 	DestinationUrl string `dynamodbav:"destinationUrl"`
 	CreatedAt      string `dynamodbav:"createdAt"`
 	Status         string `dynamodbav:"registrationStatus"`
+	// Manifest is this version's app.yml, parsed at registration; nil for an
+	// app without one, or a version registered before manifests were kept.
+	Manifest *AppManifest `dynamodbav:"manifest,omitempty"`
+	// ManifestProblems is how the app.yml doesn't follow its schema
+	// (manifestschema), one "path: reason" each, as found at registration.
+	ManifestProblems []string `dynamodbav:"manifestProblems,omitempty"`
+	// License is the repository's license (its SPDX id) at this version, as
+	// GitHub reads its LICENSE file; empty when there's none or it's unknown.
+	License string `dynamodbav:"license,omitempty"`
+}
+
+// AppManifest is a version's app.yml as stored.
+type AppManifest struct {
+	Name        string          `dynamodbav:"name,omitempty"`
+	Description string          `dynamodbav:"description,omitempty"`
+	Tags        []string        `dynamodbav:"tags,omitempty"`
+	Maintainers []AppMaintainer `dynamodbav:"maintainers,omitempty"`
+	Runtime     AppRuntime      `dynamodbav:"runtime"`
+	Parameters  []AppParameter  `dynamodbav:"parameters,omitempty"`
+	Inputs      []AppPort       `dynamodbav:"inputs,omitempty"`
+	Outputs     []AppPort       `dynamodbav:"outputs,omitempty"`
+}
+
+// AppRuntime is what a version asks for to run: CPU units and MiB, the
+// compute types it runs on, and its timeout. Zero means not declared.
+type AppRuntime struct {
+	CPU            int      `dynamodbav:"cpu,omitempty"`
+	Memory         int      `dynamodbav:"memory,omitempty"`
+	ComputeTypes   []string `dynamodbav:"computeTypes,omitempty"`
+	TimeoutSeconds int      `dynamodbav:"timeoutSeconds,omitempty"`
+	// LLM: the app calls language models through Pennsieve (opt-in to the
+	// LLM proxy sidecar); workflow-service reads it at run start.
+	LLM bool `dynamodbav:"llm,omitempty"`
+	// Interactive: a human-in-the-loop app, run as a live session of
+	// SessionType ("jupyter" is a notebook); Kernel is a Jupyter session's
+	// language ("python", "r").
+	Interactive bool   `dynamodbav:"interactive,omitempty"`
+	SessionType string `dynamodbav:"sessionType,omitempty"`
+	Kernel      string `dynamodbav:"kernel,omitempty"`
+}
+
+// AppMaintainer is one of the people maintaining an app; Orcid is the bare
+// iD (0000-0002-1825-0097).
+type AppMaintainer struct {
+	Name  string `dynamodbav:"name"`
+	Email string `dynamodbav:"email,omitempty"`
+	Orcid string `dynamodbav:"orcid,omitempty"`
+}
+
+// AppPort is one of a version's declared inputs or outputs: by MIME type,
+// by EDAM format id (format_3590), or neither, meaning any file. Container
+// (file or directory) and ConformsTo (folder structures such as bids@1.9,
+// outermost first) are empty when app.yml doesn't set them.
+type AppPort struct {
+	Name        string   `dynamodbav:"name"`
+	Description string   `dynamodbav:"description,omitempty"`
+	MediaTypes  []string `dynamodbav:"mediaTypes,omitempty"`
+	Formats     []string `dynamodbav:"formats,omitempty"`
+	Container   string   `dynamodbav:"container,omitempty"`
+	ConformsTo  []string `dynamodbav:"conformsTo,omitempty"`
+	Placement   string   `dynamodbav:"placement,omitempty"`
 }
 
 func (i AppStoreVersion) GetKey() map[string]types.AttributeValue {

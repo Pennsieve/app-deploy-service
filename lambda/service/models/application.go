@@ -102,6 +102,9 @@ type AppStoreApplication struct {
 	LatestVersionTag string            `json:"latestVersionTag,omitempty"`
 	Versions         []AppStoreVersion `json:"versions"`
 	Params           []AppParameter    `json:"params,omitempty"`
+	// Summary is the README's first paragraph as plain text, for cards when
+	// app.yml has no description.
+	Summary string `json:"summary,omitempty"`
 }
 
 // AppParameter is a processor parameter declaration parsed from the app's
@@ -163,6 +166,64 @@ type AppStoreVersion struct {
 	CreatedAt     string       `json:"createdAt"`
 	Status        string       `json:"status"`
 	Deployments   []Deployment `json:"deployments"`
+	// Manifest is this version's app.yml; absent for an app without one.
+	Manifest *AppManifest `json:"manifest,omitempty"`
+	// ManifestProblems: how its app.yml doesn't follow the schema, as found
+	// at registration ("path: reason" each).
+	ManifestProblems []string `json:"manifestProblems,omitempty"`
+	// License: the repository's license at this version (an SPDX id, from its
+	// LICENSE file); absent when there's none or it's unknown.
+	License string `json:"license,omitempty"`
+}
+
+// AppManifest is a version's app.yml: what the app is, what it asks for, its
+// parameters, and what goes in and out.
+type AppManifest struct {
+	Name        string          `json:"name,omitempty"`
+	Description string          `json:"description,omitempty"`
+	Tags        []string        `json:"tags,omitempty"`
+	Maintainers []AppMaintainer `json:"maintainers,omitempty"`
+	Runtime     AppRuntime      `json:"runtime"`
+	Parameters  []AppParameter  `json:"parameters"`
+	Inputs      []AppPort       `json:"inputs"`
+	Outputs     []AppPort       `json:"outputs"`
+}
+
+// AppRuntime: CPU units and MiB, compute types and timeout; 0 or empty when
+// the manifest doesn't declare them.
+type AppRuntime struct {
+	CPU            int      `json:"cpu,omitempty"`
+	Memory         int      `json:"memory,omitempty"`
+	ComputeTypes   []string `json:"computeTypes,omitempty"`
+	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+	// LLM: the app calls language models through Pennsieve (opt-in to the
+	// LLM proxy sidecar).
+	LLM bool `json:"llm,omitempty"`
+	// Interactive: a human-in-the-loop app, run as a live session of
+	// SessionType ("jupyter" is a notebook); Kernel is a Jupyter session's
+	// language ("python", "r").
+	Interactive bool   `json:"interactive,omitempty"`
+	SessionType string `json:"sessionType,omitempty"`
+	Kernel      string `json:"kernel,omitempty"`
+}
+
+type AppMaintainer struct {
+	Name  string `json:"name"`
+	Email string `json:"email,omitempty"`
+	Orcid string `json:"orcid,omitempty"`
+}
+
+// AppPort is an input or output: MIME types, EDAM format ids, or neither
+// (any file). Container and ConformsTo are omitted when app.yml doesn't set
+// them; no container means file.
+type AppPort struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description,omitempty"`
+	MediaTypes  []string `json:"mediaTypes"`
+	Formats     []string `json:"formats,omitempty"`
+	Container   string   `json:"container,omitempty"`
+	ConformsTo  []string `json:"conformsTo,omitempty"`
+	Placement   string   `json:"placement,omitempty"`
 }
 
 type AppStoreApplicationDetail struct {

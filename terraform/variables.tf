@@ -65,6 +65,20 @@ variable "deployer_task_memory" {
   default = "24576"
 }
 
+# Publish the app.yml schema (app-manifest/v1.json) to the platform's schemas
+# host (schemas.<domain>). On where the schema's $id points: prod.
+variable "publish_schemas" {
+  type    = bool
+  default = false
+}
+
+# warn: register a release whose app.yml doesn't follow the schema and record
+# why on the version; enforce: refuse it.
+variable "app_manifest_validation" {
+  type    = string
+  default = "warn"
+}
+
 locals {
   common_tags = {
     aws_account      = var.aws_account

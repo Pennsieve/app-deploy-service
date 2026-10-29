@@ -61,9 +61,14 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 	}
 
 	claims := authorizer.ParseClaims(request.RequestContext.Authorizer.Lambda)
-	log.Printf("%s: caller org=%s user=%s", handlerName, claims.OrgClaim.NodeId, claims.UserClaim.NodeId)
 
-	if !CanAccessApp(ctx, claims, app, appAccessStore) {
+	// token_auth: the workspace comes from the request, verified here; none
+	// means the personal scope. Never claims.OrgClaim (see workspace_access.go).
+	ws, errResp := workspaceFromRequest(ctx, request, claims, handlerName)
+	if errResp != nil {
+		return *errResp, nil
+	}
+	if !CanAccessAppIn(ctx, claims, ws, app, appAccessStore) {
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusForbidden,
 			Body:       handlerError(handlerName, ErrNotPermitted),
@@ -129,22 +134,16 @@ func GetAppstoreApplicationHandler(ctx context.Context, request events.APIGatewa
 	}, nil
 }
 
-// latestVersionTag returns the Version tag of the most recently created version,
-// or an empty string if there are no versions with a tag. Assets are only synced
+// latestVersionTag returns the newest version's tag (version_order.go): the
+// highest semantic version, else the most recently registered; or an empty
+// string if there are no versions with a tag. Assets are only synced
 // for release tags, so there is no meaningful default when no release exists.
 func latestVersionTag(versions []models.AppStoreVersion) string {
-	latest := ""
-	latestCreatedAt := ""
+	tagged := make([]taggedVersion, 0, len(versions))
 	for _, v := range versions {
-		if v.Version == "" {
-			continue
-		}
-		if v.CreatedAt > latestCreatedAt {
-			latestCreatedAt = v.CreatedAt
-			latest = v.Version
-		}
+		tagged = append(tagged, taggedVersion{Tag: v.Version, CreatedAt: v.CreatedAt})
 	}
-	return latest
+	return newestTag(tagged)
 }
 
 // paramsFromAppConfig parses the parameter declarations out of a synced
