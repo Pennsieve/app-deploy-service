@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -120,10 +119,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}
 	} else {
 		applicationId = uuid.NewString()
-		visibility := "public"
-		if application.Source.IsPrivate {
-			visibility = "private"
-		}
+		visibility := initialVisibility(application.Source.IsPrivate, application.Access)
 		appRecord := store_dynamodb.AppStoreApplication{
 			Uuid:       applicationId,
 			SourceUrl:  application.Source.Url,
@@ -142,21 +138,20 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			}, nil
 		}
 
+		// the owner row, plus the grants the publisher chose up front (if any);
+		// a request without access gives the owner-only list
 		appAccessTable := os.Getenv(appAccessTableNameKey)
 		appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, appAccessTable)
-		ownerAccess := store_dynamodb.AppAccess{
-			EntityId:    fmt.Sprintf("user#%s", userId),
-			AppId:       fmt.Sprintf("app#%s", applicationId),
-			EntityType:  "user",
-			EntityRawId: userId,
-			AppUuid:     applicationId,
-			AccessType:  "owner",
-			GrantedAt:   time.Now().UTC().String(),
-			GrantedBy:   userId,
+		var initialAccess models.SetPermissionsRequest
+		if application.Access != nil {
+			initialAccess = *application.Access
 		}
-		if err := appAccessStore.Insert(ctx, ownerAccess); err != nil {
-			log.Println("error inserting owner access: ", err.Error())
+		for _, entry := range accessEntriesFor(applicationId, userId, userId, time.Now().UTC().String(), initialAccess) {
+			if err := appAccessStore.Insert(ctx, entry); err != nil {
+				log.Printf("error inserting %s access for %s: %s", entry.EntityType, entry.EntityId, err.Error())
+			}
 		}
+		log.Printf("application %s starts %s with %d access entries", applicationId, visibility, len(accessEntriesFor(applicationId, userId, userId, "", initialAccess)))
 
 		log.Printf("created new appstore application %s for sourceUrl %s", applicationId, application.Source.Url)
 	}

@@ -151,24 +151,54 @@ func PutAppPermissionsHandler(ctx context.Context, request events.APIGatewayV2HT
 		}, nil
 	}
 
-	now := time.Now().UTC().String()
-	grantedBy := claims.UserClaim.NodeId
+	accessEntries := accessEntriesFor(appId, app.OwnerId, claims.UserClaim.NodeId, time.Now().UTC().String(), req)
 
-	var accessEntries []store_dynamodb.AppAccess
+	if err := appAccessStore.ReplaceByApp(ctx, appId, accessEntries); err != nil {
+		log.Printf("%s: error replacing access entries: %v", handlerName, err)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrDynamoDB),
+		}, nil
+	}
 
-	accessEntries = append(accessEntries, store_dynamodb.AppAccess{
-		EntityId:    fmt.Sprintf("user#%s", app.OwnerId),
+	permissions := models.AppPermissions{
+		Visibility: req.Visibility,
+		OwnerId:    app.OwnerId,
+		Access:     mappers.AppAccessItemsToModels(accessEntries),
+	}
+
+	m, err := json.Marshal(permissions)
+	if err != nil {
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       handlerError(handlerName, ErrMarshaling),
+		}, nil
+	}
+
+	return events.APIGatewayV2HTTPResponse{
+		StatusCode: http.StatusOK,
+		Body:       string(m),
+	}, nil
+}
+
+// accessEntriesFor builds the full access list for an application from a sharing
+// request: the owner row first, then every requested user (other than the owner),
+// team and workspace. It is what PUT /store/{id}/permissions writes, and what
+// POST /store applies when a publish request carries initial sharing.
+func accessEntriesFor(appId string, ownerId string, grantedBy string, now string, req models.SetPermissionsRequest) []store_dynamodb.AppAccess {
+	accessEntries := []store_dynamodb.AppAccess{{
+		EntityId:    fmt.Sprintf("user#%s", ownerId),
 		AppId:       fmt.Sprintf("app#%s", appId),
 		EntityType:  "user",
-		EntityRawId: app.OwnerId,
+		EntityRawId: ownerId,
 		AppUuid:     appId,
 		AccessType:  "owner",
 		GrantedAt:   now,
 		GrantedBy:   grantedBy,
-	})
+	}}
 
 	for _, u := range req.Users {
-		if u.EntityId == app.OwnerId {
+		if u.EntityId == ownerId {
 			continue
 		}
 		accessEntries = append(accessEntries, store_dynamodb.AppAccess{
@@ -212,30 +242,18 @@ func PutAppPermissionsHandler(ctx context.Context, request events.APIGatewayV2HT
 		})
 	}
 
-	if err := appAccessStore.ReplaceByApp(ctx, appId, accessEntries); err != nil {
-		log.Printf("%s: error replacing access entries: %v", handlerName, err)
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrDynamoDB),
-		}, nil
-	}
+	return accessEntries
+}
 
-	permissions := models.AppPermissions{
-		Visibility: req.Visibility,
-		OwnerId:    app.OwnerId,
-		Access:     mappers.AppAccessItemsToModels(accessEntries),
+// initialVisibility is the visibility a new application starts with: what the
+// publisher asked for when the request carries valid sharing, otherwise private
+// for a private GitHub repository and public for a public one.
+func initialVisibility(isPrivate bool, access *models.SetPermissionsRequest) string {
+	if access != nil && (access.Visibility == "public" || access.Visibility == "private") {
+		return access.Visibility
 	}
-
-	m, err := json.Marshal(permissions)
-	if err != nil {
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
-			Body:       handlerError(handlerName, ErrMarshaling),
-		}, nil
+	if isPrivate {
+		return "private"
 	}
-
-	return events.APIGatewayV2HTTPResponse{
-		StatusCode: http.StatusOK,
-		Body:       string(m),
-	}, nil
+	return "public"
 }

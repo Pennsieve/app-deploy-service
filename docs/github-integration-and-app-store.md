@@ -221,6 +221,10 @@ A user is considered to have access if **any one** of these is true: they're the
 - **"This app should be available to the entire 'Imaging' team plus one external reviewer."**
   Set visibility to **Private**, share with the **Imaging** team, and add the reviewer as a shared **user**.
 
+### Choosing sharing before the first release
+
+An application only exists once its first release has been built, but you do not have to wait for that to decide who can see it. The "add a repository" flow in **My Code** asks for the sharing up front and stores it with the repository's publishing settings (`github-service`, `POST /repositories` with `access`). When the first release arrives, `POST /store` creates the application with that visibility and share list instead of the defaults (private for a private repository, public for a public one). Later releases never touch sharing, so anything you change on the app page stays.
+
 ### Changing your mind later
 
 All of the above is editable. Open the app in the App Store, go to **Permissions**, change visibility or edit the share list, and save.
@@ -232,7 +236,7 @@ All of the above is editable. Open the app in the App Store, go to **Permissions
 | Concept | In the web app | Behind the scenes |
 |---|---|---|
 | Connect / disconnect GitHub | **My Workspace → Settings → Integrations → GitHub** | `github-service` (`POST /accounts/github/register`, `DELETE /accounts/github/user`) |
-| Add / remove repos the App can see | **Update Integration** button on the GitHub card → GitHub install screen | GitHub App installation; Pennsieve stores only the installation ID |
+| Add / remove repos the App can see | **Add repository** in My Code (direct, when GitHub allows it), or **Update Integration** on the GitHub card → GitHub install screen | `github-service` (`POST /repository/{owner}/{repo}/access`) and the GitHub App installation |
 | See tracked repos & toggle publishing | **My Workspace → My Code** | `codeReposModule/fetchMyRepos` |
 | App Store catalog, versions, permissions | **App Store** | `app-deploy-service` (`POST /store`, `GET /store/...`, `PUT /store/{id}/permissions`) |
 | Authorization rule | — | `CanAccessApp` in `app-deploy-service`: public ⇒ open; otherwise owner, user share, team share, or workspace share |
