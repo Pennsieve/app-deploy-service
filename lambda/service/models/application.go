@@ -25,6 +25,10 @@ type Application struct {
 type AppStoreDeployment struct {
 	Source  DeploymentSource `json:"source"`
 	Release Release          `json:"release"`
+	// Access is the sharing the publisher chose before the application existed
+	// (visibility plus user/team/workspace grants). It is applied only when this
+	// request creates the application; later releases leave sharing alone.
+	Access *SetPermissionsRequest `json:"access,omitempty"`
 }
 
 type Account struct {
