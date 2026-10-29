@@ -58,9 +58,17 @@ type Detail struct {
 
 	StopCode      string `json:"stopCode,omitempty"`
 	StoppedReason string `json:"stoppedReason,omitempty"`
+
+	// BuildFailed marks a CodeBuild image build that ended other than
+	// SUCCEEDED. Not part of the ECS event: set when a CodeBuild event is
+	// recorded through the same path (handler/codebuild.go).
+	BuildFailed bool `json:"-"`
 }
 
 func (d Detail) Errored() bool {
+	if d.BuildFailed {
+		return true
+	}
 	for _, c := range d.Containers {
 		if c.Errored() {
 			return true

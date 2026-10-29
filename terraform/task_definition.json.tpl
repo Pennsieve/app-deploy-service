@@ -13,7 +13,11 @@
       { "name" : "ENVIRONMENT", "value": "${environment_name}" },
       { "name" : "ENV", "value": "${environment_name}" },
       { "name" : "REGION", "value": "${aws_region}" },
-      { "name" : "REALTIME_EVENTS_ENDPOINT", "value": "${realtime_events_endpoint}" }
+      { "name" : "REALTIME_EVENTS_ENDPOINT", "value": "${realtime_events_endpoint}" },
+      { "name" : "IMAGE_BUILDER", "value": "${image_builder}" },
+      { "name" : "IMAGE_BUILDER_PROJECT", "value": "${image_builder_project}" },
+      { "name" : "BUILD_CACHE_ECR_URL", "value": "${build_cache_ecr_url}" },
+      { "name" : "IMAGE_BUILD_PARAMETER_PREFIX", "value": "${image_build_param_prefix}" }
     ],
     "name": "${tier}",
     "image": "${image_url}:${image_tag}",

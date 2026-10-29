@@ -63,6 +63,9 @@ resource "aws_lambda_function" "service_lambda" {
       // Live updates: the Event API's publish host where realtime is on
       // (realtime.tf); empty keeps Pusher.
       REALTIME_EVENTS_ENDPOINT = local.realtime_events_endpoint
+      // Which builder builds App Store images (docs/builds.md); with kaniko,
+      // releases whose Dockerfile uses BuildKit-only syntax are refused.
+      IMAGE_BUILDER = var.image_builder
     }
   }
 }

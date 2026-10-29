@@ -14,7 +14,7 @@
       { "name" : "REGION", "value": "${aws_region}" }
     ],
     "name": "${tier}",
-    "image": "${image_url}:${image_tag}",
+    "image": "${image}",
     "cpu": ${container_cpu},
     "memory": ${container_memory},
     "essential": true

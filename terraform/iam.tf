@@ -308,6 +308,38 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
     resources = ["*"]
   }
 
+  # CodeBuild image builds (codebuild.tf): look up a build, read a failed
+  # build's log for its error, delete its GitHub token parameter.
+  dynamic "statement" {
+    for_each = local.use_codebuild ? [1] : []
+    content {
+      sid       = "StatusLambdaImageBuilds"
+      effect    = "Allow"
+      actions   = ["codebuild:BatchGetBuilds"]
+      resources = [aws_codebuild_project.image_builder[0].arn]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = local.use_codebuild ? [1] : []
+    content {
+      sid       = "StatusLambdaImageBuildLogs"
+      effect    = "Allow"
+      actions   = ["logs:GetLogEvents"]
+      resources = ["${aws_cloudwatch_log_group.image_builder[0].arn}:*"]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = local.use_codebuild ? [1] : []
+    content {
+      sid       = "StatusLambdaImageBuildTokens"
+      effect    = "Allow"
+      actions   = ["ssm:DeleteParameter"]
+      resources = [local.image_build_parameter_arn]
+    }
+  }
+
 }
 
 # Fargate Task
@@ -498,6 +530,28 @@ data "aws_iam_policy_document" "app_provisioner_fargate_iam_policy_document" {
     resources = [
       "arn:aws:iam::*:role/Pennsieve-Compute-*",
     ]
+  }
+
+  # CodeBuild image builds (codebuild.tf): start a build, and put/delete the
+  # GitHub token parameter a private repo's build reads.
+  dynamic "statement" {
+    for_each = local.use_codebuild ? [1] : []
+    content {
+      sid       = "StartImageBuilds"
+      effect    = "Allow"
+      actions   = ["codebuild:StartBuild"]
+      resources = [aws_codebuild_project.image_builder[0].arn]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = local.use_codebuild ? [1] : []
+    content {
+      sid       = "ImageBuildTokens"
+      effect    = "Allow"
+      actions   = ["ssm:PutParameter", "ssm:DeleteParameter"]
+      resources = [local.image_build_parameter_arn]
+    }
   }
 
   statement {

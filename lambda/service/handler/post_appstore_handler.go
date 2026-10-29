@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/pennsieve/app-deploy-service/service/manifestschema"
 	"log"
@@ -213,6 +214,19 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 					manifestschema.URL, strings.Join(problems, "; "))),
 			}, nil
 		}
+	}
+
+	// While kaniko builds the images, a Dockerfile it can't build faithfully
+	// (heredocs, RUN --mount) is refused here with the reason, instead of
+	// silently pushing an image other than the one the author tested.
+	// Skipped when the environment builds with BuildKit (IMAGE_BUILDER).
+	if reason := unsupportedDockerfileSyntax(application.Source.Url, application.Source.Tag, application.Source.AuthToken); reason != "" {
+		log.Printf("refusing %s %s: %s", application.Source.Url, application.Source.Tag, reason)
+		refusal := withLiveUpdates(ctx, NewAppStoreStatusManager(handlerName, versionStore, versionUuid), cfg)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusUnprocessableEntity,
+			Body:       refusal.SetErrorStatus(ctx, errors.New(reason)),
+		}, nil
 	}
 
 	// The repository's license at this tag (from its LICENSE file, as GitHub
