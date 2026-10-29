@@ -219,6 +219,21 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}
 	}
 
+	// The repository's CITATION.cff at this tag, typed by app.yml's
+	// application.relations. An invalid file, or a relation for a DOI it
+	// doesn't list, is a manifest problem; it never refuses the release.
+	cff, haveCFF := readSyncedFile(ctx, cfg, application.Source.Url, application.Source.Tag, citationFile)
+	appCite, citeProblems := appCitation(cff, haveCFF, appCfg.Application.Relations)
+	if len(citeProblems) > 0 {
+		log.Printf("citation of %s %s: %s", application.Source.Url, application.Source.Tag, strings.Join(citeProblems, "; "))
+		problems = append(problems, citeProblems...)
+	}
+	if appCite != nil {
+		if err := versionStore.SetCitation(ctx, versionUuid, appCite); err != nil {
+			log.Printf("warning: unable to persist the citation of %s %s: %v", applicationId, application.Source.Tag, err)
+		}
+	}
+
 	// The repository's license at this tag (from its LICENSE file, as GitHub
 	// reads it), kept with the version. A failed lookup only logs.
 	license, err := repoLicense(ctx, application.Source.Url, application.Source.Tag, application.Source.AuthToken)

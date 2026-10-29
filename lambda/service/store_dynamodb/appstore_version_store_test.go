@@ -334,3 +334,26 @@ func TestAppStoreVersionDatabaseStore_SetRegistrationDetails(t *testing.T) {
 	assert.Equal(t, "remove license, manifestProblems", aws.ToString(api.UpdateItemInput.UpdateExpression))
 	assert.Nil(t, api.UpdateItemInput.ExpressionAttributeValues)
 }
+
+func TestAppStoreVersionDatabaseStore_SetCitation(t *testing.T) {
+	api := &ArgCaptureAppStoreVersionTableAPI{}
+	store := NewAppStoreVersionDatabaseStore(api, "versions")
+
+	citation := &AppCitation{
+		Title:   "FlowSOM clustering",
+		Authors: []CitationAuthor{{Name: "Sofie Van Gassen", GivenNames: "Sofie", FamilyNames: "Van Gassen", Orcid: "0000-0002-7119-5330"}},
+		RelatedWorks: []RelatedWork{
+			{DOI: "10.1002/cyto.a.22625", RelationType: "References", Title: "FlowSOM", Year: 2015, Source: "references"},
+			{RelationType: "References", Title: "FlowKit", URL: "https://github.com/whitews/FlowKit", Source: "references"},
+		},
+	}
+	require.NoError(t, store.SetCitation(context.Background(), "v1", citation))
+	assert.Equal(t, "set citation = :c", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	var got AppCitation
+	require.NoError(t, attributevalue.Unmarshal(api.UpdateItemInput.ExpressionAttributeValues[":c"], &got))
+	assert.Equal(t, *citation, got)
+
+	require.NoError(t, store.SetCitation(context.Background(), "v1", nil))
+	assert.Equal(t, "remove citation", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	assert.Nil(t, api.UpdateItemInput.ExpressionAttributeValues)
+}

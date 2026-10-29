@@ -226,6 +226,95 @@ components:
         license:
           type: string
           description: The repository's license at this version, an SPDX id (e.g. "MIT"), as GitHub reads its LICENSE file. Absent when there's none or it's unknown.
+        citation:
+          $ref: '#/components/schemas/AppCitation'
+    AppCitation:
+      type: object
+      description: >
+        The repository's CITATION.cff (Citation File Format 1.2.0) at this
+        version, read when it was registered, with app.yml's
+        application.relations applied. Absent when the repository has none or
+        it couldn't be parsed (then manifestProblems says why).
+      required: [authors, preferredCitation, relatedWorks]
+      properties:
+        title:
+          type: string
+        version:
+          type: string
+        doi:
+          type: string
+          description: The software's own DOI, normalised (10.5281/zenodo.1234567).
+        dateReleased:
+          type: string
+          description: As written in CITATION.cff, e.g. 2026-10-01.
+        authors:
+          type: array
+          items:
+            $ref: '#/components/schemas/CitationAuthor'
+        preferredCitation:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/RelatedWork'
+          description: >
+            The work to cite for the app (CITATION.cff's preferred-citation),
+            also the first of relatedWorks. Null means cite the software
+            itself (title, authors, version, doi).
+        relatedWorks:
+          type: array
+          description: >
+            Every work CITATION.cff lists, the preferred citation first, then
+            its references in file order, each DOI once.
+          items:
+            $ref: '#/components/schemas/RelatedWork'
+    CitationAuthor:
+      type: object
+      description: A person (givenNames, familyNames) or an entity such as an organisation (only name).
+      required: [name]
+      properties:
+        name:
+          type: string
+          description: How the author is shown, e.g. "Sofie Van Gassen" or "Pennsieve Team".
+        givenNames:
+          type: string
+        familyNames:
+          type: string
+        orcid:
+          type: string
+          description: The bare ORCID iD, e.g. 0000-0002-1825-0097.
+        affiliation:
+          type: string
+    RelatedWork:
+      type: object
+      description: A work CITATION.cff lists, with its DataCite relation type.
+      required: [doi, relationType, source]
+      properties:
+        doi:
+          type: string
+          description: >
+            Normalised (lowercase, no https://doi.org/ or doi:), e.g.
+            10.1038/nbt.4314. Empty for a work without a DOI, which is shown
+            by its url and not sent to DataCite.
+        relationType:
+          type: string
+          enum: [Describes, Documents, IsCitedBy, IsDerivedFrom, IsDescribedBy, IsDocumentedBy, IsMetadataFor, IsReferencedBy, IsRequiredBy, IsSourceOf, IsSupplementedBy, IsSupplementTo, IsOriginalFormOf, IsVariantFormOf, References, Requires]
+          description: >
+            IsDescribedBy for the preferred citation, References for a
+            reference, unless app.yml's application.relations says otherwise.
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        year:
+          type: integer
+        journal:
+          type: string
+        url:
+          type: string
+        source:
+          type: string
+          enum: [preferred-citation, references]
     AppManifest:
       type: object
       description: The version's app.yml, parsed when it was registered. Absent for an app without an app.yml.
@@ -418,7 +507,7 @@ components:
             type: string
           description: >
             Map of asset filename to content string. Includes files like
-            app.yml and README.md when they exist in the synced
+            app.yml, README.md and CITATION.cff when they exist in the synced
             repository content.
         params:
           type: array

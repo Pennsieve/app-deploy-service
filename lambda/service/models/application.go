@@ -170,6 +170,51 @@ type AppStoreVersion struct {
 	// License: the repository's license at this version (an SPDX id, from its
 	// LICENSE file); absent when there's none or it's unknown.
 	License string `json:"license,omitempty"`
+	// Citation: the repository's CITATION.cff at this version; absent when
+	// there's none or it couldn't be read (see manifestProblems).
+	Citation *AppCitation `json:"citation,omitempty"`
+}
+
+// AppCitation is a version's CITATION.cff: its title, version, DOI and
+// release date, its authors, how to cite it, and the works it lists with
+// their DataCite relation types (app.yml's application.relations applied).
+type AppCitation struct {
+	Title        string           `json:"title,omitempty"`
+	Version      string           `json:"version,omitempty"`
+	DOI          string           `json:"doi,omitempty"`
+	DateReleased string           `json:"dateReleased,omitempty"`
+	Authors      []CitationAuthor `json:"authors"`
+	// PreferredCitation: the work to cite for the app; null means cite the
+	// software itself (title, authors, version, doi).
+	PreferredCitation *RelatedWork `json:"preferredCitation"`
+	// RelatedWorks: every work listed, the preferred citation first, then
+	// the references, each DOI once.
+	RelatedWorks []RelatedWork `json:"relatedWorks"`
+}
+
+// CitationAuthor is a person (givenNames, familyNames) or an entity (only
+// name); name is how it's shown, orcid the bare iD.
+type CitationAuthor struct {
+	Name        string `json:"name"`
+	GivenNames  string `json:"givenNames,omitempty"`
+	FamilyNames string `json:"familyNames,omitempty"`
+	Orcid       string `json:"orcid,omitempty"`
+	Affiliation string `json:"affiliation,omitempty"`
+}
+
+// RelatedWork is a listed work: doi normalised (10.1038/nbt.4314), or ""
+// for a work without one (link it by url; it isn't sent to DataCite);
+// relationType one of the 16 DataCite types Pennsieve allows; source
+// "preferred-citation" or "references".
+type RelatedWork struct {
+	DOI          string   `json:"doi"`
+	RelationType string   `json:"relationType"`
+	Title        string   `json:"title,omitempty"`
+	Authors      []string `json:"authors,omitempty"`
+	Year         int      `json:"year,omitempty"`
+	Journal      string   `json:"journal,omitempty"`
+	URL          string   `json:"url,omitempty"`
+	Source       string   `json:"source"`
 }
 
 // AppManifest is a version's app.yml: what the app is, what it asks for, its

@@ -54,6 +54,9 @@ type appInfo struct {
 	Description string          `yaml:"description"`
 	Tags        []string        `yaml:"tags"`
 	Maintainers []appMaintainer `yaml:"maintainers"`
+	// Relations types works listed in the repository's CITATION.cff that
+	// aren't plain references: DOI → DataCite relation type.
+	Relations map[string]string `yaml:"relations"`
 }
 
 // appMaintainer is one of `application.maintainers`.
@@ -163,6 +166,12 @@ func readSyncedAppConfig(ctx context.Context, cfg aws.Config, sourceUrl string, 
 // readSyncedAppYml reads the synced app.yml's text from S3; false when there's
 // none (or it can't be read).
 func readSyncedAppYml(ctx context.Context, cfg aws.Config, sourceUrl string, tag string) ([]byte, bool) {
+	return readSyncedFile(ctx, cfg, sourceUrl, tag, appConfigFile)
+}
+
+// readSyncedFile reads one of a tag's synced files (CONTENT_SYNC_FILES) from
+// S3; false when there's none (or it can't be read).
+func readSyncedFile(ctx context.Context, cfg aws.Config, sourceUrl string, tag string, file string) ([]byte, bool) {
 	bucket := os.Getenv("CONTENT_SYNC_BUCKET")
 	if bucket == "" {
 		return nil, false
@@ -175,7 +184,7 @@ func readSyncedAppYml(ctx context.Context, cfg aws.Config, sourceUrl string, tag
 	s3Client := s3.NewFromConfig(cfg)
 	dest := ghsync.NewS3Destination(s3Client, bucket)
 
-	key := namespace + "/" + appConfigFile
+	key := namespace + "/" + file
 	data, _, err := dest.Read(ctx, key)
 	if err != nil {
 		log.Printf("warning: unable to read %s: %v", key, err)

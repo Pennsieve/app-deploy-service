@@ -66,6 +66,8 @@ func TestProblems(t *testing.T) {
 		{"an unknown parameter type", "application:\n  name: a\nparameters:\n  - name: p\n    type: file\n", "/parameters/0/type"},
 		{"a license, which comes from the repository", "application:\n  name: a\n  license: MIT\n", "license"},
 		{"llm that isn't a boolean", "application:\n  name: a\nruntime:\n  llm: claude\n", "/runtime/llm"},
+		{"a relation that isn't a DataCite type", "application:\n  name: a\n  relations:\n    10.1038/nbt.4314: Cites\n", "/application/relations/10.1038/nbt.4314"},
+		{"a relation keyed by something that isn't a DOI", "application:\n  name: a\n  relations:\n    flowsom: References\n", "flowsom"},
 	}
 	for _, c := range cases {
 		ps, err := Validate([]byte(c.yml))
@@ -88,6 +90,10 @@ func TestOptionalVocabularyIsValid(t *testing.T) {
     - name: Bo
       orcid: 0000-0002-1694-233X
   tags: [eeg, spikes]
+  relations:
+    10.5281/zenodo.15388817: IsDerivedFrom
+    https://doi.org/10.1002/cyto.a.22625: Requires
+    "doi:10.1038/NBT.4314": IsSupplementTo
 runtime:
   computeTypes: [standard, gpu]
   llm: true

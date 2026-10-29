@@ -131,6 +131,53 @@ type AppStoreVersion struct {
 	// License is the repository's license (its SPDX id) at this version, as
 	// GitHub reads its LICENSE file; empty when there's none or it's unknown.
 	License string `dynamodbav:"license,omitempty"`
+	// Citation is the repository's CITATION.cff at this version: its authors,
+	// how to cite it, and the works it lists typed for DataCite (app.yml's
+	// application.relations applied). Nil when there's none or it can't be
+	// read; its problems are among ManifestProblems.
+	Citation *AppCitation `dynamodbav:"citation,omitempty"`
+}
+
+// AppCitation is a version's CITATION.cff as stored.
+type AppCitation struct {
+	Title        string           `dynamodbav:"title,omitempty"`
+	Version      string           `dynamodbav:"version,omitempty"`
+	DOI          string           `dynamodbav:"doi,omitempty"`
+	DateReleased string           `dynamodbav:"dateReleased,omitempty"`
+	Authors      []CitationAuthor `dynamodbav:"authors,omitempty"`
+	// PreferredCitation is how the app asks to be cited (the work
+	// CITATION.cff's preferred-citation names); nil means cite the software
+	// itself (Title, Authors, Version, DOI).
+	PreferredCitation *RelatedWork `dynamodbav:"preferredCitation,omitempty"`
+	// RelatedWorks is every work it lists, preferred citation first, then
+	// references, each once.
+	RelatedWorks []RelatedWork `dynamodbav:"relatedWorks,omitempty"`
+}
+
+// CitationAuthor is one of CITATION.cff's authors: a person (GivenNames,
+// FamilyNames) or an entity (only Name). Name is how it's shown; Orcid is
+// the bare iD.
+type CitationAuthor struct {
+	Name        string `dynamodbav:"name"`
+	GivenNames  string `dynamodbav:"givenNames,omitempty"`
+	FamilyNames string `dynamodbav:"familyNames,omitempty"`
+	Orcid       string `dynamodbav:"orcid,omitempty"`
+	Affiliation string `dynamodbav:"affiliation,omitempty"`
+}
+
+// RelatedWork is a work CITATION.cff lists with its DataCite relation type.
+// DOI is normalised (10.1038/nbt.4314), or empty for a work without one
+// (shown by its URL, not sent to DataCite). Source is "preferred-citation"
+// or "references".
+type RelatedWork struct {
+	DOI          string   `dynamodbav:"doi,omitempty"`
+	RelationType string   `dynamodbav:"relationType"`
+	Title        string   `dynamodbav:"title,omitempty"`
+	Authors      []string `dynamodbav:"authors,omitempty"`
+	Year         int      `dynamodbav:"year,omitempty"`
+	Journal      string   `dynamodbav:"journal,omitempty"`
+	URL          string   `dynamodbav:"url,omitempty"`
+	Source       string   `dynamodbav:"source"`
 }
 
 // AppManifest is a version's app.yml as stored.

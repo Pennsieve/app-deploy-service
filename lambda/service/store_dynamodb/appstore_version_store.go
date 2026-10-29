@@ -29,6 +29,7 @@ type AppStoreVersionDBStore interface {
 	UpdateStatus(ctx context.Context, newStatus string, uuid string) error
 	SetManifest(ctx context.Context, uuid string, manifest *AppManifest) error
 	SetRegistrationDetails(ctx context.Context, uuid string, license string, manifestProblems []string) error
+	SetCitation(ctx context.Context, uuid string, citation *AppCitation) error
 }
 
 type AppStoreVersionDatabaseStore struct {
@@ -219,6 +220,31 @@ func (r *AppStoreVersionDatabaseStore) SetManifest(ctx context.Context, uuid str
 	})
 	if err != nil {
 		return fmt.Errorf("error setting appstore version manifest: %w", err)
+	}
+	return nil
+}
+
+// SetCitation records a version's CITATION.cff; nil removes it.
+func (r *AppStoreVersionDatabaseStore) SetCitation(ctx context.Context, uuid string, citation *AppCitation) error {
+	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: uuid})
+	if err != nil {
+		return fmt.Errorf("error marshaling key for appstore version citation: %w", err)
+	}
+	in := &dynamodb.UpdateItemInput{
+		TableName:        aws.String(r.TableName),
+		Key:              key,
+		UpdateExpression: aws.String("remove citation"),
+	}
+	if citation != nil {
+		value, err := attributevalue.Marshal(citation)
+		if err != nil {
+			return fmt.Errorf("error marshaling appstore version citation: %w", err)
+		}
+		in.UpdateExpression = aws.String("set citation = :c")
+		in.ExpressionAttributeValues = map[string]types.AttributeValue{":c": value}
+	}
+	if _, err := r.api.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("error setting appstore version citation: %w", err)
 	}
 	return nil
 }

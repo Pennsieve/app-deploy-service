@@ -140,7 +140,39 @@ func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVer
 		Manifest:         AppManifestToModel(v.Manifest),
 		ManifestProblems: v.ManifestProblems,
 		License:          v.License,
+		Citation:         AppCitationToModel(v.Citation),
 	}
+}
+
+func AppCitationToModel(c *store_dynamodb.AppCitation) *models.AppCitation {
+	if c == nil {
+		return nil
+	}
+	out := &models.AppCitation{
+		Title:        c.Title,
+		Version:      c.Version,
+		DOI:          c.DOI,
+		DateReleased: c.DateReleased,
+		Authors:      []models.CitationAuthor{},
+		RelatedWorks: []models.RelatedWork{},
+	}
+	for _, a := range c.Authors {
+		out.Authors = append(out.Authors, models.CitationAuthor{Name: a.Name, GivenNames: a.GivenNames,
+			FamilyNames: a.FamilyNames, Orcid: a.Orcid, Affiliation: a.Affiliation})
+	}
+	if c.PreferredCitation != nil {
+		p := relatedWorkToModel(*c.PreferredCitation)
+		out.PreferredCitation = &p
+	}
+	for _, w := range c.RelatedWorks {
+		out.RelatedWorks = append(out.RelatedWorks, relatedWorkToModel(w))
+	}
+	return out
+}
+
+func relatedWorkToModel(w store_dynamodb.RelatedWork) models.RelatedWork {
+	return models.RelatedWork{DOI: w.DOI, RelationType: w.RelationType, Title: w.Title, Authors: w.Authors,
+		Year: w.Year, Journal: w.Journal, URL: w.URL, Source: w.Source}
 }
 
 func AppManifestToModel(m *store_dynamodb.AppManifest) *models.AppManifest {

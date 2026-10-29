@@ -13,7 +13,7 @@ import (
 	ghsync "github.com/pennsieve/github-client/pkg/github/sync"
 )
 
-var defaultSyncFiles = []string{"app.yml", "README.md"}
+var defaultSyncFiles = []string{"app.yml", "README.md", citationFile}
 
 func getSyncFiles() []string {
 	if v := os.Getenv("CONTENT_SYNC_FILES"); v != "" {

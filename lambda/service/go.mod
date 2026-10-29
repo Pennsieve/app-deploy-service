@@ -16,7 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.56.9
 	github.com/google/uuid v1.3.0
 	github.com/pennsieve/github-client v0.0.1
-	github.com/pennsieve/pennsieve-go-core v1.21.0
+	github.com/pennsieve/pennsieve-go-core v1.23.1-0.20261029111727-af22a5b57d93
 	github.com/pusher/pusher-http-go/v5 v5.1.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/stretchr/testify v1.12.1
@@ -44,9 +44,7 @@ require (
 	github.com/aws/smithy-go v1.28.6 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/lib/pq v1.10.7 // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
