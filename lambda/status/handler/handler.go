@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/pennsieve/app-deploy-service/status/external"
@@ -20,6 +21,20 @@ type DeployTaskStateChangeHandler struct {
 	ApplicationsTable string
 	DeploymentsTable  string
 	logger            *slog.Logger
+
+	// CodeBuild image builds (handler/codebuild.go); nil where unused.
+	CodeBuildApi external.CodeBuildApi
+	LogsApi      external.LogsApi
+	SSMApi       external.SSMApi
+}
+
+// WithCodeBuild lets the handler follow CodeBuild image builds: look up a
+// build's variables, read a failed build's log and delete its token parameter.
+func (h *DeployTaskStateChangeHandler) WithCodeBuild(codeBuildApi external.CodeBuildApi, logsApi external.LogsApi, ssmApi external.SSMApi) *DeployTaskStateChangeHandler {
+	h.CodeBuildApi = codeBuildApi
+	h.LogsApi = logsApi
+	h.SSMApi = ssmApi
+	return h
 }
 
 func NewDeployTaskStateChangeHandler(ecsApi external.ECSApi, dynamoDBApi external.DynamoDBApi, applicationsTable string, deploymentsTable string) *DeployTaskStateChangeHandler {
@@ -37,6 +52,30 @@ func (h *DeployTaskStateChangeHandler) WithRealtime(publisher realtime.Publisher
 	return h
 }
 
+// HandleEvent is the Lambda entry point. It takes ECS "Task State Change"
+// events from the kaniko task and CodeBuild "Build State Change" events from
+// the image-builder project, whichever builder the environment uses.
+func (h *DeployTaskStateChangeHandler) HandleEvent(ctx context.Context, raw json.RawMessage) error {
+	var envelope struct {
+		Source string `json:"source"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return fmt.Errorf("error reading event: %w", err)
+	}
+	if envelope.Source == models.CodeBuildSource {
+		var event models.BuildStateChangeEvent
+		if err := json.Unmarshal(raw, &event); err != nil {
+			return fmt.Errorf("error reading CodeBuild event: %w", err)
+		}
+		return h.HandleBuild(ctx, event)
+	}
+	var event models.TaskStateChangeEvent
+	if err := json.Unmarshal(raw, &event); err != nil {
+		return fmt.Errorf("error reading ECS event: %w", err)
+	}
+	return h.Handle(ctx, event)
+}
+
 func (h *DeployTaskStateChangeHandler) Handle(ctx context.Context, event models.TaskStateChangeEvent) error {
 	taskArn := event.Detail.TaskArn
 	h.logger = h.logger.With(slog.String("taskArn", taskArn))
@@ -46,7 +85,13 @@ func (h *DeployTaskStateChangeHandler) Handle(ctx context.Context, event models.
 	if err != nil {
 		return fmt.Errorf("error getting ids from task tags: %w", err)
 	}
+	return h.recordStateChange(ctx, ids, event)
+}
 
+// recordStateChange updates the deployment, and on a final state the
+// application (or App Store version) and its live status. ECS task events
+// (kaniko) and CodeBuild build events (handler/codebuild.go) both end here.
+func (h *DeployTaskStateChangeHandler) recordStateChange(ctx context.Context, ids DeploymentApplicationIds, event models.TaskStateChangeEvent) error {
 	deploymentId := ids.DeploymentId
 	applicationId := ids.ApplicationId
 	applicationsTable := h.ApplicationsTable

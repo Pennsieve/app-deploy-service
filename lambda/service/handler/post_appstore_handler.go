@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/pennsieve/app-deploy-service/service/manifestschema"
 	"log"
@@ -200,6 +201,18 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			log.Printf("warning: unable to parse the app.yml of %s %s: %v", application.Source.Url, application.Source.Tag, err)
 		}
 	}
+	// "--" separates the release tag from the variant id in image tags, so
+	// an app with variants can't use it in a tag, whatever the validation mode.
+	if haveAppCfg {
+		if reason := variantTagProblem(appCfg, application.Source.Tag); reason != "" {
+			log.Printf("refusing %s %s: %s", application.Source.Url, application.Source.Tag, reason)
+			refusal := withLiveUpdates(ctx, NewAppStoreStatusManager(handlerName, versionStore, versionUuid), cfg)
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusUnprocessableEntity,
+				Body:       refusal.SetErrorStatus(ctx, fmt.Errorf("%s", reason)),
+			}, nil
+		}
+	}
 	if len(problems) > 0 {
 		log.Printf("app.yml of %s %s doesn't follow %s: %s", application.Source.Url, application.Source.Tag, manifestschema.URL, strings.Join(problems, "; "))
 		if manifestValidationMode() == manifestValidationEnforce {
@@ -212,6 +225,34 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 				Body: refusal.SetErrorStatus(ctx, fmt.Errorf("app.yml doesn't follow %s: %s",
 					manifestschema.URL, strings.Join(problems, "; "))),
 			}, nil
+		}
+	}
+
+	// While kaniko builds the images, a Dockerfile it can't build faithfully
+	// (heredocs, RUN --mount) is refused here with the reason, instead of
+	// silently pushing an image other than the one the author tested.
+	// Skipped when the environment builds with BuildKit (IMAGE_BUILDER).
+	if reason := unsupportedDockerfileSyntax(application.Source.Url, application.Source.Tag, application.Source.AuthToken); reason != "" {
+		log.Printf("refusing %s %s: %s", application.Source.Url, application.Source.Tag, reason)
+		refusal := withLiveUpdates(ctx, NewAppStoreStatusManager(handlerName, versionStore, versionUuid), cfg)
+		return events.APIGatewayV2HTTPResponse{
+			StatusCode: http.StatusUnprocessableEntity,
+			Body:       refusal.SetErrorStatus(ctx, errors.New(reason)),
+		}, nil
+	}
+
+	// The repository's CITATION.cff at this tag, typed by app.yml's
+	// application.relations. An invalid file, or a relation for a DOI it
+	// doesn't list, is a manifest problem; it never refuses the release.
+	cff, haveCFF := readSyncedFile(ctx, cfg, application.Source.Url, application.Source.Tag, citationFile)
+	appCite, citeProblems := appCitation(cff, haveCFF, appCfg.Application.Relations)
+	if len(citeProblems) > 0 {
+		log.Printf("citation of %s %s: %s", application.Source.Url, application.Source.Tag, strings.Join(citeProblems, "; "))
+		problems = append(problems, citeProblems...)
+	}
+	if appCite != nil {
+		if err := versionStore.SetCitation(ctx, versionUuid, appCite); err != nil {
+			log.Printf("warning: unable to persist the citation of %s %s: %v", applicationId, application.Source.Tag, err)
 		}
 	}
 
@@ -231,13 +272,22 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	// app's newest version, its parameters on the app (what consumers of the
 	// app's top-level params read). Registering an older tag again doesn't
 	// roll the app back. Advisory: a failure here never blocks the deployment,
-	// and an app without an app.yml simply has no manifest.
+	// and an app without an app.yml simply has no manifest. With variants,
+	// the manifest and params are the default variant's, and the variants
+	// (each with its resolved manifest and build settings) are recorded
+	// beside them; without, the version record is as it always was.
 	if haveAppCfg {
-		if err := versionStore.SetManifest(ctx, versionUuid, appManifest(appCfg)); err != nil {
+		resolved := resolveVariants(appCfg)
+		if err := versionStore.SetManifest(ctx, versionUuid, resolved.versionManifest()); err != nil {
 			log.Printf("warning: unable to persist the manifest of %s %s: %v", applicationId, application.Source.Tag, err)
 		}
+		if vv := resolved.versionVariants(); !vv.Empty() {
+			if err := versionStore.SetVariants(ctx, versionUuid, vv); err != nil {
+				log.Printf("warning: unable to persist the variants of %s %s: %v", applicationId, application.Source.Tag, err)
+			}
+		}
 		if isNewestVersion(ctx, versionStore, applicationId, application.Source.Tag) {
-			if err := appStoreStore.UpdateParams(ctx, applicationId, appParameters(appCfg)); err != nil {
+			if err := appStoreStore.UpdateParams(ctx, applicationId, resolved.parameters()); err != nil {
 				log.Printf("warning: unable to persist app parameters for %s: %v", applicationId, err)
 			}
 		}

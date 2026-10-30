@@ -21,6 +21,7 @@ func DeploymentItemToModel(item store_dynamodb.Deployment) models.Deployment {
 		StoppedReason: item.StoppedReason,
 		SourceUrl:     item.SourceUrl,
 		Tag:           item.Tag,
+		Variant:       item.Variant,
 		Errored:       item.Errored,
 	}
 }

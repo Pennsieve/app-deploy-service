@@ -19,26 +19,43 @@ func TestParserFieldsAreInTheSchema(t *testing.T) {
 	if err := json.Unmarshal(manifestschema.V1, &schema); err != nil {
 		t.Fatal(err)
 	}
-	defs := schema["$defs"].(map[string]any)
-	var props func(node map[string]any) map[string]any
-	props = func(node map[string]any) map[string]any {
-		if ref, ok := node["$ref"].(string); ok {
-			node = defs[strings.TrimPrefix(ref, "#/$defs/")].(map[string]any)
+	// resolve follows a local $ref (#/$defs/x, or a deeper JSON pointer such
+	// as #/$defs/runtime/properties/cpu).
+	var resolve func(node map[string]any) map[string]any
+	resolve = func(node map[string]any) map[string]any {
+		ref, ok := node["$ref"].(string)
+		if !ok {
+			return node
 		}
-		if items, ok := node["items"].(map[string]any); ok {
-			return props(items)
+		var cur any = schema
+		for _, part := range strings.Split(strings.TrimPrefix(ref, "#/"), "/") {
+			cur = cur.(map[string]any)[part]
 		}
-		p, _ := node["properties"].(map[string]any)
-		return p
+		return resolve(cur.(map[string]any))
 	}
-	var walk func(rt reflect.Type, schemaProps map[string]any, path string)
-	walk = func(rt reflect.Type, schemaProps map[string]any, path string) {
-		for rt.Kind() == reflect.Slice || rt.Kind() == reflect.Ptr {
+	var walk func(rt reflect.Type, node map[string]any, path string)
+	walk = func(rt reflect.Type, node map[string]any, path string) {
+		node = resolve(node)
+		for rt.Kind() == reflect.Slice || rt.Kind() == reflect.Ptr || rt.Kind() == reflect.Map {
+			switch rt.Kind() {
+			case reflect.Slice:
+				if items, ok := node["items"].(map[string]any); ok {
+					node = resolve(items)
+				}
+			case reflect.Map:
+				values, ok := node["additionalProperties"].(map[string]any)
+				if !ok {
+					t.Errorf("the parser reads %s as a map, which the schema doesn't declare", path)
+					return
+				}
+				node = resolve(values)
+			}
 			rt = rt.Elem()
 		}
 		if rt.Kind() != reflect.Struct {
 			return
 		}
+		schemaProps, _ := node["properties"].(map[string]any)
 		for i := 0; i < rt.NumField(); i++ {
 			f := rt.Field(i)
 			name := strings.Split(f.Tag.Get("yaml"), ",")[0]
@@ -50,10 +67,10 @@ func TestParserFieldsAreInTheSchema(t *testing.T) {
 				t.Errorf("the parser reads %s%s, which the schema doesn't declare", path, name)
 				continue
 			}
-			walk(f.Type, props(sub), path+name+".")
+			walk(f.Type, sub, path+name+".")
 		}
 	}
-	walk(reflect.TypeOf(appConfig{}), schema["properties"].(map[string]any), "")
+	walk(reflect.TypeOf(appConfig{}), schema, "")
 }
 
 func TestAppManifestKeepsMaintainersAndFormats(t *testing.T) {

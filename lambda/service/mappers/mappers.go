@@ -1,6 +1,8 @@
 package mappers
 
 import (
+	"sort"
+
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 )
@@ -140,7 +142,87 @@ func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVer
 		Manifest:         AppManifestToModel(v.Manifest),
 		ManifestProblems: v.ManifestProblems,
 		License:          v.License,
+		Citation:         AppCitationToModel(v.Citation),
+		DefaultVariant:   v.DefaultVariant,
+		Variants:         appStoreVariantsToModels(v),
 	}
+}
+
+func AppCitationToModel(c *store_dynamodb.AppCitation) *models.AppCitation {
+	if c == nil {
+		return nil
+	}
+	out := &models.AppCitation{
+		Title:        c.Title,
+		Version:      c.Version,
+		DOI:          c.DOI,
+		DateReleased: c.DateReleased,
+		Authors:      []models.CitationAuthor{},
+		RelatedWorks: []models.RelatedWork{},
+	}
+	for _, a := range c.Authors {
+		out.Authors = append(out.Authors, models.CitationAuthor{Name: a.Name, GivenNames: a.GivenNames,
+			FamilyNames: a.FamilyNames, Orcid: a.Orcid, Affiliation: a.Affiliation})
+	}
+	if c.PreferredCitation != nil {
+		p := relatedWorkToModel(*c.PreferredCitation)
+		out.PreferredCitation = &p
+	}
+	for _, w := range c.RelatedWorks {
+		out.RelatedWorks = append(out.RelatedWorks, relatedWorkToModel(w))
+	}
+	return out
+}
+
+// appStoreVariantsToModels lists a version's variants in app.yml order
+// (variantOrder), then any the order doesn't name, by id. The default
+// variant's status falls back to the version's, which is its status; another
+// variant without a status has no build recorded and has none.
+func appStoreVariantsToModels(v store_dynamodb.AppStoreVersion) []models.AppStoreVariant {
+	if len(v.Variants) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(v.Variants))
+	seen := map[string]bool{}
+	for _, id := range v.VariantOrder {
+		if _, ok := v.Variants[id]; ok && !seen[id] {
+			seen[id] = true
+			ids = append(ids, id)
+		}
+	}
+	var rest []string
+	for id := range v.Variants {
+		if !seen[id] {
+			rest = append(rest, id)
+		}
+	}
+	sort.Strings(rest)
+	ids = append(ids, rest...)
+
+	out := make([]models.AppStoreVariant, 0, len(ids))
+	for _, id := range ids {
+		sv := v.Variants[id]
+		isDefault := id == v.DefaultVariant
+		status := sv.Status
+		if status == "" && isDefault {
+			status = v.Status
+		}
+		out = append(out, models.AppStoreVariant{
+			ID:            id,
+			Name:          sv.Name,
+			Description:   sv.Description,
+			Default:       isDefault,
+			Status:        status,
+			FailureReason: sv.FailureReason,
+			Manifest:      AppManifestToModel(sv.Manifest),
+		})
+	}
+	return out
+}
+
+func relatedWorkToModel(w store_dynamodb.RelatedWork) models.RelatedWork {
+	return models.RelatedWork{DOI: w.DOI, RelationType: w.RelationType, Title: w.Title, Authors: w.Authors,
+		Year: w.Year, Journal: w.Journal, URL: w.URL, Source: w.Source}
 }
 
 func AppManifestToModel(m *store_dynamodb.AppManifest) *models.AppManifest {
@@ -169,7 +251,15 @@ func AppManifestToModel(m *store_dynamodb.AppManifest) *models.AppManifest {
 		Parameters: params,
 		Inputs:     appPortsToModels(m.Inputs),
 		Outputs:    appPortsToModels(m.Outputs),
+		Variant:    appManifestVariantToModel(m.Variant),
 	}
+}
+
+func appManifestVariantToModel(v *store_dynamodb.AppManifestVariant) *models.AppManifestVariant {
+	if v == nil {
+		return nil
+	}
+	return &models.AppManifestVariant{ID: v.ID, Name: v.Name, Description: v.Description}
 }
 
 func appPortsToModels(ports []store_dynamodb.AppPort) []models.AppPort {

@@ -334,3 +334,94 @@ func TestAppStoreVersionDatabaseStore_SetRegistrationDetails(t *testing.T) {
 	assert.Equal(t, "remove license, manifestProblems", aws.ToString(api.UpdateItemInput.UpdateExpression))
 	assert.Nil(t, api.UpdateItemInput.ExpressionAttributeValues)
 }
+
+func TestAppStoreVersionDatabaseStore_SetCitation(t *testing.T) {
+	api := &ArgCaptureAppStoreVersionTableAPI{}
+	store := NewAppStoreVersionDatabaseStore(api, "versions")
+
+	citation := &AppCitation{
+		Title:   "FlowSOM clustering",
+		Authors: []CitationAuthor{{Name: "Sofie Van Gassen", GivenNames: "Sofie", FamilyNames: "Van Gassen", Orcid: "0000-0002-7119-5330"}},
+		RelatedWorks: []RelatedWork{
+			{DOI: "10.1002/cyto.a.22625", RelationType: "References", Title: "FlowSOM", Year: 2015, Source: "references"},
+			{RelationType: "References", Title: "FlowKit", URL: "https://github.com/whitews/FlowKit", Source: "references"},
+		},
+	}
+	require.NoError(t, store.SetCitation(context.Background(), "v1", citation))
+	assert.Equal(t, "set citation = :c", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	var got AppCitation
+	require.NoError(t, attributevalue.Unmarshal(api.UpdateItemInput.ExpressionAttributeValues[":c"], &got))
+	assert.Equal(t, *citation, got)
+
+	require.NoError(t, store.SetCitation(context.Background(), "v1", nil))
+	assert.Equal(t, "remove citation", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	assert.Nil(t, api.UpdateItemInput.ExpressionAttributeValues)
+}
+
+func dynasdVariants() VersionVariants {
+	cpu := &AppManifest{Name: "DynaSD", Runtime: AppRuntime{CPU: 4096, Memory: 8192, ComputeTypes: []string{"standard"}},
+		Parameters: []AppParameter{{Name: "MODEL", DefaultValue: "lindda", ValidValues: []string{"lindda", "oncet"}}},
+		Variant:    &AppManifestVariant{ID: "cpu", Name: "CPU"}}
+	gpu := &AppManifest{Name: "DynaSD", Runtime: AppRuntime{CPU: 4096, Memory: 14336, ComputeTypes: []string{"gpu"}},
+		Parameters: []AppParameter{{Name: "MODEL", DefaultValue: "oncet", ValidValues: []string{"lindda", "oncet"}}},
+		Variant:    &AppManifestVariant{ID: "gpu", Name: "GPU (ONCET)", Description: "CUDA PyTorch."}}
+	return VersionVariants{
+		DefaultVariant: "cpu",
+		VariantOrder:   []string{"cpu", "gpu"},
+		Variants: map[string]AppVariant{
+			"cpu": {Name: "CPU", Manifest: cpu, Build: &AppBuild{Args: map[string]string{"TORCH_FLAVOUR": "cpu"}}},
+			"gpu": {Name: "GPU (ONCET)", Description: "CUDA PyTorch.", Manifest: gpu,
+				Build: &AppBuild{Args: map[string]string{"TORCH_FLAVOUR": "cuda"}, Target: "gpu", Dockerfile: "docker/Dockerfile"}},
+		},
+	}
+}
+
+func TestAppStoreVersionDatabaseStore_SetVariants(t *testing.T) {
+	api := &ArgCaptureAppStoreVersionTableAPI{}
+	store := NewAppStoreVersionDatabaseStore(api, "versions")
+	vv := dynasdVariants()
+
+	require.NoError(t, store.SetVariants(context.Background(), "v1", vv))
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "v1"}, api.UpdateItemInput.Key["uuid"])
+	assert.Equal(t, "set defaultVariant = :d, variantOrder = :o, variants = :v remove build", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	assert.Equal(t, &types.AttributeValueMemberS{Value: "cpu"}, api.UpdateItemInput.ExpressionAttributeValues[":d"])
+	var order []string
+	require.NoError(t, attributevalue.Unmarshal(api.UpdateItemInput.ExpressionAttributeValues[":o"], &order))
+	assert.Equal(t, vv.VariantOrder, order)
+	// a DynamoDB map keyed by id, so variants.<id> can be updated on its own
+	m, ok := api.UpdateItemInput.ExpressionAttributeValues[":v"].(*types.AttributeValueMemberM)
+	require.True(t, ok, "variants is stored as a map")
+	assert.Contains(t, m.Value, "gpu")
+	var back map[string]AppVariant
+	require.NoError(t, attributevalue.Unmarshal(m, &back))
+	assert.Equal(t, vv.Variants, back)
+
+	// a version without variants but with a top-level build
+	require.NoError(t, store.SetVariants(context.Background(), "v2", VersionVariants{Build: &AppBuild{Target: "t"}}))
+	assert.Equal(t, "set build = :b remove defaultVariant, variantOrder, variants", aws.ToString(api.UpdateItemInput.UpdateExpression))
+}
+
+// A version with variants survives a write and a read; one without has no
+// variant attributes at all, so its record is as it always was.
+func TestAppStoreVersion_VariantsRoundTrip(t *testing.T) {
+	vv := dynasdVariants()
+	v := AppStoreVersion{Uuid: "u", ApplicationId: "a", Version: "v0.3.0", Status: "registering",
+		Manifest: vv.Variants["cpu"].Manifest, DefaultVariant: vv.DefaultVariant, VariantOrder: vv.VariantOrder, Variants: vv.Variants}
+	item, err := attributevalue.MarshalMap(v)
+	require.NoError(t, err)
+	mock := &ArgCaptureAppStoreVersionTableAPI{GetItemOutput: &dynamodb.GetItemOutput{Item: item}}
+	got, err := NewAppStoreVersionDatabaseStore(mock, "versions").GetById(context.Background(), "u")
+	require.NoError(t, err)
+	assert.Equal(t, v, *got)
+	assert.Equal(t, "oncet", got.Variants["gpu"].Manifest.Parameters[0].DefaultValue)
+
+	plain := AppStoreVersion{Uuid: "u", Version: "v0.2.2", Manifest: &AppManifest{Name: "x"}}
+	item, err = attributevalue.MarshalMap(plain)
+	require.NoError(t, err)
+	for _, attr := range []string{"defaultVariant", "variantOrder", "variants", "build"} {
+		_, has := item[attr]
+		assert.False(t, has, "a version without variants has no %s", attr)
+	}
+	_, has := item["manifest"].(*types.AttributeValueMemberM).Value["variant"]
+	assert.False(t, has, "nor a manifest variant")
+}

@@ -1,11 +1,13 @@
 package mappers
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/pennsieve/app-deploy-service/service/models"
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAppStoreAppToModel_DefaultsStatusToActive(t *testing.T) {
@@ -84,4 +86,61 @@ func TestAppStoreVersionToModel_LicenseProblemsMaintainersFormats(t *testing.T) 
 	assert.Equal(t, []string{"format_3590"}, m.Manifest.Inputs[0].Formats)
 	assert.Equal(t, []string{"pennsieve-published-dataset", "bids@1.9"}, m.Manifest.Inputs[1].ConformsTo)
 	assert.Equal(t, "directory", m.Manifest.Inputs[1].Container)
+}
+
+func TestAppStoreVersionToModel_Variants(t *testing.T) {
+	cpu := &store_dynamodb.AppManifest{Name: "DynaSD", Runtime: store_dynamodb.AppRuntime{ComputeTypes: []string{"standard"}},
+		Variant: &store_dynamodb.AppManifestVariant{ID: "cpu", Name: "CPU"}}
+	gpu := &store_dynamodb.AppManifest{Name: "DynaSD", Runtime: store_dynamodb.AppRuntime{ComputeTypes: []string{"gpu"}},
+		Variant: &store_dynamodb.AppManifestVariant{ID: "gpu", Name: "GPU (ONCET)", Description: "CUDA."}}
+	v := store_dynamodb.AppStoreVersion{
+		Uuid: "u", Version: "v0.3.0", Status: "deployed", DestinationUrl: "repo:1-v0.3.0", Manifest: cpu,
+		DefaultVariant: "cpu", VariantOrder: []string{"gpu", "cpu"},
+		Variants: map[string]store_dynamodb.AppVariant{
+			"cpu": {Name: "CPU", Manifest: cpu, Build: &store_dynamodb.AppBuild{Args: map[string]string{"TORCH_FLAVOUR": "cpu"}}},
+			"gpu": {Name: "GPU (ONCET)", Description: "CUDA.", Manifest: gpu, Status: "error", FailureReason: "no stage", DestinationUrl: "repo:1-v0.3.0--gpu"},
+			"arm": {Name: "ARM"},
+		},
+	}
+	m := AppStoreVersionToModel(v)
+	assert.Equal(t, "cpu", m.DefaultVariant)
+	require.Len(t, m.Variants, 3)
+	// variantOrder, then the rest by id
+	assert.Equal(t, []string{"gpu", "cpu", "arm"}, []string{m.Variants[0].ID, m.Variants[1].ID, m.Variants[2].ID})
+
+	assert.Equal(t, models.AppStoreVariant{ID: "gpu", Name: "GPU (ONCET)", Description: "CUDA.", Status: "error",
+		FailureReason: "no stage", Manifest: AppManifestToModel(gpu)}, m.Variants[0])
+	// the default's status is the version's until its own is recorded
+	assert.True(t, m.Variants[1].Default)
+	assert.Equal(t, "deployed", m.Variants[1].Status)
+	// another variant without a build recorded has no status
+	assert.False(t, m.Variants[2].Default)
+	assert.Empty(t, m.Variants[2].Status)
+	assert.Nil(t, m.Variants[2].Manifest)
+
+	assert.Equal(t, &models.AppManifestVariant{ID: "cpu", Name: "CPU"}, m.Manifest.Variant)
+	assert.Equal(t, "gpu", m.Variants[0].Manifest.Variant.ID)
+
+	// never the image or build settings
+	b, err := json.Marshal(m)
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "repo:")
+	assert.NotContains(t, string(b), "TORCH_FLAVOUR")
+}
+
+// A version without variants marshals exactly as before: no variant keys.
+func TestAppStoreVersionToModel_NoVariantsJSONUnchanged(t *testing.T) {
+	m := AppStoreVersionToModel(store_dynamodb.AppStoreVersion{Uuid: "u", Version: "v1", Status: "deployed",
+		Manifest: &store_dynamodb.AppManifest{Name: "x"}})
+	b, err := json.Marshal(m)
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "variant")
+
+	d := DeploymentItemToModel(store_dynamodb.Deployment{DeploymentKey: store_dynamodb.DeploymentKey{DeploymentId: "d"}})
+	b, err = json.Marshal(d)
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "variant")
+
+	d = DeploymentItemToModel(store_dynamodb.Deployment{Variant: "gpu"})
+	assert.Equal(t, "gpu", d.Variant)
 }

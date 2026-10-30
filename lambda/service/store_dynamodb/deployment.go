@@ -25,6 +25,9 @@ type Deployment struct {
 	TaskArn         string    `dynamodbav:"taskArn"`
 	SourceUrl       string    `dynamodbav:"sourceUrl,omitempty"`
 	Tag             string    `dynamodbav:"tag,omitempty"`
+	// Variant is the app variant this deployment builds; empty for an app
+	// without variants (and for deployments made before variants).
+	Variant string `dynamodbav:"variant,omitempty"`
 
 	// UpdatedAt is not in the reference. Assume it is the time this state change happened.
 	UpdatedAt *time.Time `dynamodbav:"updatedAt,omitempty"`

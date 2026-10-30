@@ -131,6 +131,107 @@ type AppStoreVersion struct {
 	// License is the repository's license (its SPDX id) at this version, as
 	// GitHub reads its LICENSE file; empty when there's none or it's unknown.
 	License string `dynamodbav:"license,omitempty"`
+	// Citation is the repository's CITATION.cff at this version: its authors,
+	// how to cite it, and the works it lists typed for DataCite (app.yml's
+	// application.relations applied). Nil when there's none or it can't be
+	// read; its problems are among ManifestProblems.
+	Citation *AppCitation `dynamodbav:"citation,omitempty"`
+	// DefaultVariant, VariantOrder and Variants are set only when the
+	// version's app.yml declares variants (docs/app-manifest-variants.md).
+	// Manifest is then the default variant's resolved manifest, so readers
+	// that don't know about variants see the default. Variants is a map,
+	// keyed by variant id, so one variant can be updated on its own.
+	DefaultVariant string                `dynamodbav:"defaultVariant,omitempty"`
+	VariantOrder   []string              `dynamodbav:"variantOrder,omitempty"`
+	Variants       map[string]AppVariant `dynamodbav:"variants,omitempty"`
+	// Build is the image's build settings from app.yml's top-level build,
+	// for a version without variants (each variant has its own); nil when
+	// app.yml has none.
+	Build *AppBuild `dynamodbav:"build,omitempty"`
+}
+
+// AppCitation is a version's CITATION.cff as stored.
+type AppCitation struct {
+	Title        string           `dynamodbav:"title,omitempty"`
+	Version      string           `dynamodbav:"version,omitempty"`
+	DOI          string           `dynamodbav:"doi,omitempty"`
+	DateReleased string           `dynamodbav:"dateReleased,omitempty"`
+	Authors      []CitationAuthor `dynamodbav:"authors,omitempty"`
+	// PreferredCitation is how the app asks to be cited (the work
+	// CITATION.cff's preferred-citation names); nil means cite the software
+	// itself (Title, Authors, Version, DOI).
+	PreferredCitation *RelatedWork `dynamodbav:"preferredCitation,omitempty"`
+	// RelatedWorks is every work it lists, preferred citation first, then
+	// references, each once.
+	RelatedWorks []RelatedWork `dynamodbav:"relatedWorks,omitempty"`
+}
+
+// CitationAuthor is one of CITATION.cff's authors: a person (GivenNames,
+// FamilyNames) or an entity (only Name). Name is how it's shown; Orcid is
+// the bare iD.
+type CitationAuthor struct {
+	Name        string `dynamodbav:"name"`
+	GivenNames  string `dynamodbav:"givenNames,omitempty"`
+	FamilyNames string `dynamodbav:"familyNames,omitempty"`
+	Orcid       string `dynamodbav:"orcid,omitempty"`
+	Affiliation string `dynamodbav:"affiliation,omitempty"`
+}
+
+// RelatedWork is a work CITATION.cff lists with its DataCite relation type.
+// DOI is normalised (10.1038/nbt.4314), or empty for a work without one
+// (shown by its URL, not sent to DataCite). Source is "preferred-citation"
+// or "references".
+type RelatedWork struct {
+	DOI          string   `dynamodbav:"doi,omitempty"`
+	RelationType string   `dynamodbav:"relationType"`
+	Title        string   `dynamodbav:"title,omitempty"`
+	Authors      []string `dynamodbav:"authors,omitempty"`
+	Year         int      `dynamodbav:"year,omitempty"`
+	Journal      string   `dynamodbav:"journal,omitempty"`
+	URL          string   `dynamodbav:"url,omitempty"`
+	Source       string   `dynamodbav:"source"`
+}
+
+// AppVariant is one variant of a version: its label, its resolved manifest
+// (the top level with the variant's overrides) and how its image is built.
+type AppVariant struct {
+	Name        string       `dynamodbav:"name,omitempty"`
+	Description string       `dynamodbav:"description,omitempty"`
+	Manifest    *AppManifest `dynamodbav:"manifest,omitempty"`
+	Build       *AppBuild    `dynamodbav:"build,omitempty"`
+	// DestinationUrl, Status, DeploymentId and FailureReason are the
+	// variant's own build: its image (<hash>-<tag> for the default,
+	// <hash>-<tag>--<id> for the others), its status (registering, deployed,
+	// error), the deployment record that builds it, and why it failed. They
+	// are written by the per-variant builds; until then they are absent, and
+	// the registry treats a non-default variant without a status as not yet
+	// deployed.
+	DestinationUrl string `dynamodbav:"destinationUrl,omitempty"`
+	Status         string `dynamodbav:"status,omitempty"`
+	DeploymentId   string `dynamodbav:"deploymentId,omitempty"`
+	FailureReason  string `dynamodbav:"failureReason,omitempty"`
+}
+
+// AppBuild is how an image is built: Docker build args, the stage to build
+// (empty: the last) and the Dockerfile's path in the repository (empty:
+// Dockerfile).
+type AppBuild struct {
+	Args       map[string]string `dynamodbav:"args,omitempty"`
+	Target     string            `dynamodbav:"target,omitempty"`
+	Dockerfile string            `dynamodbav:"dockerfile,omitempty"`
+}
+
+// VersionVariants is what SetVariants records on a version.
+type VersionVariants struct {
+	DefaultVariant string
+	VariantOrder   []string
+	Variants       map[string]AppVariant
+	Build          *AppBuild
+}
+
+// Empty is true for an app.yml without variants or a build: nothing to record.
+func (v VersionVariants) Empty() bool {
+	return v.DefaultVariant == "" && len(v.VariantOrder) == 0 && len(v.Variants) == 0 && v.Build == nil
 }
 
 // AppManifest is a version's app.yml as stored.
@@ -143,6 +244,16 @@ type AppManifest struct {
 	Parameters  []AppParameter  `dynamodbav:"parameters,omitempty"`
 	Inputs      []AppPort       `dynamodbav:"inputs,omitempty"`
 	Outputs     []AppPort       `dynamodbav:"outputs,omitempty"`
+	// Variant names the variant this manifest was resolved for; nil for an
+	// app without variants.
+	Variant *AppManifestVariant `dynamodbav:"variant,omitempty"`
+}
+
+// AppManifestVariant is the variant a resolved manifest belongs to.
+type AppManifestVariant struct {
+	ID          string `dynamodbav:"id"`
+	Name        string `dynamodbav:"name,omitempty"`
+	Description string `dynamodbav:"description,omitempty"`
 }
 
 // AppRuntime is what a version asks for to run: CPU units and MiB, the
