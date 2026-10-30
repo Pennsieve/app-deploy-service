@@ -29,6 +29,7 @@ type AppStoreVersionDBStore interface {
 	UpdateStatus(ctx context.Context, newStatus string, uuid string) error
 	SetManifest(ctx context.Context, uuid string, manifest *AppManifest) error
 	SetRegistrationDetails(ctx context.Context, uuid string, license string, manifestProblems []string) error
+	SetVariants(ctx context.Context, uuid string, variants VersionVariants) error
 }
 
 type AppStoreVersionDatabaseStore struct {
@@ -219,6 +220,62 @@ func (r *AppStoreVersionDatabaseStore) SetManifest(ctx context.Context, uuid str
 	})
 	if err != nil {
 		return fmt.Errorf("error setting appstore version manifest: %w", err)
+	}
+	return nil
+}
+
+// SetVariants records a version's variants (defaultVariant, variantOrder and
+// the variants map) and its top-level build settings. Empty values remove
+// the attributes.
+func (r *AppStoreVersionDatabaseStore) SetVariants(ctx context.Context, uuid string, v VersionVariants) error {
+	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: uuid})
+	if err != nil {
+		return fmt.Errorf("error marshaling key for appstore version variants: %w", err)
+	}
+	values := map[string]types.AttributeValue{}
+	var set, remove []string
+	field := func(attr, placeholder string, empty bool, value any) error {
+		if empty {
+			remove = append(remove, attr)
+			return nil
+		}
+		av, err := attributevalue.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("error marshaling appstore version %s: %w", attr, err)
+		}
+		values[placeholder] = av
+		set = append(set, attr+" = "+placeholder)
+		return nil
+	}
+	if err := field("defaultVariant", ":d", v.DefaultVariant == "", v.DefaultVariant); err != nil {
+		return err
+	}
+	if err := field("variantOrder", ":o", len(v.VariantOrder) == 0, v.VariantOrder); err != nil {
+		return err
+	}
+	if err := field("variants", ":v", len(v.Variants) == 0, v.Variants); err != nil {
+		return err
+	}
+	if err := field("build", ":b", v.Build == nil, v.Build); err != nil {
+		return err
+	}
+	expr := ""
+	if len(set) > 0 {
+		expr = "set " + strings.Join(set, ", ")
+	}
+	if len(remove) > 0 {
+		expr = strings.TrimSpace(expr + " remove " + strings.Join(remove, ", "))
+	}
+	in := &dynamodb.UpdateItemInput{
+		TableName:        aws.String(r.TableName),
+		Key:              key,
+		UpdateExpression: aws.String(expr),
+	}
+	if len(values) > 0 {
+		in.ExpressionAttributeValues = values
+	}
+	if _, err := r.api.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("error setting appstore version variants: %w", err)
 	}
 	return nil
 }

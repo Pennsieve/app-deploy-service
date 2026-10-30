@@ -1,0 +1,175 @@
+# yaml-language-server: $schema=https://schemas.pennsieve.io/app-manifest/v1.json
+schemaVersion: "1.0"
+application:
+  name: Seizure Onset (DynaSD)
+  description: >-
+    Finds when a seizure starts and which channels start it, from intracranial EEG (SEEG or
+    ECoG). Wraps DynaSD (Ojemann et al. 2026): a model of each recording's own pre-ictal
+    dynamics (by default LiNDDA, a linear vector autoregressive forecaster) is fitted on the
+    baseline, and the seizure is where the signals stop following it. Writes the recording-level
+    onset and, per channel, its onset time, whether it is recruited at onset, and a score. Runs
+    on CPU or, for the slow pretrained ONCET model, on the gpu runtime (DEVICE=auto).
+  type: processor
+  tags:
+    - ieeg
+    - seeg
+    - electrophysiology
+    - epilepsy
+    - neuroscience
+    - seizure-detection
+    - seizure-onset
+    - machine-learning
+runtime:
+  # Shared by both variants unless a variant overrides a field (app-variants pilot, v0.3.0).
+  cpu: 4096
+  memory: 8192
+  timeoutSeconds: 14400
+build:
+  # Shared build settings; each variant adds its TORCH_FLAVOUR.
+  args:
+    DYNASD_COMMIT: 48b2b959605a37fb03a4d99ae6fcc1459c04cc37
+parameters:
+  - name: MODEL
+    type: string
+    label: Detector
+    description: >-
+      lindda (default): linear forecaster of the baseline dynamics, the preprint's best
+      intracranial model; ndd: the same with an LSTM forecaster; absslp: baseline-normalised
+      absolute slope (Schindler et al. 2007), no training; oncet: DynaSD's pretrained
+      convolutional seizure classifier (bundled checkpoint; slow on CPU, ~5 min per recording:
+      run it on the gpu runtime).
+    defaultValue: lindda
+    validValues: [lindda, ndd, absslp, oncet]
+  - name: THRESHOLD
+    type: string
+    label: Threshold
+    description: >-
+      mean or median: the two thresholds DynaSD calibrated on its annotated cohort (phi-optimal
+      mean, F1-optimal median of per-patient thresholds); mean is stricter and did better on the
+      demo. A number sets the threshold on the detector's score directly.
+    defaultValue: mean
+  - name: MIN_CHANNELS
+    type: integer
+    label: Channels needed for onset
+    description: >-
+      The recording-level onset is when this many channels have started seizing (the k-th
+      earliest channel onset). 1 takes the first channel, which an isolated artefact can trigger.
+    defaultValue: 3
+    min: 1
+  - name: SEARCH_BEFORE_S
+    type: number
+    label: Search before the known onset (s)
+    description: >-
+      When the input gives a seizure onset (recordings.csv onset_s or a seizure event), onsets are
+      searched from this many seconds before it to the end of the recording; a negative value
+      ignores the given onset and searches everything after the baseline.
+    defaultValue: 30
+    min: -1
+  - name: ONSET_WINDOW_S
+    type: number
+    label: Recruited-at-onset window (s)
+    description: A channel is recruited when its onset is at most this long after the recording-level onset.
+    defaultValue: 1
+    min: 0
+  - name: SCORE_WINDOW_S
+    type: number
+    label: Score window (s)
+    description: The per-channel score is the smoothed detector output over this long after the recording-level onset, divided by the threshold.
+    defaultValue: 5
+    min: 0.5
+  - name: BASELINE_S
+    type: number
+    label: Baseline length (s)
+    description: >-
+      Length of the baseline the detector is fitted on when the input does not give one: the
+      stretch ending 60 s before the given onset, else the start of the recording.
+    defaultValue: 60
+    min: 5
+  - name: FILTER_W
+    type: number
+    label: Smoothing (s)
+    description: DynaSD filter_w, the moving-average window applied to the scores before thresholding.
+    defaultValue: 10
+    min: 1
+  - name: RWIN_SIZE
+    type: number
+    label: Sustained-activity span (s)
+    description: DynaSD rwin_size; a window seizes when RWIN_REQ of the next RWIN_SIZE seconds are above threshold.
+    defaultValue: 5
+    min: 1
+  - name: RWIN_REQ
+    type: number
+    label: Sustained-activity requirement (s)
+    description: DynaSD rwin_req (at most RWIN_SIZE).
+    defaultValue: 4
+    min: 1
+  - name: SEED
+    type: integer
+    label: Random seed
+    description: Seed for the forecaster's initial weights and training order (LiNDDA, NDD).
+    defaultValue: 42
+  - name: DEVICE
+    type: string
+    label: Device
+    description: >-
+      Where PyTorch runs: auto picks cuda when the step has a GPU (the gpu runtime) and cpu
+      otherwise; cuda on a host without a GPU falls back to cpu with a warning. Worth a GPU for
+      ONCET (an estimated 20-50x faster); LiNDDA, the default, is fast on CPU. CPU results are
+      the same as v0.1.0's; on a GPU float32 scores differ in the last digits. Logged and
+      recorded in provenance.json.
+    defaultValue: auto
+    validValues: [auto, cuda, cpu]
+  - name: BATCH
+    type: integer
+    label: ONCET batch size
+    description: >-
+      Windows per ONCET forward pass; 0 = automatic (8192 on a GPU, sized for a 16 GB T4;
+      128 on CPU). Does not change the results beyond float rounding. LiNDDA's and NDD's
+      batch sizes are training settings and stay fixed.
+    defaultValue: 0
+    min: 0
+inputs:
+  - name: ieeg
+    description: >-
+      The BIDS-iEEG derivative of ieeg-prep (recordings.csv, EDF + _channels.tsv + _events.tsv),
+      or any BIDS-iEEG dataset or EDF / BrainVision / FIF files. Referential recordings are
+      re-referenced to neighbouring contacts (bipolar). Needs a pre-ictal baseline (given, or the
+      start of the recording).
+    mediaTypes:
+      - application/edf
+      - text/csv
+      - text/tab-separated-values
+      - application/json
+    placement: root
+    required: true
+outputs:
+  - name: onsets
+    description: >-
+      dynasd/seizure_onsets.csv (recording_id, onset_s, method), dynasd/channel_onsets.csv
+      (recording_id, channel, onset_s, recruited, score, method) and dynasd/provenance.json: one
+      folder named after the method, so the output can be one of several links into a fan-in
+      port (seizure-consensus methods).
+    mediaTypes:
+      - text/csv
+      - application/json
+variants:
+  - id: cpu
+    name: CPU
+    default: true
+    build:
+      args:
+        TORCH_FLAVOUR: cpu
+    runtime:
+      computeTypes: [standard]
+  - id: gpu
+    name: GPU (ONCET)
+    description: CUDA PyTorch on an NVIDIA T4; runs the pretrained ONCET model by default.
+    build:
+      args:
+        TORCH_FLAVOUR: cuda
+    runtime:
+      computeTypes: [gpu]
+      memory: 14336
+    parameters:
+      MODEL:
+        defaultValue: oncet

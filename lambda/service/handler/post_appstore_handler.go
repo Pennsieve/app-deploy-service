@@ -200,6 +200,18 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			log.Printf("warning: unable to parse the app.yml of %s %s: %v", application.Source.Url, application.Source.Tag, err)
 		}
 	}
+	// "--" separates the release tag from the variant id in image tags, so
+	// an app with variants can't use it in a tag, whatever the validation mode.
+	if haveAppCfg {
+		if reason := variantTagProblem(appCfg, application.Source.Tag); reason != "" {
+			log.Printf("refusing %s %s: %s", application.Source.Url, application.Source.Tag, reason)
+			refusal := withLiveUpdates(ctx, NewAppStoreStatusManager(handlerName, versionStore, versionUuid), cfg)
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusUnprocessableEntity,
+				Body:       refusal.SetErrorStatus(ctx, fmt.Errorf("%s", reason)),
+			}, nil
+		}
+	}
 	if len(problems) > 0 {
 		log.Printf("app.yml of %s %s doesn't follow %s: %s", application.Source.Url, application.Source.Tag, manifestschema.URL, strings.Join(problems, "; "))
 		if manifestValidationMode() == manifestValidationEnforce {
@@ -231,13 +243,22 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	// app's newest version, its parameters on the app (what consumers of the
 	// app's top-level params read). Registering an older tag again doesn't
 	// roll the app back. Advisory: a failure here never blocks the deployment,
-	// and an app without an app.yml simply has no manifest.
+	// and an app without an app.yml simply has no manifest. With variants,
+	// the manifest and params are the default variant's, and the variants
+	// (each with its resolved manifest and build settings) are recorded
+	// beside them; without, the version record is as it always was.
 	if haveAppCfg {
-		if err := versionStore.SetManifest(ctx, versionUuid, appManifest(appCfg)); err != nil {
+		resolved := resolveVariants(appCfg)
+		if err := versionStore.SetManifest(ctx, versionUuid, resolved.versionManifest()); err != nil {
 			log.Printf("warning: unable to persist the manifest of %s %s: %v", applicationId, application.Source.Tag, err)
 		}
+		if vv := resolved.versionVariants(); !vv.Empty() {
+			if err := versionStore.SetVariants(ctx, versionUuid, vv); err != nil {
+				log.Printf("warning: unable to persist the variants of %s %s: %v", applicationId, application.Source.Tag, err)
+			}
+		}
 		if isNewestVersion(ctx, versionStore, applicationId, application.Source.Tag) {
-			if err := appStoreStore.UpdateParams(ctx, applicationId, appParameters(appCfg)); err != nil {
+			if err := appStoreStore.UpdateParams(ctx, applicationId, resolved.parameters()); err != nil {
 				log.Printf("warning: unable to persist app parameters for %s: %v", applicationId, err)
 			}
 		}

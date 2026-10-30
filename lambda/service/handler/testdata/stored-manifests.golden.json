@@ -1,0 +1,1290 @@
+{
+ "gpuAppYAML": {
+  "manifest": {
+   "Value": {
+    "description": {
+     "Value": "gpu-app"
+    },
+    "inputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "Pipeline package file."
+        },
+        "mediaTypes": {
+         "Value": [
+          {
+           "Value": "application/octet-stream"
+          }
+         ]
+        },
+        "name": {
+         "Value": "package_file"
+        }
+       }
+      }
+     ]
+    },
+    "maintainers": {
+     "Value": [
+      {
+       "Value": {
+        "name": {
+         "Value": "edmore"
+        }
+       }
+      }
+     ]
+    },
+    "name": {
+     "Value": "gpu-app"
+    },
+    "outputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "Pipeline package file."
+        },
+        "mediaTypes": {
+         "Value": [
+          {
+           "Value": "application/octet-stream"
+          }
+         ]
+        },
+        "name": {
+         "Value": "package_file"
+        }
+       }
+      }
+     ]
+    },
+    "runtime": {
+     "Value": {
+      "computeTypes": {
+       "Value": [
+        {
+         "Value": "gpu"
+        }
+       ]
+      },
+      "cpu": {
+       "Value": "1024"
+      },
+      "memory": {
+       "Value": "2048"
+      },
+      "timeoutSeconds": {
+       "Value": "300"
+      }
+     }
+    },
+    "tags": {
+     "Value": [
+      {
+       "Value": "pytorch"
+      },
+      {
+       "Value": "gpu"
+      },
+      {
+       "Value": "demo"
+      }
+     ]
+    }
+   }
+  },
+  "params": {
+   "Value": true
+  }
+ },
+ "pennsieve-jupyter-session.app.yml": {
+  "manifest": {
+   "Value": {
+    "description": {
+     "Value": "A live JupyterLab session on the files you select. You work in the notebook in your browser; the workflow waits until you close the session."
+    },
+    "inputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "Files to open in the notebook, staged under input/"
+        },
+        "name": {
+         "Value": "files"
+        }
+       }
+      }
+     ]
+    },
+    "name": {
+     "Value": "Jupyter notebook"
+    },
+    "outputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "Whatever the notebook writes under output/"
+        },
+        "name": {
+         "Value": "files"
+        }
+       }
+      }
+     ]
+    },
+    "runtime": {
+     "Value": {
+      "computeTypes": {
+       "Value": [
+        {
+         "Value": "standard"
+        }
+       ]
+      },
+      "interactive": {
+       "Value": true
+      },
+      "kernel": {
+       "Value": "python"
+      },
+      "sessionType": {
+       "Value": "jupyter"
+      }
+     }
+    },
+    "tags": {
+     "Value": [
+      {
+       "Value": "notebook"
+      },
+      {
+       "Value": "interactive"
+      },
+      {
+       "Value": "python"
+      }
+     ]
+    }
+   }
+  },
+  "params": {
+   "Value": true
+  }
+ },
+ "pennsieve-r-session.app.yml": {
+  "manifest": {
+   "Value": {
+    "description": {
+     "Value": "A live R session on the files you select. You work in it in your browser; the workflow waits until you close the session."
+    },
+    "inputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "Files to open in the session, staged under input/"
+        },
+        "name": {
+         "Value": "files"
+        }
+       }
+      }
+     ]
+    },
+    "name": {
+     "Value": "R notebook"
+    },
+    "outputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "Whatever the session writes under output/"
+        },
+        "name": {
+         "Value": "files"
+        }
+       }
+      }
+     ]
+    },
+    "runtime": {
+     "Value": {
+      "computeTypes": {
+       "Value": [
+        {
+         "Value": "standard"
+        }
+       ]
+      },
+      "interactive": {
+       "Value": true
+      },
+      "kernel": {
+       "Value": "r"
+      },
+      "sessionType": {
+       "Value": "jupyter"
+      }
+     }
+    },
+    "tags": {
+     "Value": [
+      {
+       "Value": "notebook"
+      },
+      {
+       "Value": "interactive"
+      },
+      {
+       "Value": "r"
+      }
+     ]
+    }
+   }
+  },
+  "params": {
+   "Value": true
+  }
+ },
+ "processor-seizure-dynasd.app.yml": {
+  "manifest": {
+   "Value": {
+    "description": {
+     "Value": "Finds when a seizure starts and which channels start it, from intracranial EEG (SEEG or ECoG). Wraps DynaSD (Ojemann et al. 2026): a model of each recording's own pre-ictal dynamics (by default LiNDDA, a linear vector autoregressive forecaster) is fitted on the baseline, and the seizure is where the signals stop following it. Writes the recording-level onset and, per channel, its onset time, whether it is recruited at onset, and a score. Runs on CPU or, for the slow pretrained ONCET model, on the gpu runtime (DEVICE=auto)."
+    },
+    "inputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "The BIDS-iEEG derivative of ieeg-prep (recordings.csv, EDF + _channels.tsv + _events.tsv), or any BIDS-iEEG dataset or EDF / BrainVision / FIF files. Referential recordings are re-referenced to neighbouring contacts (bipolar). Needs a pre-ictal baseline (given, or the start of the recording)."
+        },
+        "mediaTypes": {
+         "Value": [
+          {
+           "Value": "application/edf"
+          },
+          {
+           "Value": "text/csv"
+          },
+          {
+           "Value": "text/tab-separated-values"
+          },
+          {
+           "Value": "application/json"
+          }
+         ]
+        },
+        "name": {
+         "Value": "ieeg"
+        },
+        "placement": {
+         "Value": "root"
+        }
+       }
+      }
+     ]
+    },
+    "name": {
+     "Value": "Seizure Onset (DynaSD)"
+    },
+    "outputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "dynasd/seizure_onsets.csv (recording_id, onset_s, method), dynasd/channel_onsets.csv (recording_id, channel, onset_s, recruited, score, method) and dynasd/provenance.json: one folder named after the method, so the output can be one of several links into a fan-in port (seizure-consensus methods)."
+        },
+        "mediaTypes": {
+         "Value": [
+          {
+           "Value": "text/csv"
+          },
+          {
+           "Value": "application/json"
+          }
+         ]
+        },
+        "name": {
+         "Value": "onsets"
+        }
+       }
+      }
+     ]
+    },
+    "parameters": {
+     "Value": [
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "lindda"
+        },
+        "description": {
+         "Value": "lindda (default): linear forecaster of the baseline dynamics, the preprint's best intracranial model; ndd: the same with an LSTM forecaster; absslp: baseline-normalised absolute slope (Schindler et al. 2007), no training; oncet: DynaSD's pretrained convolutional seizure classifier (bundled checkpoint; slow on CPU, ~5 min per recording: run it on the gpu runtime)."
+        },
+        "name": {
+         "Value": "MODEL"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "string"
+        },
+        "validValues": {
+         "Value": [
+          {
+           "Value": "lindda"
+          },
+          {
+           "Value": "ndd"
+          },
+          {
+           "Value": "absslp"
+          },
+          {
+           "Value": "oncet"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "mean"
+        },
+        "description": {
+         "Value": "mean or median: the two thresholds DynaSD calibrated on its annotated cohort (phi-optimal mean, F1-optimal median of per-patient thresholds); mean is stricter and did better on the demo. A number sets the threshold on the detector's score directly."
+        },
+        "name": {
+         "Value": "THRESHOLD"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "string"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "3"
+        },
+        "description": {
+         "Value": "The recording-level onset is when this many channels have started seizing (the k-th earliest channel onset). 1 takes the first channel, which an isolated artefact can trigger."
+        },
+        "name": {
+         "Value": "MIN_CHANNELS"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "integer"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "30"
+        },
+        "description": {
+         "Value": "When the input gives a seizure onset (recordings.csv onset_s or a seizure event), onsets are searched from this many seconds before it to the end of the recording; a negative value ignores the given onset and searches everything after the baseline."
+        },
+        "name": {
+         "Value": "SEARCH_BEFORE_S"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "1"
+        },
+        "description": {
+         "Value": "A channel is recruited when its onset is at most this long after the recording-level onset."
+        },
+        "name": {
+         "Value": "ONSET_WINDOW_S"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "5"
+        },
+        "description": {
+         "Value": "The per-channel score is the smoothed detector output over this long after the recording-level onset, divided by the threshold."
+        },
+        "name": {
+         "Value": "SCORE_WINDOW_S"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "60"
+        },
+        "description": {
+         "Value": "Length of the baseline the detector is fitted on when the input does not give one: the stretch ending 60 s before the given onset, else the start of the recording."
+        },
+        "name": {
+         "Value": "BASELINE_S"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "10"
+        },
+        "description": {
+         "Value": "DynaSD filter_w, the moving-average window applied to the scores before thresholding."
+        },
+        "name": {
+         "Value": "FILTER_W"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "5"
+        },
+        "description": {
+         "Value": "DynaSD rwin_size; a window seizes when RWIN_REQ of the next RWIN_SIZE seconds are above threshold."
+        },
+        "name": {
+         "Value": "RWIN_SIZE"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "4"
+        },
+        "description": {
+         "Value": "DynaSD rwin_req (at most RWIN_SIZE)."
+        },
+        "name": {
+         "Value": "RWIN_REQ"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "42"
+        },
+        "description": {
+         "Value": "Seed for the forecaster's initial weights and training order (LiNDDA, NDD)."
+        },
+        "name": {
+         "Value": "SEED"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "integer"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "auto"
+        },
+        "description": {
+         "Value": "Where PyTorch runs: auto picks cuda when the step has a GPU (the gpu runtime) and cpu otherwise; cuda on a host without a GPU falls back to cpu with a warning. Worth a GPU for ONCET (an estimated 20-50x faster); LiNDDA, the default, is fast on CPU. CPU results are the same as v0.1.0's; on a GPU float32 scores differ in the last digits. Logged and recorded in provenance.json."
+        },
+        "name": {
+         "Value": "DEVICE"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "string"
+        },
+        "validValues": {
+         "Value": [
+          {
+           "Value": "auto"
+          },
+          {
+           "Value": "cuda"
+          },
+          {
+           "Value": "cpu"
+          }
+         ]
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "0"
+        },
+        "description": {
+         "Value": "Windows per ONCET forward pass; 0 = automatic (8192 on a GPU, sized for a 16 GB T4; 128 on CPU). Does not change the results beyond float rounding. LiNDDA's and NDD's batch sizes are training settings and stay fixed."
+        },
+        "name": {
+         "Value": "BATCH"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "integer"
+        }
+       }
+      }
+     ]
+    },
+    "runtime": {
+     "Value": {
+      "computeTypes": {
+       "Value": [
+        {
+         "Value": "standard"
+        },
+        {
+         "Value": "gpu"
+        }
+       ]
+      },
+      "cpu": {
+       "Value": "4096"
+      },
+      "memory": {
+       "Value": "8192"
+      },
+      "timeoutSeconds": {
+       "Value": "14400"
+      }
+     }
+    },
+    "tags": {
+     "Value": [
+      {
+       "Value": "ieeg"
+      },
+      {
+       "Value": "seeg"
+      },
+      {
+       "Value": "electrophysiology"
+      },
+      {
+       "Value": "epilepsy"
+      },
+      {
+       "Value": "neuroscience"
+      },
+      {
+       "Value": "seizure-detection"
+      },
+      {
+       "Value": "seizure-onset"
+      },
+      {
+       "Value": "machine-learning"
+      }
+     ]
+    }
+   }
+  },
+  "params": {
+   "Value": [
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "lindda"
+      },
+      "description": {
+       "Value": "lindda (default): linear forecaster of the baseline dynamics, the preprint's best intracranial model; ndd: the same with an LSTM forecaster; absslp: baseline-normalised absolute slope (Schindler et al. 2007), no training; oncet: DynaSD's pretrained convolutional seizure classifier (bundled checkpoint; slow on CPU, ~5 min per recording: run it on the gpu runtime)."
+      },
+      "name": {
+       "Value": "MODEL"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "string"
+      },
+      "validValues": {
+       "Value": [
+        {
+         "Value": "lindda"
+        },
+        {
+         "Value": "ndd"
+        },
+        {
+         "Value": "absslp"
+        },
+        {
+         "Value": "oncet"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "mean"
+      },
+      "description": {
+       "Value": "mean or median: the two thresholds DynaSD calibrated on its annotated cohort (phi-optimal mean, F1-optimal median of per-patient thresholds); mean is stricter and did better on the demo. A number sets the threshold on the detector's score directly."
+      },
+      "name": {
+       "Value": "THRESHOLD"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "string"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "3"
+      },
+      "description": {
+       "Value": "The recording-level onset is when this many channels have started seizing (the k-th earliest channel onset). 1 takes the first channel, which an isolated artefact can trigger."
+      },
+      "name": {
+       "Value": "MIN_CHANNELS"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "integer"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "30"
+      },
+      "description": {
+       "Value": "When the input gives a seizure onset (recordings.csv onset_s or a seizure event), onsets are searched from this many seconds before it to the end of the recording; a negative value ignores the given onset and searches everything after the baseline."
+      },
+      "name": {
+       "Value": "SEARCH_BEFORE_S"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "1"
+      },
+      "description": {
+       "Value": "A channel is recruited when its onset is at most this long after the recording-level onset."
+      },
+      "name": {
+       "Value": "ONSET_WINDOW_S"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "5"
+      },
+      "description": {
+       "Value": "The per-channel score is the smoothed detector output over this long after the recording-level onset, divided by the threshold."
+      },
+      "name": {
+       "Value": "SCORE_WINDOW_S"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "60"
+      },
+      "description": {
+       "Value": "Length of the baseline the detector is fitted on when the input does not give one: the stretch ending 60 s before the given onset, else the start of the recording."
+      },
+      "name": {
+       "Value": "BASELINE_S"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "10"
+      },
+      "description": {
+       "Value": "DynaSD filter_w, the moving-average window applied to the scores before thresholding."
+      },
+      "name": {
+       "Value": "FILTER_W"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "5"
+      },
+      "description": {
+       "Value": "DynaSD rwin_size; a window seizes when RWIN_REQ of the next RWIN_SIZE seconds are above threshold."
+      },
+      "name": {
+       "Value": "RWIN_SIZE"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "4"
+      },
+      "description": {
+       "Value": "DynaSD rwin_req (at most RWIN_SIZE)."
+      },
+      "name": {
+       "Value": "RWIN_REQ"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "42"
+      },
+      "description": {
+       "Value": "Seed for the forecaster's initial weights and training order (LiNDDA, NDD)."
+      },
+      "name": {
+       "Value": "SEED"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "integer"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "auto"
+      },
+      "description": {
+       "Value": "Where PyTorch runs: auto picks cuda when the step has a GPU (the gpu runtime) and cpu otherwise; cuda on a host without a GPU falls back to cpu with a warning. Worth a GPU for ONCET (an estimated 20-50x faster); LiNDDA, the default, is fast on CPU. CPU results are the same as v0.1.0's; on a GPU float32 scores differ in the last digits. Logged and recorded in provenance.json."
+      },
+      "name": {
+       "Value": "DEVICE"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "string"
+      },
+      "validValues": {
+       "Value": [
+        {
+         "Value": "auto"
+        },
+        {
+         "Value": "cuda"
+        },
+        {
+         "Value": "cpu"
+        }
+       ]
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "0"
+      },
+      "description": {
+       "Value": "Windows per ONCET forward pass; 0 = automatic (8192 on a GPU, sized for a 16 GB T4; 128 on CPU). Does not change the results beyond float rounding. LiNDDA's and NDD's batch sizes are training settings and stay fixed."
+      },
+      "name": {
+       "Value": "BATCH"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "integer"
+      }
+     }
+    }
+   ]
+  }
+ },
+ "seurat-processor.app.yml": {
+  "manifest": {
+   "Value": {
+    "description": {
+     "Value": "Processes Seurat Objects (.rds) and exports UMAP embeddings, metadata, and gene expression data to Parquet files for web visualization."
+    },
+    "inputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "A Seurat object saved with saveRDS (.rds)."
+        },
+        "mediaTypes": {
+         "Value": [
+          {
+           "Value": "application/x-rds"
+          }
+         ]
+        },
+        "name": {
+         "Value": "seurat-object"
+        }
+       }
+      }
+     ]
+    },
+    "name": {
+     "Value": "Seurat Processor"
+    },
+    "outputs": {
+     "Value": [
+      {
+       "Value": {
+        "description": {
+         "Value": "UMAP embeddings, cell metadata and gene expression as Parquet files, for the UMAP viewer."
+        },
+        "mediaTypes": {
+         "Value": [
+          {
+           "Value": "application/vnd.apache.parquet"
+          }
+         ]
+        },
+        "name": {
+         "Value": "parquet"
+        }
+       }
+      }
+     ]
+    },
+    "parameters": {
+     "Value": [
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "expanded"
+        },
+        "description": {
+         "Value": "Output mode - \"expanded\" for multi-file parquet (PrecisionDashWidgets) or \"consolidated\" for single results.parquet (legacy)"
+        },
+        "name": {
+         "Value": "OUTPUT_MODE"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "string"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "500"
+        },
+        "description": {
+         "Value": "Number of genes per chunk file"
+        },
+        "name": {
+         "Value": "CHUNK_SIZE"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "true"
+        },
+        "description": {
+         "Value": "Compute peak-gene links for multiome datasets (\"true\" or \"false\")"
+        },
+        "name": {
+         "Value": "LINK_PEAKS"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "string"
+        }
+       }
+      },
+      {
+       "Value": {
+        "description": {
+         "Value": "Genes to always link, comma-separated (e.g. SCN10A,TAC1). These are linked first"
+        },
+        "name": {
+         "Value": "LINK_GENES"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "string"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "5000"
+        },
+        "description": {
+         "Value": "Link the N most variable genes (0 = all). About 50 minutes per 1000 genes on a large dataset"
+        },
+        "name": {
+         "Value": "LINK_MAX_GENES"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "1000"
+        },
+        "description": {
+         "Value": "Genes per linking batch (progress is logged after each batch)"
+        },
+        "name": {
+         "Value": "LINK_BATCH_SIZE"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      },
+      {
+       "Value": {
+        "defaultValue": {
+         "Value": "0"
+        },
+        "description": {
+         "Value": "Stop linking after this many minutes and keep the links found so far (0 = no limit)"
+        },
+        "name": {
+         "Value": "LINK_MAX_MINUTES"
+        },
+        "required": {
+         "Value": false
+        },
+        "type": {
+         "Value": "number"
+        }
+       }
+      }
+     ]
+    },
+    "runtime": {
+     "Value": {
+      "computeTypes": {
+       "Value": [
+        {
+         "Value": "standard"
+        }
+       ]
+      },
+      "cpu": {
+       "Value": "4096"
+      },
+      "memory": {
+       "Value": "65536"
+      }
+     }
+    },
+    "tags": {
+     "Value": [
+      {
+       "Value": "single-cell"
+      },
+      {
+       "Value": "scrna-seq"
+      },
+      {
+       "Value": "visualization"
+      },
+      {
+       "Value": "seurat"
+      }
+     ]
+    }
+   }
+  },
+  "params": {
+   "Value": [
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "expanded"
+      },
+      "description": {
+       "Value": "Output mode - \"expanded\" for multi-file parquet (PrecisionDashWidgets) or \"consolidated\" for single results.parquet (legacy)"
+      },
+      "name": {
+       "Value": "OUTPUT_MODE"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "string"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "500"
+      },
+      "description": {
+       "Value": "Number of genes per chunk file"
+      },
+      "name": {
+       "Value": "CHUNK_SIZE"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "true"
+      },
+      "description": {
+       "Value": "Compute peak-gene links for multiome datasets (\"true\" or \"false\")"
+      },
+      "name": {
+       "Value": "LINK_PEAKS"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "string"
+      }
+     }
+    },
+    {
+     "Value": {
+      "description": {
+       "Value": "Genes to always link, comma-separated (e.g. SCN10A,TAC1). These are linked first"
+      },
+      "name": {
+       "Value": "LINK_GENES"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "string"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "5000"
+      },
+      "description": {
+       "Value": "Link the N most variable genes (0 = all). About 50 minutes per 1000 genes on a large dataset"
+      },
+      "name": {
+       "Value": "LINK_MAX_GENES"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "1000"
+      },
+      "description": {
+       "Value": "Genes per linking batch (progress is logged after each batch)"
+      },
+      "name": {
+       "Value": "LINK_BATCH_SIZE"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    },
+    {
+     "Value": {
+      "defaultValue": {
+       "Value": "0"
+      },
+      "description": {
+       "Value": "Stop linking after this many minutes and keep the links found so far (0 = no limit)"
+      },
+      "name": {
+       "Value": "LINK_MAX_MINUTES"
+      },
+      "required": {
+       "Value": false
+      },
+      "type": {
+       "Value": "number"
+      }
+     }
+    }
+   ]
+  }
+ }
+}

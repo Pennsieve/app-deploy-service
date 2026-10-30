@@ -8,18 +8,31 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 )
 
-// manifestReader reads a version's synced app.yml: false when it has none.
-type manifestReader func(ctx context.Context, sourceUrl, tag string) (*store_dynamodb.AppManifest, bool)
+// storedManifest is what registration stores from a version's app.yml: its
+// manifest (the default variant's, with variants) and its variants.
+type storedManifest struct {
+	Manifest *store_dynamodb.AppManifest
+	Variants store_dynamodb.VersionVariants
+}
 
-// SyncedManifestReader reads manifests from the content-sync bucket, as
-// registration does.
+// storedManifestOf resolves an app.yml as registration does.
+func storedManifestOf(c appConfig) storedManifest {
+	r := resolveVariants(c)
+	return storedManifest{Manifest: r.versionManifest(), Variants: r.versionVariants()}
+}
+
+// manifestReader reads a version's synced app.yml: false when it has none.
+type manifestReader func(ctx context.Context, sourceUrl, tag string) (storedManifest, bool)
+
+// SyncedManifestReader reads manifests from the content-sync bucket and
+// resolves their variants, as registration does.
 func SyncedManifestReader(cfg aws.Config) manifestReader {
-	return func(ctx context.Context, sourceUrl, tag string) (*store_dynamodb.AppManifest, bool) {
+	return func(ctx context.Context, sourceUrl, tag string) (storedManifest, bool) {
 		c, ok := readSyncedAppConfig(ctx, cfg, sourceUrl, tag)
 		if !ok {
-			return nil, false
+			return storedManifest{}, false
 		}
-		return appManifest(c), true
+		return storedManifestOf(c), true
 	}
 }
 
@@ -29,10 +42,11 @@ type BackfillResult struct {
 }
 
 // BackfillManifests stores the manifest of every version registered before
-// manifests were kept, from its synced app.yml, and sets each app's
-// top-level params from its newest version's (undoing any rollback by a
-// re-registered older tag). Versions without an app.yml are left without a
-// manifest. With dryRun nothing is written.
+// manifests were kept, from its synced app.yml resolved as registration
+// does (with variants: the default's manifest, plus the variants), and sets
+// each app's top-level params from its newest version's (undoing any
+// rollback by a re-registered older tag). Versions without an app.yml are
+// left without a manifest. With dryRun nothing is written.
 func BackfillManifests(ctx context.Context, apps store_dynamodb.AppStoreDBStore, versions store_dynamodb.AppStoreVersionDBStore,
 	read manifestReader, dryRun bool, logf func(string, ...any)) (BackfillResult, error) {
 	var res BackfillResult
@@ -53,15 +67,21 @@ func BackfillManifests(ctx context.Context, apps store_dynamodb.AppStoreDBStore,
 			tagged = append(tagged, taggedVersion{Tag: v.Version, CreatedAt: v.CreatedAt})
 			m := v.Manifest
 			if m == nil && v.Version != "" {
-				var ok bool
-				if m, ok = read(ctx, app.SourceUrl, v.Version); !ok {
+				stored, ok := read(ctx, app.SourceUrl, v.Version)
+				if !ok {
 					res.WithoutAppYml++
 					continue
 				}
+				m = stored.Manifest
 				logf("%s %s: storing its manifest", app.SourceUrl, v.Version)
 				if !dryRun {
 					if err := versions.SetManifest(ctx, v.Uuid, m); err != nil {
 						return res, err
+					}
+					if !stored.Variants.Empty() {
+						if err := versions.SetVariants(ctx, v.Uuid, stored.Variants); err != nil {
+							return res, err
+						}
 					}
 				}
 				res.Stored++
