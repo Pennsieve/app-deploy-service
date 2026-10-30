@@ -132,11 +132,26 @@ variable "build_cache_expiry_days" {
 }
 
 # Pull base images from Docker Hub with the platform's Docker Hub account
-# (platform-infrastructure docker_hub_credentials) instead of anonymously.
-# Gives the build role read access to that one secret.
+# (platform-infrastructure docker_hub_credentials) instead of anonymously:
+# CodeBuild's IP addresses are shared, so anonymous pulls hit Docker Hub's
+# per-IP rate limit. Gives the build role read access to that one secret.
 variable "image_builder_dockerhub_auth" {
   type    = bool
-  default = false
+  default = true
+}
+
+# Pull Docker Hub base images through an ECR pull-through cache in this
+# account (prefix image_builder_dockerhub_cache_prefix): each image is pulled
+# from Docker Hub once, with the platform's account, and builds read the copy
+# in ECR. BuildKit falls back to Docker Hub itself when the cache fails.
+variable "image_builder_dockerhub_cache" {
+  type    = bool
+  default = true
+}
+
+variable "image_builder_dockerhub_cache_prefix" {
+  type    = string
+  default = "docker-hub"
 }
 
 variable "image_builder_log_retention_days" {

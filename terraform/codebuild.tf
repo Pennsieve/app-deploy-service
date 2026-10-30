@@ -31,6 +31,52 @@ locals {
   build_cache_ecr_url_or_empty        = local.use_codebuild ? aws_ecr_repository.build_cache[0].repository_url : ""
 
   docker_hub_credentials_arn = data.terraform_remote_state.platform_infrastructure.outputs.docker_hub_credentials_arn
+
+  use_dockerhub_cache = local.use_codebuild && var.image_builder_dockerhub_cache
+  # Mirror for docker.io in buildkitd (build.sh): <registry>/<prefix>
+  dockerhub_mirror = local.use_dockerhub_cache ? "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current_region.name}.amazonaws.com/${var.image_builder_dockerhub_cache_prefix}" : ""
+}
+
+# --- Docker Hub pull-through cache -------------------------------------------
+# ECR reads upstream credentials only from a secret named
+# ecr-pullthroughcache/..., with the keys username and accessToken, so the
+# platform's Docker Hub account is copied into one (the value is in this
+# state, as the source secret's is readable by the deploy role anyway).
+data "aws_secretsmanager_secret_version" "docker_hub" {
+  count     = local.use_dockerhub_cache ? 1 : 0
+  secret_id = local.docker_hub_credentials_arn
+}
+
+resource "aws_secretsmanager_secret" "dockerhub_cache" {
+  count = local.use_dockerhub_cache ? 1 : 0
+
+  name        = "ecr-pullthroughcache/${var.environment_name}-${var.service_name}-docker-hub-${local.region_shortname}"
+  description = "Docker Hub account for the ECR pull-through cache (copy of docker-hub-credentials)"
+
+  tags = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "dockerhub_cache" {
+  count = local.use_dockerhub_cache ? 1 : 0
+
+  secret_id = aws_secretsmanager_secret.dockerhub_cache[0].id
+  secret_string = jsonencode({
+    username    = jsondecode(data.aws_secretsmanager_secret_version.docker_hub[0].secret_string)["username"]
+    accessToken = jsondecode(data.aws_secretsmanager_secret_version.docker_hub[0].secret_string)["password"]
+  })
+}
+
+# docker.io/library/python:3.12 is served as <registry>/docker-hub/library/python:3.12;
+# ECR creates the repository on the first pull and refreshes tags from Docker
+# Hub at most once a day.
+resource "aws_ecr_pull_through_cache_rule" "docker_hub" {
+  count = local.use_dockerhub_cache ? 1 : 0
+
+  ecr_repository_prefix = var.image_builder_dockerhub_cache_prefix
+  upstream_registry_url = "registry-1.docker.io"
+  credential_arn        = aws_secretsmanager_secret.dockerhub_cache[0].arn
+
+  depends_on = [aws_secretsmanager_secret_version.dockerhub_cache]
 }
 
 # Build cache: one tag per app (provisioner imagebuild.CacheRef), never shared
@@ -178,6 +224,24 @@ data "aws_iam_policy_document" "image_builder" {
   }
 
   dynamic "statement" {
+    for_each = local.use_dockerhub_cache ? [1] : []
+    content {
+      # A pull through the cache creates the repository and imports the
+      # image on a miss.
+      sid    = "DockerHubCache"
+      effect = "Allow"
+      actions = [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchImportUpstreamImage",
+        "ecr:CreateRepository",
+      ]
+      resources = ["arn:aws:ecr:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:repository/${var.image_builder_dockerhub_cache_prefix}/*"]
+    }
+  }
+
+  dynamic "statement" {
     for_each = var.image_builder_dockerhub_auth ? [1] : []
     content {
       sid       = "DockerHubCredentials"
@@ -220,6 +284,11 @@ resource "aws_codebuild_project" "image_builder" {
     environment_variable {
       name  = "BUILDKIT_SHA256"
       value = var.buildkit_sha256
+    }
+
+    environment_variable {
+      name  = "DOCKERHUB_MIRROR"
+      value = local.dockerhub_mirror
     }
 
     dynamic "environment_variable" {

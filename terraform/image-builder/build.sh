@@ -17,12 +17,15 @@
 #   BUILD_PLATFORM   optional; default linux/amd64 (what the runners run)
 #   DOCKERHUB_USERNAME, DOCKERHUB_PASSWORD
 #                    optional; authenticated Docker Hub pulls
+#   DOCKERHUB_MIRROR optional; registry mirror for docker.io, <registry>/<path>,
+#                    e.g. the ECR pull-through cache <account>.dkr.ecr.<region>.amazonaws.com/docker-hub.
+#                    buildkitd tries it first and falls back to Docker Hub.
 #   BUILDKIT_HOST    optional; use this buildkitd instead of starting one
 #   BUILDKITD_FLAGS  optional; extra flags for the buildkitd started here
 #   DOCKER_CONFIG    optional; where registry credentials are written
 #                    (default $HOME/.docker)
 #
-# ECR registries named by DESTINATION or BUILD_CACHE_REF are logged in to
+# ECR registries named by DESTINATION, BUILD_CACHE_REF or DOCKERHUB_MIRROR are logged in to
 # with `aws ecr get-login-password` (the CodeBuild service role).
 #
 # Exit status is buildctl's: 0 = pushed, anything else = failed.
@@ -63,7 +66,7 @@ add_auth() { # <registry> <user> <password>
 }
 
 ecr_logged_in=" "
-for ref in "$DESTINATION" "${BUILD_CACHE_REF:-}"; do
+for ref in "$DESTINATION" "${BUILD_CACHE_REF:-}" "${DOCKERHUB_MIRROR:-}"; do
   [ -n "$ref" ] || continue
   registry=${ref%%/*}
   case "$registry" in
@@ -111,11 +114,20 @@ if [ -z "${BUILDKIT_HOST:-}" ]; then
     break
   done
 
+  # Base images from Docker Hub go through the mirror first; buildkitd
+  # falls back to registry-1.docker.io when the mirror fails.
+  config=""
+  if [ -n "${DOCKERHUB_MIRROR:-}" ]; then
+    config=/tmp/buildkitd.toml
+    printf '[registry."docker.io"]\n  mirrors = ["%s"]\n' "$DOCKERHUB_MIRROR" > "$config"
+    log "docker.io mirror: $DOCKERHUB_MIRROR"
+  fi
+
   BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock
   export BUILDKIT_HOST
   mkdir -p /run/buildkit
   # shellcheck disable=SC2086 # BUILDKITD_FLAGS is a list of flags
-  buildkitd --addr "$BUILDKIT_HOST" ${root:+--root "$root"} ${BUILDKITD_FLAGS:-} >/tmp/buildkitd.log 2>&1 &
+  buildkitd --addr "$BUILDKIT_HOST" ${root:+--root "$root"} ${config:+--config "$config"} ${BUILDKITD_FLAGS:-} >/tmp/buildkitd.log 2>&1 &
   tries=0
   until buildctl debug workers >/dev/null 2>&1; do
     tries=$((tries + 1))
