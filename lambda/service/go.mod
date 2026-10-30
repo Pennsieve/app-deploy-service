@@ -16,7 +16,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.56.9
 	github.com/google/uuid v1.3.0
 	github.com/pennsieve/github-client v0.0.1
-	github.com/pennsieve/pennsieve-go-core v1.23.1-0.20261029111727-af22a5b57d93
+	github.com/pennsieve/pennsieve-go-core v1.24.0
 	github.com/pusher/pusher-http-go/v5 v5.1.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/stretchr/testify v1.12.1
