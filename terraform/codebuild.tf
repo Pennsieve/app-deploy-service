@@ -38,46 +38,14 @@ locals {
 }
 
 # --- Docker Hub pull-through cache -------------------------------------------
-# ECR reads upstream credentials only from a secret named
-# ecr-pullthroughcache/..., with the keys username and accessToken, so the
-# platform's Docker Hub account is copied into one (the value is in this
-# state, as the source secret's is readable by the deploy role anyway).
-data "aws_secretsmanager_secret_version" "docker_hub" {
-  count     = local.use_dockerhub_cache ? 1 : 0
-  secret_id = local.docker_hub_credentials_arn
-}
-
-resource "aws_secretsmanager_secret" "dockerhub_cache" {
-  count = local.use_dockerhub_cache ? 1 : 0
-
-  name        = "ecr-pullthroughcache/${var.environment_name}-${var.service_name}-docker-hub-${local.region_shortname}"
-  description = "Docker Hub account for the ECR pull-through cache (copy of docker-hub-credentials)"
-
-  tags = local.common_tags
-}
-
-resource "aws_secretsmanager_secret_version" "dockerhub_cache" {
-  count = local.use_dockerhub_cache ? 1 : 0
-
-  secret_id = aws_secretsmanager_secret.dockerhub_cache[0].id
-  secret_string = jsonencode({
-    username    = jsondecode(data.aws_secretsmanager_secret_version.docker_hub[0].secret_string)["username"]
-    accessToken = jsondecode(data.aws_secretsmanager_secret_version.docker_hub[0].secret_string)["password"]
-  })
-}
-
-# docker.io/library/python:3.12 is served as <registry>/docker-hub/library/python:3.12;
-# ECR creates the repository on the first pull and refreshes tags from Docker
-# Hub at most once a day.
-resource "aws_ecr_pull_through_cache_rule" "docker_hub" {
-  count = local.use_dockerhub_cache ? 1 : 0
-
-  ecr_repository_prefix = var.image_builder_dockerhub_cache_prefix
-  upstream_registry_url = "registry-1.docker.io"
-  credential_arn        = aws_secretsmanager_secret.dockerhub_cache[0].arn
-
-  depends_on = [aws_secretsmanager_secret_version.dockerhub_cache]
-}
+# The ECR pull-through cache rule for Docker Hub (prefix
+# image_builder_dockerhub_cache_prefix) is NOT created here: it needs an
+# upstream credential (credential_arn), which AWS provider 4.x doesn't have,
+# and the environments run this module on 4.67. It is a registry-wide setting
+# anyway; create it where the provider is 5.x (platform-infrastructure), with a
+# secret named ecr-pullthroughcache/... holding username and accessToken.
+# Until the rule exists, leave image_builder_dockerhub_cache off: with it on,
+# buildkitd tries the missing mirror first and falls back to Docker Hub.
 
 # Build cache: one tag per app (provisioner imagebuild.CacheRef), never shared
 # between apps. A repository of its own, NOT appstore-private: pushes there
