@@ -13,6 +13,11 @@ type DeploymentApplicationIds struct {
 	DeploymentId      string
 	ApplicationId     string
 	ApplicationsTable string
+	// Variant is the app variant an App Store build makes ("" for an app
+	// without variants), and VariantDefault says it is the version's
+	// default variant, whose status is the version's.
+	Variant        string
+	VariantDefault bool
 }
 
 func (i DeploymentApplicationIds) CheckIds() error {
@@ -53,6 +58,10 @@ func (h *DeployTaskStateChangeHandler) GetIdsFromTags(ctx context.Context, taskA
 			ids.ApplicationId = aws.ToString(tag.Value)
 		} else if key == ApplicationsTableTag {
 			ids.ApplicationsTable = aws.ToString(tag.Value)
+		} else if key == VariantTag {
+			ids.Variant = aws.ToString(tag.Value)
+		} else if key == VariantDefaultTag {
+			ids.VariantDefault = aws.ToString(tag.Value) == "true"
 		}
 	}
 	if err := ids.CheckIds(); err != nil {

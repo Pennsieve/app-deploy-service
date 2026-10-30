@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -94,6 +96,81 @@ func setOptionalString(updateBuilder expression.UpdateBuilder, name string, opti
 	if len(optionalValue) > 0 {
 		updateBuilder.Set(expression.Name(name), expression.Value(optionalValue))
 	}
+}
+
+// UpdateVariantStatus records how a variant's build ended on the version:
+// variants.<id>.status, and failureReason when it failed. The variant must
+// already be recorded (the service lambda writes every variant at
+// registration).
+func (h *DeployTaskStateChangeHandler) UpdateVariantStatus(ctx context.Context, applicationId, variant string, finalState *FinalState, failureReason string, tableName string) error {
+	in, err := VariantStatusUpdate(applicationId, variant, finalState, failureReason, tableName)
+	if err != nil {
+		return err
+	}
+	if _, err := h.DynamoDBApi.UpdateItem(ctx, in); err != nil {
+		var notRecorded *types.ConditionalCheckFailedException
+		if errors.As(err, &notRecorded) {
+			// nothing to update; retrying won't change that
+			h.logger.Warn("variant not recorded on the version; its status is not kept",
+				slog.String("variant", variant), slog.String("status", finalState.Status()))
+			return nil
+		}
+		return fmt.Errorf("error updating variant %s of %s in table %s to status %s: %w",
+			variant, applicationId, tableName, finalState.Status(), err)
+	}
+	return nil
+}
+
+// VariantStatusUpdate is the update UpdateVariantStatus makes.
+func VariantStatusUpdate(applicationId, variant string, finalState *FinalState, failureReason string, tableName string) (*dynamodb.UpdateItemInput, error) {
+	path := func(field string) expression.NameBuilder {
+		return expression.Name(models.VariantsField + "." + variant + "." + field)
+	}
+	update := expression.Set(path(models.VariantStatusField), expression.Value(finalState.Status()))
+	if finalState.Errored {
+		if failureReason == "" {
+			failureReason = "image build failed"
+		}
+		update = update.Set(path(models.VariantFailureReasonField), expression.Value(failureReason))
+	} else {
+		update = update.Remove(path(models.VariantFailureReasonField))
+	}
+	expressions, err := expression.NewBuilder().
+		WithCondition(expression.AttributeExists(expression.Name(models.VariantsField + "." + variant))).
+		WithUpdate(update).Build()
+	if err != nil {
+		return nil, fmt.Errorf("error building the status update of variant %s of %s: %w", variant, applicationId, err)
+	}
+	return &dynamodb.UpdateItemInput{
+		Key:                       models.ApplicationKey(applicationId),
+		TableName:                 aws.String(tableName),
+		ConditionExpression:       expressions.Condition(),
+		ExpressionAttributeNames:  expressions.Names(),
+		ExpressionAttributeValues: expressions.Values(),
+		UpdateExpression:          expressions.Update(),
+	}, nil
+}
+
+// VariantFailureReason is why a variant's build failed, for its
+// failureReason: the build's stopped reason (for CodeBuild, its failed
+// phase, log tail and log link), with the kaniko container's exit code.
+func VariantFailureReason(event models.TaskStateChangeEvent) string {
+	if !event.Detail.Errored() {
+		return ""
+	}
+	reason := strings.TrimSpace(event.Detail.StoppedReason)
+	for _, c := range event.Detail.Containers {
+		if c.Errored() {
+			code := fmt.Sprintf("image build exited with code %d", c.ExitCode)
+			if reason == "" {
+				reason = code
+			} else {
+				reason = code + ": " + reason
+			}
+			break
+		}
+	}
+	return reason
 }
 
 func (h *DeployTaskStateChangeHandler) UpdateApplicationsTable(ctx context.Context, applicationId string, finalState *FinalState, tableName string) error {

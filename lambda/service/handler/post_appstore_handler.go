@@ -213,6 +213,14 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			}, nil
 		}
 	}
+	// app.yml's variants, resolved once: what the version records, which
+	// images the release builds and how. With APP_VARIANTS_ENABLED=false
+	// only the default variant is built.
+	var resolved resolvedApp
+	if haveAppCfg {
+		resolved = resolveVariants(appCfg)
+	}
+	buildAllVariants := variantBuildsEnabled()
 	if len(problems) > 0 {
 		log.Printf("app.yml of %s %s doesn't follow %s: %s", application.Source.Url, application.Source.Tag, manifestschema.URL, strings.Join(problems, "; "))
 		if manifestValidationMode() == manifestValidationEnforce {
@@ -232,7 +240,11 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	// (heredocs, RUN --mount) is refused here with the reason, instead of
 	// silently pushing an image other than the one the author tested.
 	// Skipped when the environment builds with BuildKit (IMAGE_BUILDER).
-	if reason := unsupportedDockerfileSyntax(application.Source.Url, application.Source.Tag, application.Source.AuthToken); reason != "" {
+	var dockerfiles []string
+	if haveAppCfg {
+		dockerfiles = builtDockerfiles(resolved, buildAllVariants)
+	}
+	if reason := unsupportedDockerfileSyntax(application.Source.Url, application.Source.Tag, application.Source.AuthToken, dockerfiles); reason != "" {
 		log.Printf("refusing %s %s: %s", application.Source.Url, application.Source.Tag, reason)
 		refusal := withLiveUpdates(ctx, NewAppStoreStatusManager(handlerName, versionStore, versionUuid), cfg)
 		return events.APIGatewayV2HTTPResponse{
@@ -276,14 +288,24 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	// the manifest and params are the default variant's, and the variants
 	// (each with its resolved manifest and build settings) are recorded
 	// beside them; without, the version record is as it always was.
+	//
+	// Each variant that is built gets its own deployment (the default's is
+	// this release's); the provisioner reads the variants and build settings
+	// back from the version (READ_VERSION_BUILDS) and starts one build each.
+	var variantDeployments []variantDeployment
+	readVersionBuilds := false
 	if haveAppCfg {
-		resolved := resolveVariants(appCfg)
 		if err := versionStore.SetManifest(ctx, versionUuid, resolved.versionManifest()); err != nil {
 			log.Printf("warning: unable to persist the manifest of %s %s: %v", applicationId, application.Source.Tag, err)
 		}
 		if vv := resolved.versionVariants(); !vv.Empty() {
+			planned := planVariantBuilds(&vv, resolved, deploymentId, buildAllVariants, uuid.NewString)
 			if err := versionStore.SetVariants(ctx, versionUuid, vv); err != nil {
+				// the provisioner then builds the one image, as it would
+				// without variants
 				log.Printf("warning: unable to persist the variants of %s %s: %v", applicationId, application.Source.Tag, err)
+			} else {
+				variantDeployments, readVersionBuilds = planned, true
 			}
 		}
 		if isNewestVersion(ctx, versionStore, applicationId, application.Source.Tag) {
@@ -295,9 +317,11 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 
 	// Derive build-time ephemeral storage from app.yml (e.g. GPU apps pull large
 	// dependencies that exhaust Fargate's default 20 GiB). 0 means no override.
+	// With variants, this is the default variant's; each variant's own is
+	// recorded on it (planVariantBuilds).
 	buildStorage := int32(0)
 	if haveAppCfg {
-		buildStorage = buildStorageGiB(appCfg)
+		buildStorage = buildStorageGiB(resolved.Default)
 	}
 
 	// StatusManager uses the version store for status updates (keyed by versionUuid)
@@ -321,12 +345,41 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		LastStatus:      "NOT_STARTED",
 		SourceUrl:       application.Source.Url,
 		Tag:             application.Source.Tag,
+		Variant:         resolved.defaultVariantBuilt(variantDeployments),
 	}); err != nil {
 		log.Println("error creating deployment record: ", err.Error())
 		return events.APIGatewayV2HTTPResponse{
 			StatusCode: http.StatusInternalServerError,
 			Body:       handlerError(handlerName, ErrStoringDeployment),
 		}, nil
+	}
+	// one more deployment per other variant built, which the status lambda
+	// follows like the release's own
+	for _, vd := range variantDeployments {
+		if vd.DeploymentId == deploymentId {
+			continue
+		}
+		if err := deploymentsStore.Insert(ctx, store_dynamodb.Deployment{
+			DeploymentKey: store_dynamodb.DeploymentKey{
+				DeploymentId:  vd.DeploymentId,
+				ApplicationId: versionUuid,
+			},
+			ReleaseId:       application.Release.ID,
+			InitiatedAt:     time.Now().UTC(),
+			WorkspaceNodeId: appstoreIdentifier,
+			UserNodeId:      application.Source.SourceType,
+			Action:          actionValue,
+			LastStatus:      "NOT_STARTED",
+			SourceUrl:       application.Source.Url,
+			Tag:             application.Source.Tag,
+			Variant:         vd.Variant,
+		}); err != nil {
+			log.Printf("error creating the deployment record of variant %s: %s", vd.Variant, err.Error())
+			return events.APIGatewayV2HTTPResponse{
+				StatusCode: http.StatusInternalServerError,
+				Body:       statusManager.SetErrorStatus(ctx, ErrStoringDeployment),
+			}, nil
+		}
 	}
 
 	log.Println("Initiating new AppStore Fargate Task.")
@@ -416,6 +469,13 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			Name:  &authTokenKey,
 			Value: &authTokenValue,
 		},
+	}
+
+	if readVersionBuilds {
+		environment = append(environment, types.KeyValuePair{
+			Name:  aws.String(readVersionBuildsEnv),
+			Value: aws.String("true"),
+		})
 	}
 
 	if buildStorage > 0 {

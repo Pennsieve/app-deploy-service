@@ -84,29 +84,45 @@ func dockerfileInstructions(dockerfile string) []dockerfileInstruction {
 	return filtered
 }
 
-// fetchDockerfile reads the release's root Dockerfile (what both builders
-// build). A variable so tests can replace it.
-var fetchDockerfile = func(sourceUrl, tag, authToken string) ([]byte, error) {
-	return newGitHubClient(authToken).GetFileContent(sourceUrl, "Dockerfile", tag)
+// fetchDockerfile reads a Dockerfile of the release (a path in the
+// repository). A variable so tests can replace it.
+var fetchDockerfile = func(sourceUrl, tag, authToken, file string) ([]byte, error) {
+	return newGitHubClient(authToken).GetFileContent(sourceUrl, file, tag)
 }
 
 // unsupportedDockerfileSyntax returns why kaniko can't build this release
-// faithfully, or "" when it can, when the Dockerfile can't be read (the build
-// will say), or when BuildKit builds the environment's images.
-func unsupportedDockerfileSyntax(sourceUrl, tag, authToken string) string {
+// faithfully, or "" when it can, when a Dockerfile can't be read (the build
+// will say), or when BuildKit builds the environment's images. It checks
+// each Dockerfile the release builds (builtDockerfiles): the root
+// Dockerfile unless app.yml's build, or a variant's, names others.
+func unsupportedDockerfileSyntax(sourceUrl, tag, authToken string, dockerfiles []string) string {
 	if !kanikoBuildsImages() {
 		return ""
 	}
-	dockerfile, err := fetchDockerfile(sourceUrl, tag, authToken)
-	if err != nil || dockerfile == nil {
-		log.Printf("warning: unable to read the Dockerfile of %s %s to check its syntax: %v", sourceUrl, tag, err)
-		return ""
+	if len(dockerfiles) == 0 {
+		dockerfiles = []string{"Dockerfile"}
 	}
-	problems := buildKitOnlySyntax(string(dockerfile))
-	if len(problems) == 0 {
+	var reasons []string
+	for _, file := range dockerfiles {
+		dockerfile, err := fetchDockerfile(sourceUrl, tag, authToken, file)
+		if err != nil || dockerfile == nil {
+			log.Printf("warning: unable to read %s of %s %s to check its syntax: %v", file, sourceUrl, tag, err)
+			continue
+		}
+		problems := buildKitOnlySyntax(string(dockerfile))
+		if len(problems) == 0 {
+			continue
+		}
+		if len(dockerfiles) == 1 && file == "Dockerfile" {
+			reasons = append(reasons, strings.Join(problems, "; "))
+		} else {
+			reasons = append(reasons, file+": "+strings.Join(problems, "; "))
+		}
+	}
+	if len(reasons) == 0 {
 		return ""
 	}
 	return fmt.Sprintf("the Dockerfile uses BuildKit-only syntax that the App Store's image builder (kaniko) "+
 		"does not build correctly: %s. Rewrite those steps without heredocs or RUN --mount "+
-		"(e.g. COPY a script and RUN it), then publish a new release.", strings.Join(problems, "; "))
+		"(e.g. COPY a script and RUN it), then publish a new release.", strings.Join(reasons, "; "))
 }

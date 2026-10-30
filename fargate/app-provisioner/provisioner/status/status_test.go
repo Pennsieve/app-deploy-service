@@ -61,3 +61,26 @@ func TestManagerIgnoresRealtimeErrors(t *testing.T) {
 	assert.Equal(t, []string{"deployed"}, store.statuses)
 	assert.Len(t, publisher.channels, 1)
 }
+
+// A non-default variant's status goes out as its own event, so a failed
+// GPU build never reads as the version's status; the version's own events
+// name the default variant.
+func TestManagerVariantEvents(t *testing.T) {
+	publisher := &recordingPublisher{}
+	store := &fakeStatusStore{}
+	m := NewAppStoreManager(store, "v-1").WithRealtime(publisher).WithVariant("cpu")
+
+	m.UpdateApplicationStatus(context.Background(), "deploying", false)
+	m.SendVariantStatusEvent(context.Background(), "gpu", "dep-2", "error", true)
+
+	assert.Equal(t, []string{"deploying"}, store.statuses, "the variant event leaves the version's status alone")
+	require.Len(t, publisher.names, 2)
+	assert.Equal(t, events.ApplicationStatusEventName, publisher.names[0])
+	assert.Equal(t, "cpu", publisher.data[0].(events.ApplicationStatusEvent).Variant)
+	assert.Equal(t, events.VariantStatusEventName, publisher.names[1])
+	gpu := publisher.data[1].(events.ApplicationStatusEvent)
+	assert.Equal(t, "gpu", gpu.Variant)
+	assert.Equal(t, "dep-2", gpu.DeploymentId)
+	assert.True(t, gpu.IsErrorStatus)
+	assert.Equal(t, "/applications/v-1", publisher.channels[1])
+}

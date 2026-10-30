@@ -13,6 +13,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -46,7 +49,24 @@ const (
 	DeploymentIdVar      = "DEPLOYMENT_ID"
 	ApplicationIdVar     = "APPLICATION_ID"
 	ApplicationsTableVar = "APPLICATIONS_TABLE"
+
+	// Per-variant build settings (app.yml build; docs/app-manifest-variants.md).
+	// Each is set only when it says something, so an app without variants
+	// or build settings gets exactly the variables it always got.
+	VariantVar        = "VARIANT"         // the variant id; the status lambda reads it
+	VariantDefaultVar = "VARIANT_DEFAULT" // "true" for the version's default variant
+	BuildArgsVar      = "BUILD_ARGS"      // newline-separated K=V, sorted by name
+	BuildTargetVar    = "BUILD_TARGET"    // the Dockerfile stage
+	DockerfileVar     = "DOCKERFILE"      // the Dockerfile's path in the repository
+	// CacheImportRefVar is a second cache build.sh imports (not exported):
+	// the default variant's, for a non-default variant's build.
+	CacheImportRefVar = "BUILD_CACHE_IMPORT_REF"
 )
+
+// VariantTagSeparator joins a tag and a non-default variant's id: images are
+// <hash>-<tag>--<id>, build caches app-<key>--<id>. Release tags of apps with
+// variants, and variant ids, never contain it.
+const VariantTagSeparator = "--"
 
 // largeDiskGiB is the disk of BUILD_GENERAL1_LARGE, the project's default
 // compute type. A build that needs more storage (APP_STORAGE) runs on
@@ -111,6 +131,100 @@ type Request struct {
 	Tag               string
 	Destination       string // <appstore-private>:<hash>-<tag>
 	StorageGiB        int32  // APP_STORAGE; 0 = default
+
+	// Variant is the app variant this build makes (app.yml variants[].id);
+	// "" for an app without variants. DefaultVariant says it is the
+	// version's default, whose image and cache keep the app's own
+	// (unsuffixed) tags; a non-default variant's are suffixed with --<id>.
+	Variant        string
+	DefaultVariant bool
+	// BuildArgs, Target and Dockerfile are app.yml's build settings (a
+	// variant's merged over the top level's): Docker build args, the stage
+	// to build ("" = the last) and the Dockerfile's path ("" = Dockerfile).
+	BuildArgs  map[string]string
+	Target     string
+	Dockerfile string
+}
+
+// secondaryVariant is a build of a variant other than the version's default.
+func (r Request) secondaryVariant() bool {
+	return r.Variant != "" && !r.DefaultVariant
+}
+
+// VariantDestination is a variant's image: the version's own for the
+// default variant (or an app without variants), <image>--<id> for another.
+func VariantDestination(destination, variant string, isDefault bool) string {
+	if variant == "" || isDefault {
+		return destination
+	}
+	return destination + VariantTagSeparator + variant
+}
+
+var buildArgNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// Validate checks the build settings before a build starts: build arg names
+// as app.yml's schema allows them, values on one line (BUILD_ARGS is one
+// K=V per line), a target without spaces, and a relative Dockerfile path
+// that stays in the repository.
+func (r Request) Validate() error {
+	for _, k := range sortedArgNames(r.BuildArgs) {
+		if !buildArgNamePattern.MatchString(k) {
+			return fmt.Errorf("build arg %q is not a valid name", k)
+		}
+		if strings.ContainsAny(r.BuildArgs[k], "\r\n") {
+			return fmt.Errorf("build arg %s has a line break in its value", k)
+		}
+	}
+	if strings.ContainsAny(r.Target, " \t\r\n") {
+		return fmt.Errorf("build target %q has white space", r.Target)
+	}
+	if d := r.Dockerfile; d != "" {
+		if strings.HasPrefix(d, "/") || strings.ContainsAny(d, "\r\n") {
+			return fmt.Errorf("dockerfile %q must be a relative path", d)
+		}
+		for _, part := range strings.Split(d, "/") {
+			if part == ".." {
+				return fmt.Errorf("dockerfile %q leaves the repository", d)
+			}
+		}
+	}
+	return nil
+}
+
+func sortedArgNames(args map[string]string) []string {
+	names := make([]string, 0, len(args))
+	for k := range args {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// BuildArgLines is BUILD_ARGS: one K=V per line, sorted by name so the same
+// settings always give the same build.
+func BuildArgLines(args map[string]string) string {
+	lines := make([]string, 0, len(args))
+	for _, k := range sortedArgNames(args) {
+		lines = append(lines, k+"="+args[k])
+	}
+	return strings.Join(lines, "\n")
+}
+
+// KanikoFlags are the kaniko executor flags for the build settings:
+// --build-arg K=V per arg (sorted), --target and --dockerfile. None for a
+// build without settings, so its command is the one it always was.
+func KanikoFlags(r Request) []string {
+	var flags []string
+	for _, k := range sortedArgNames(r.BuildArgs) {
+		flags = append(flags, "--build-arg", k+"="+r.BuildArgs[k])
+	}
+	if r.Target != "" {
+		flags = append(flags, "--target", r.Target)
+	}
+	if r.Dockerfile != "" {
+		flags = append(flags, "--dockerfile", r.Dockerfile)
+	}
+	return flags
 }
 
 // GitContext is the BuildKit git context for a source URL at a tag. BuildKit
@@ -135,6 +249,18 @@ func CacheRef(cacheRepoUrl, sourceUrl string) string {
 	return fmt.Sprintf("%s:app-%s", cacheRepoUrl, hex.EncodeToString(sum[:])[:defaultCacheKeySize])
 }
 
+// VariantCacheRef is a variant's own cache: the app's (CacheRef) for the
+// default variant, so an app's cache stays warm when it adopts variants,
+// and app-<key>--<id> for another, so concurrent builds of one release
+// never export to the same ref.
+func VariantCacheRef(cacheRepoUrl, sourceUrl, variant string, isDefault bool) string {
+	ref := CacheRef(cacheRepoUrl, sourceUrl)
+	if variant == "" || isDefault {
+		return ref
+	}
+	return ref + VariantTagSeparator + variant
+}
+
 // ComputeTypeOverride returns a larger compute type when the build needs
 // more disk than the project's default (BUILD_GENERAL1_LARGE, 128 GB).
 func ComputeTypeOverride(storageGiB int32) (cbtypes.ComputeType, bool) {
@@ -157,9 +283,25 @@ func StartBuildInput(cfg Config, r Request, gitTokenParameter string) *codebuild
 	vars := []cbtypes.EnvironmentVariable{
 		plain(ContextVar, GitContext(r.SourceUrl, r.Tag)),
 		plain(DestinationVar, r.Destination),
-		plain(CacheRefVar, CacheRef(cfg.CacheRepoUrl, r.SourceUrl)),
+		plain(CacheRefVar, VariantCacheRef(cfg.CacheRepoUrl, r.SourceUrl, r.Variant, r.DefaultVariant)),
 		plain(DeploymentIdVar, r.DeploymentId),
 		plain(ApplicationIdVar, r.ApplicationId),
+	}
+	if r.secondaryVariant() {
+		// shared layers (base image, dependencies) hit the default's cache
+		vars = append(vars, plain(CacheImportRefVar, CacheRef(cfg.CacheRepoUrl, r.SourceUrl)))
+	}
+	if r.Variant != "" {
+		vars = append(vars, plain(VariantVar, r.Variant), plain(VariantDefaultVar, strconv.FormatBool(r.DefaultVariant)))
+	}
+	if len(r.BuildArgs) > 0 {
+		vars = append(vars, plain(BuildArgsVar, BuildArgLines(r.BuildArgs)))
+	}
+	if r.Target != "" {
+		vars = append(vars, plain(BuildTargetVar, r.Target))
+	}
+	if r.Dockerfile != "" {
+		vars = append(vars, plain(DockerfileVar, r.Dockerfile))
 	}
 	if r.ApplicationsTable != "" {
 		vars = append(vars, plain(ApplicationsTableVar, r.ApplicationsTable))
@@ -207,6 +349,9 @@ type SSMAPI interface {
 // returns the build's ARN. The status lambda deletes the token parameter
 // when the build ends; Start deletes it itself if the build doesn't start.
 func Start(ctx context.Context, cb CodeBuildAPI, params SSMAPI, cfg Config, r Request, gitToken string) (string, error) {
+	if err := r.Validate(); err != nil {
+		return "", err
+	}
 	tokenParameter := ""
 	if gitToken != "" {
 		tokenParameter = GitTokenParameterName(cfg.GitTokenParameterPrefix, r.DeploymentId)

@@ -66,6 +66,8 @@ resource "aws_lambda_function" "service_lambda" {
       // Which builder builds App Store images (docs/builds.md); with kaniko,
       // releases whose Dockerfile uses BuildKit-only syntax are refused.
       IMAGE_BUILDER = var.image_builder
+      // Build every variant of a release (true), or only the default.
+      APP_VARIANTS_ENABLED = tostring(var.app_variants_enabled)
     }
   }
 }

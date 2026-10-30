@@ -20,6 +20,8 @@ const (
 	BuildApplicationIdVar     = "APPLICATION_ID"
 	BuildApplicationsTableVar = "APPLICATIONS_TABLE"
 	BuildGitTokenVar          = "GIT_TOKEN"
+	BuildVariantVar           = "VARIANT"
+	BuildVariantDefaultVar    = "VARIANT_DEFAULT"
 )
 
 const (
@@ -151,6 +153,8 @@ func idsFromBuildVariables(env models.BuildEnvironment) DeploymentApplicationIds
 		DeploymentId:      value(BuildDeploymentIdVar),
 		ApplicationId:     value(BuildApplicationIdVar),
 		ApplicationsTable: value(BuildApplicationsTableVar),
+		Variant:           value(BuildVariantVar),
+		VariantDefault:    value(BuildVariantDefaultVar) == "true",
 	}
 }
 

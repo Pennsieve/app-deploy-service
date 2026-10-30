@@ -210,6 +210,10 @@ type AppVariant struct {
 	Status         string `dynamodbav:"status,omitempty"`
 	DeploymentId   string `dynamodbav:"deploymentId,omitempty"`
 	FailureReason  string `dynamodbav:"failureReason,omitempty"`
+	// BuildStorageGiB is the disk the variant's build asks for (100 when
+	// its computeTypes include gpu); 0 for the builder's default. Set at
+	// registration for the provisioner, never shown.
+	BuildStorageGiB int32 `dynamodbav:"buildStorageGiB,omitempty"`
 }
 
 // AppBuild is how an image is built: Docker build args, the stage to build

@@ -13,6 +13,15 @@
 #   DESTINATION      required; image to push, <registry>/<repo>:<tag>
 #   BUILD_CACHE_REF  optional; this app's registry cache, <registry>/<repo>:<key>.
 #                    Imported before and exported (mode=max) after the build.
+#   BUILD_CACHE_IMPORT_REF
+#                    optional; another cache to import (never exported): the
+#                    app's default variant's, for a build of another variant
+#   BUILD_ARGS       optional; Docker build args, one NAME=value per line
+#                    (app.yml build.args, a variant's merged over the top level's)
+#   BUILD_TARGET     optional; the Dockerfile stage to build (default: the last)
+#   DOCKERFILE       optional; the Dockerfile's path in the repository
+#                    (default: Dockerfile)
+#   VARIANT          optional; the app variant this build makes, for the log
 #   GIT_TOKEN        optional; token for a private GitHub repo
 #   BUILD_PLATFORM   optional; default linux/amd64 (what the runners run)
 #   DOCKERHUB_USERNAME, DOCKERHUB_PASSWORD
@@ -66,7 +75,7 @@ add_auth() { # <registry> <user> <password>
 }
 
 ecr_logged_in=" "
-for ref in "$DESTINATION" "${BUILD_CACHE_REF:-}" "${DOCKERHUB_MIRROR:-}"; do
+for ref in "$DESTINATION" "${BUILD_CACHE_REF:-}" "${BUILD_CACHE_IMPORT_REF:-}" "${DOCKERHUB_MIRROR:-}"; do
   [ -n "$ref" ] || continue
   registry=${ref%%/*}
   case "$registry" in
@@ -162,14 +171,44 @@ if [ -n "${GIT_TOKEN:-}" ]; then
   set -- "$@" --secret id=GIT_AUTH_TOKEN,env=GIT_TOKEN
 fi
 
+# app.yml's build settings (dockerfile.v0 frontend options).
+if [ -n "${BUILD_ARGS:-}" ]; then
+  # one NAME=value per line; names were checked by the provisioner, and a
+  # value may hold spaces, "=" or quotes (each is one argv entry)
+  while IFS= read -r arg; do
+    [ -n "$arg" ] || continue
+    case "$arg" in
+      [A-Za-z_]*=*) ;;
+      *) die "BUILD_ARGS line is not NAME=value: $arg" ;;
+    esac
+    set -- "$@" --opt "build-arg:$arg"
+    log "build arg ${arg%%=*}"
+  done <<EOF
+$BUILD_ARGS
+EOF
+fi
+if [ -n "${BUILD_TARGET:-}" ]; then
+  set -- "$@" --opt "target=$BUILD_TARGET"
+fi
+if [ -n "${DOCKERFILE:-}" ]; then
+  # read from the git context, like the default Dockerfile
+  set -- "$@" --opt "filename=$DOCKERFILE"
+fi
+
 if [ -n "${BUILD_CACHE_REF:-}" ]; then
-  # One cache per app; a failed export never fails the build.
+  # One cache per app (per variant: a variant other than the default has
+  # its own, so concurrent builds of one release never export to the same
+  # ref); a failed export never fails the build.
+  set -- "$@" --import-cache "type=registry,ref=$BUILD_CACHE_REF"
+  if [ -n "${BUILD_CACHE_IMPORT_REF:-}" ] && [ "$BUILD_CACHE_IMPORT_REF" != "$BUILD_CACHE_REF" ]; then
+    # layers shared with the default variant (base image, dependencies)
+    set -- "$@" --import-cache "type=registry,ref=$BUILD_CACHE_IMPORT_REF"
+  fi
   set -- "$@" \
-    --import-cache "type=registry,ref=$BUILD_CACHE_REF" \
     --export-cache "type=registry,ref=$BUILD_CACHE_REF,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true"
 fi
 
-log "building $CONTEXT for $platform -> $DESTINATION"
+log "building $CONTEXT${VARIANT:+ (variant $VARIANT)}${BUILD_TARGET:+ target $BUILD_TARGET}${DOCKERFILE:+ from $DOCKERFILE} for $platform -> $DESTINATION"
 start=$(date +%s)
 buildctl "$@"
 end=$(date +%s)
