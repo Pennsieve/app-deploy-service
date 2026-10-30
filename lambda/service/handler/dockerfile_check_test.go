@@ -56,22 +56,46 @@ func TestBuildKitOnlySyntax(t *testing.T) {
 func TestUnsupportedDockerfileSyntax(t *testing.T) {
 	saved := fetchDockerfile
 	t.Cleanup(func() { fetchDockerfile = saved })
-	fetchDockerfile = func(string, string, string) ([]byte, error) { return []byte(dynasdV020Dockerfile), nil }
+	fetchDockerfile = func(string, string, string, string) ([]byte, error) { return []byte(dynasdV020Dockerfile), nil }
 
 	t.Setenv(imageBuilderEnv, "")
-	reason := unsupportedDockerfileSyntax("https://github.com/org/app", "v1", "")
+	reason := unsupportedDockerfileSyntax("https://github.com/org/app", "v1", "", nil)
 	assert.Contains(t, reason, "line 9: heredoc in RUN (<<)")
 	assert.Contains(t, reason, "kaniko")
 
 	t.Setenv(imageBuilderEnv, "kaniko")
-	assert.NotEmpty(t, unsupportedDockerfileSyntax("https://github.com/org/app", "v1", ""))
+	assert.NotEmpty(t, unsupportedDockerfileSyntax("https://github.com/org/app", "v1", "", nil))
 
 	t.Setenv(imageBuilderEnv, "codebuild")
-	assert.Empty(t, unsupportedDockerfileSyntax("https://github.com/org/app", "v1", ""), "BuildKit builds heredocs")
+	assert.Empty(t, unsupportedDockerfileSyntax("https://github.com/org/app", "v1", "", nil), "BuildKit builds heredocs")
 
 	t.Setenv(imageBuilderEnv, "kaniko")
-	fetchDockerfile = func(string, string, string) ([]byte, error) { return nil, errors.New("rate limited") }
-	assert.Empty(t, unsupportedDockerfileSyntax("https://github.com/org/app", "v1", ""), "an unreadable Dockerfile doesn't block the release")
-	fetchDockerfile = func(string, string, string) ([]byte, error) { return nil, nil }
-	assert.Empty(t, unsupportedDockerfileSyntax("https://github.com/org/app", "v1", ""))
+	fetchDockerfile = func(string, string, string, string) ([]byte, error) { return nil, errors.New("rate limited") }
+	assert.Empty(t, unsupportedDockerfileSyntax("https://github.com/org/app", "v1", "", nil), "an unreadable Dockerfile doesn't block the release")
+	fetchDockerfile = func(string, string, string, string) ([]byte, error) { return nil, nil }
+	assert.Empty(t, unsupportedDockerfileSyntax("https://github.com/org/app", "v1", "", nil))
+}
+
+// Every Dockerfile a release builds is checked, and the reason names the one
+// that kaniko can't build.
+func TestUnsupportedDockerfileSyntax_EachBuiltDockerfile(t *testing.T) {
+	saved := fetchDockerfile
+	t.Cleanup(func() { fetchDockerfile = saved })
+	var read []string
+	fetchDockerfile = func(_, _, _, file string) ([]byte, error) {
+		read = append(read, file)
+		if file == "docker/Dockerfile.gpu" {
+			return []byte(dynasdV020Dockerfile), nil
+		}
+		return []byte("FROM python:3.12\nRUN pip install x\n"), nil
+	}
+	t.Setenv(imageBuilderEnv, "kaniko")
+
+	reason := unsupportedDockerfileSyntax("https://github.com/org/app", "v1", "", []string{"Dockerfile", "docker/Dockerfile.gpu"})
+	assert.Equal(t, []string{"Dockerfile", "docker/Dockerfile.gpu"}, read)
+	assert.Contains(t, reason, "docker/Dockerfile.gpu: line 9: heredoc in RUN (<<)")
+
+	read = nil
+	assert.Empty(t, unsupportedDockerfileSyntax("https://github.com/org/app", "v1", "", []string{"Dockerfile"}))
+	assert.Equal(t, []string{"Dockerfile"}, read)
 }

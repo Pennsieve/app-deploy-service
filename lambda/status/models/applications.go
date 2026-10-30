@@ -13,3 +13,9 @@ const ApplicationStatusField = "registrationStatus"
 func ApplicationKey(applicationId string) map[string]types.AttributeValue {
 	return map[string]types.AttributeValue{ApplicationKeyField: dydbutils.StringAttributeValue(applicationId)}
 }
+
+// An App Store version's variants (a map keyed by variant id) and the
+// fields of a variant the status lambda sets when its build ends.
+const VariantsField = "variants"
+const VariantStatusField = "status"
+const VariantFailureReasonField = "failureReason"

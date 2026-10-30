@@ -2,7 +2,9 @@ version: 0.2
 
 # App Store image build (docs/builds.md). The provisioner starts it with
 # CONTEXT, DESTINATION, BUILD_CACHE_REF, DEPLOYMENT_ID, APPLICATION_ID,
-# APPLICATIONS_TABLE and, for a private repo, GIT_TOKEN (from SSM).
+# APPLICATIONS_TABLE and, for a private repo, GIT_TOKEN (from SSM); for an
+# app variant or app.yml build settings also VARIANT, VARIANT_DEFAULT,
+# BUILD_ARGS, BUILD_TARGET, DOCKERFILE and BUILD_CACHE_IMPORT_REF.
 env:
   shell: bash
 

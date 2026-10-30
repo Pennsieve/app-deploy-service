@@ -87,6 +87,14 @@ variable "app_manifest_validation" {
   default = "warn"
 }
 
+# App variants (docs/app-manifest-variants.md): true builds every variant of
+# a release, each its own image (<hash>-<tag>--<id>) and status; false builds
+# only the default variant, as before variant builds.
+variable "app_variants_enabled" {
+  type    = bool
+  default = true
+}
+
 # App Store image builds (docs/builds.md): "kaniko" runs the kaniko Fargate
 # task, "codebuild" runs BuildKit in the CodeBuild project in codebuild.tf.
 # The CodeBuild resources exist only when this is "codebuild".

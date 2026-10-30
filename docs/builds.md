@@ -197,6 +197,51 @@ other than what the author tested: it dropped the dynasd v0.2.0 heredoc body,
 so `/opt/dynasd` was never created. With `codebuild`, the check is skipped. A
 Dockerfile that can't be read doesn't block the release.
 
+It checks every Dockerfile the release builds: `Dockerfile`, or the ones app.yml's
+`build.dockerfile` (top level or a built variant's) names, each once.
+
+## Variants
+
+An app.yml with `variants` ([app-manifest-variants.md](app-manifest-variants.md)) builds
+one image per variant on every release. An app.yml with neither `variants` nor `build`
+builds exactly as before: the same single build, tag, variables and statuses.
+
+| | Image tag | SOCI index | Build cache |
+|---|---|---|---|
+| App without variants | `<hash>-<tag>` | `<hash>-<tag>-soci` | `app-<key>` |
+| Default variant | `<hash>-<tag>` | `<hash>-<tag>-soci` | `app-<key>` |
+| Other variant `gpu` | `<hash>-<tag>--gpu` | `<hash>-<tag>--gpu-soci` | `app-<key>--gpu`, also imports `app-<key>` |
+
+- **Registration** (service lambda): stores the variants with one deployment per built
+  variant (the default variant's is the release's), and still starts **one** provisioner
+  task, with `READ_VERSION_BUILDS=true`. `APP_VARIANTS_ENABLED=false` (Terraform
+  `app_variants_enabled`) builds only the default variant; the others then stay without
+  a status, and the registry calls them not yet deployed.
+- **Provisioner**: reads the variants and build settings from the version and calls the
+  builder once per variant, the default first. Each build gets its variant's merged
+  `build` and its own disk (`buildStorageGiB`). A top-level `build` without variants
+  applies to the single image.
+  - **kaniko**: `--build-arg K=V` per arg (sorted), `--target`, `--dockerfile`; the task
+    is tagged `Variant` and `VariantDefault`.
+  - **CodeBuild**: the variables `VARIANT`, `VARIANT_DEFAULT`, `BUILD_ARGS` (one `K=V`
+    per line, sorted), `BUILD_TARGET`, `DOCKERFILE` and `BUILD_CACHE_IMPORT_REF`.
+    build.sh passes them to buildctl as `--opt build-arg:K=V`, `--opt target=…`,
+    `--opt filename=…` (read from the git context) and a second `--import-cache`.
+  - Settings are checked before a build starts: arg names as the schema allows, values
+    on one line, a relative Dockerfile path without `..`.
+- **Status** (status lambda): reads the variant from the task tags or build variables
+  and sets `variants.<id>.status` (`deployed`/`error`) and `failureReason` (the build's
+  stopped reason; for kaniko with the exit code). The **default** variant also sets the
+  version's `registrationStatus`, as today. A build without a variant is recorded as
+  before.
+- **Partial failure**: a failed **non-default** variant (its build fails, or doesn't
+  start) leaves the version `deployed`; only that variant is `error` and refused by the
+  registry. A failed default variant fails the version as before; if it doesn't even
+  start, the other variants aren't built.
+- **Live updates**: the version's status (`application_status_event`) names the default
+  variant in `variant`. Other variants' statuses are `application_variant_status_event`
+  on the same channel, so a failed GPU build never reads as the version's status.
+
 ## Environments
 
 The module is environment-agnostic:

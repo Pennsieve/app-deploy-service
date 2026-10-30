@@ -7,9 +7,8 @@ them is read and stored exactly as before.
 
 The design (identity, builds, the registry API, workflows and the UI) is in
 workflow-service `docs/app-variants.md`. This page covers what app.yml may say and what
-registration stores. **Today only the default variant's image is built**; building every
-variant and per-variant build status come later. The registry already takes a variant
-(below).
+registration stores. Every variant is built on every release, each with its own image and
+build status ([builds.md](builds.md#variants)), and the registry takes a variant (below).
 
 ## Example
 
@@ -117,13 +116,22 @@ manifest:        <resolved manifest of the DEFAULT variant>  # what variant-unaw
 defaultVariant:  "cpu"
 variantOrder:    ["cpu", "gpu"]
 variants:                                                     # a map keyed by id
-  cpu: { name, description, manifest: <resolved>, build: {args, target, dockerfile} }
-  gpu: { ... }
+  cpu: { name, description, manifest: <resolved>, build: {args, target, dockerfile},
+         deploymentId, buildStorageGiB }
+  gpu: { ..., deploymentId, buildStorageGiB, status: registering }
 ```
 
 and the app's `params` (from its newest version) are the default variant's. Every reader
 that doesn't know about variants (the app's version manifest, workflow-service, the
-backfill) sees the default. Build status per variant is added with the variant builds.
+backfill) sees the default.
+
+Each built variant has a deployment: the default variant's is the release's own, the others
+get their own (deployment records with `variant`). Non-default variants start as
+`registering`; the default variant's status is the version's until its build ends. As the
+builds run, each variant gets its `destinationUrl`, `status` (`deploying`, then `deployed`
+or `error`) and, on a failure, `failureReason` ([builds.md](builds.md#variants)).
+`buildStorageGiB` (100 for a variant whose `computeTypes` include `gpu`) is for the
+provisioner and never shown.
 
 `backfill-manifests` resolves variants the same way.
 

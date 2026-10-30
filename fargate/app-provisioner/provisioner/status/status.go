@@ -30,6 +30,9 @@ type Manager struct {
 	Realtime          realtime.Publisher
 	ApplicationId     string
 	DeploymentId      string
+	// Variant is the app variant the status is of (the version's default
+	// variant, for an App Store version with variants); "" otherwise.
+	Variant string
 }
 
 func NewManager(applicationsStore store_dynamodb.DynamoDBStore, applicationId string) *Manager {
@@ -46,6 +49,28 @@ func (m *Manager) WithDeployment(deploymentsStore *store_dynamodb.DeploymentsSto
 	m.DeploymentsStore = deploymentsStore
 	m.DeploymentId = deploymentId
 	return m
+}
+
+// WithVariant names the variant the version's own status events are of
+// (its default variant).
+func (m *Manager) WithVariant(variant string) *Manager {
+	m.Variant = variant
+	return m
+}
+
+// SendVariantStatusEvent publishes the status of a build of a variant
+// other than the default (VariantStatusEventName); the version's own status
+// is untouched.
+func (m *Manager) SendVariantStatusEvent(ctx context.Context, variant, deploymentId, status string, isErrorStatus bool) {
+	m.publish(ctx, events.VariantStatusEventName, events.ApplicationStatusEvent{
+		ApplicationId: m.ApplicationId,
+		DeploymentId:  deploymentId,
+		Status:        status,
+		Time:          time.Now().UTC(),
+		IsErrorStatus: isErrorStatus,
+		Source:        m.HandlerName,
+		Variant:       variant,
+	})
 }
 
 func (m *Manager) WithPusher(pusherConfig *pennsievePusher.Config) *Manager {
@@ -92,27 +117,31 @@ func (m *Manager) ApplicationCreateUpdate(ctx context.Context, application store
 }
 
 func (m *Manager) sendApplicationStatusEvent(ctx context.Context, status string, isErrorStatus bool) {
-	if m.Realtime == nil && m.Pusher == nil {
-		log.Printf("warning: no Pusher client configured")
-		return
-	}
-	event := events.ApplicationStatusEvent{
+	m.publish(ctx, events.ApplicationStatusEventName, events.ApplicationStatusEvent{
 		ApplicationId: m.ApplicationId,
 		DeploymentId:  m.DeploymentId,
 		Status:        status,
 		Time:          time.Now().UTC(),
 		IsErrorStatus: isErrorStatus,
 		Source:        m.HandlerName,
+		Variant:       m.Variant,
+	})
+}
+
+func (m *Manager) publish(ctx context.Context, name string, event events.ApplicationStatusEvent) {
+	if m.Realtime == nil && m.Pusher == nil {
+		log.Printf("warning: no Pusher client configured")
+		return
 	}
 	if m.Realtime != nil {
 		channel := realtime.Application(m.ApplicationId)
-		if err := m.Realtime.Publish(ctx, channel, events.ApplicationStatusEventName, event); err != nil {
-			log.Printf("warning: error publishing realtime application channel %s with status: %s: %s\n", channel, status, err.Error())
+		if err := m.Realtime.Publish(ctx, channel, name, event); err != nil {
+			log.Printf("warning: error publishing realtime application channel %s with status: %s: %s\n", channel, event.Status, err.Error())
 		}
 		return
 	}
 	channel := events.ApplicationStatusChannel(m.ApplicationId)
-	if err := m.Pusher.Trigger(channel, events.ApplicationStatusEventName, event); err != nil {
-		log.Printf("warning: error updating pusher application channel %s with status: %s: %s\n", channel, status, err.Error())
+	if err := m.Pusher.Trigger(channel, name, event); err != nil {
+		log.Printf("warning: error updating pusher application channel %s with status: %s: %s\n", channel, event.Status, err.Error())
 	}
 }

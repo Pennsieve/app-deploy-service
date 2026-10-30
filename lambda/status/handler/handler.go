@@ -120,14 +120,28 @@ func (h *DeployTaskStateChangeHandler) recordStateChange(ctx context.Context, id
 		return err
 	}
 
-	if final := IsFinalState(event); final != nil {
+	final := IsFinalState(event)
+	if final == nil {
+		return nil
+	}
+	if ids.Variant == "" {
+		// an app without variants (or not an App Store build): as always
 		h.SendApplicationStatusEvent(ctx, applicationId, deploymentId, final, event.Detail.UpdatedAt)
+		return h.UpdateApplicationsTable(ctx, applicationId, final, applicationsTable)
+	}
+
+	// A variant's build: its own status and reason on the version's
+	// variants. The default variant's is also the version's status, exactly
+	// as for an app without variants; another variant's never is, so a
+	// failed GPU build leaves the version deployed.
+	h.logger = h.logger.With(slog.String("variant", ids.Variant), slog.Bool("defaultVariant", ids.VariantDefault))
+	h.SendVariantStatusEvent(ctx, applicationId, deploymentId, ids.Variant, ids.VariantDefault, final, event.Detail.UpdatedAt)
+	if ids.VariantDefault {
 		if err := h.UpdateApplicationsTable(ctx, applicationId, final, applicationsTable); err != nil {
 			return err
 		}
 	}
-
-	return nil
+	return h.UpdateVariantStatus(ctx, applicationId, ids.Variant, final, VariantFailureReason(event), applicationsTable)
 }
 
 type FinalState struct {

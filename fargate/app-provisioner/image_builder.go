@@ -50,7 +50,10 @@ type kanikoStarter struct {
 func (kanikoStarter) Name() string { return imagebuild.BuilderKaniko }
 
 func (k kanikoStarter) Start(ctx context.Context, r imagebuild.Request, gitToken string) error {
-	return PrivateDeploy(ctx, r.ApplicationId, r.DeploymentId, r.SourceUrl, r.Tag, r.Destination, gitToken, r.ApplicationsTable, r.StorageGiB, k.appProvisioner, k.ecsClient)
+	if err := r.Validate(); err != nil {
+		return err
+	}
+	return PrivateDeploy(ctx, r, gitToken, k.appProvisioner, k.ecsClient)
 }
 
 type codeBuildStarter struct {
