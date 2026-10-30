@@ -2,6 +2,11 @@
 
 Status: spike, 2026-10-29. Nothing deployed; no shared infrastructure changed.
 
+> Kept as background for [builds.md](builds.md), which describes what was built
+> (CodeBuild + BuildKit, option B). The prototype `fargate/buildkit-builder/`
+> mentioned below stayed in the spike PR (#203) and was not merged; its
+> `build.sh` became `terraform/image-builder/build.sh`.
+
 ## TL;DR
 
 - **BuildKit does not run on Fargate.** Every BuildKit mode needs either a user

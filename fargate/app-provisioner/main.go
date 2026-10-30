@@ -17,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	awsProvisioner "github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/aws"
+	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/imagebuild"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/parser"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/runner"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/store_dynamodb"
@@ -118,9 +119,13 @@ func main() {
 		appStoreStatusManager = appStoreStatusManager.WithDeployment(deploymentsStore, appStoreDeploymentId)
 		appStoreStatusManager = withLiveUpdates(ctx, appStoreStatusManager, cfg)
 
-		ecsClient := ecs.NewFromConfig(cfg)
 		authToken := os.Getenv("AUTH_TOKEN")
-		err := AddToAppstore(ctx, applicationUuid, appStoreDeploymentId, sourceUrl, tag, authToken, buildStorageGiB, appProvisioner, ecsClient, appStoreStatusManager, versionStore)
+		builder, err := newBuildStarter(os.Getenv(imagebuild.BuilderEnv), os.Getenv, cfg, appProvisioner)
+		if err != nil {
+			appStoreStatusManager.SetErrorStatus(ctx, err)
+			log.Fatal(err)
+		}
+		err = AddToAppstore(ctx, applicationUuid, appStoreDeploymentId, sourceUrl, tag, authToken, buildStorageGiB, builder, appStoreStatusManager, versionStore)
 		if err != nil {
 			appStoreStatusManager.SetErrorStatus(ctx, err)
 			log.Fatal(err)
@@ -166,7 +171,7 @@ func Create(ctx context.Context, applicationUuid string, deploymentId string, so
 	return nil
 }
 
-func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, authToken string, buildStorageGiB int32, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager, versionStore store_dynamodb.AppStoreVersionDBStore) error {
+func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, tag string, authToken string, buildStorageGiB int32, builder buildStarter, statusManager *status.Manager, versionStore store_dynamodb.AppStoreVersionDBStore) error {
 	// Get the pre-existing private ECR URL from environment variable
 	ecrRepoUrl := os.Getenv("APPSTORE_PRIVATE_ECR_URL")
 	if ecrRepoUrl == "" {
@@ -188,13 +193,16 @@ func AddToAppstore(ctx context.Context, applicationUuid string, deploymentId str
 	statusManager.UpdateApplicationStatus(ctx, "deploying", false)
 
 	// Build and push
-	log.Printf("Initiating new Deployment Fargate Task: ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", sourceUrl, tag, destinationUrl)
-	applicationsTable := os.Getenv("APPLICATIONS_TABLE")
-	if err := PrivateDeploy(ctx, applicationUuid, deploymentId, sourceUrl, tag, destinationUrl, authToken, applicationsTable, buildStorageGiB, appProvisioner, ecsClient); err != nil {
-		return err
-	}
-
-	return nil
+	log.Printf("Initiating new image build (%s): ADD_TO_APPSTORE - sourceUrl: %s, tag: %s, destinationUrl: %s", builder.Name(), sourceUrl, tag, destinationUrl)
+	return builder.Start(ctx, imagebuild.Request{
+		DeploymentId:      deploymentId,
+		ApplicationId:     applicationUuid,
+		ApplicationsTable: os.Getenv("APPLICATIONS_TABLE"),
+		SourceUrl:         sourceUrl,
+		Tag:               tag,
+		Destination:       destinationUrl,
+		StorageGiB:        buildStorageGiB,
+	}, authToken)
 }
 
 func Redeploy(ctx context.Context, applicationUuid string, deploymentId string, sourceUrl string, destinationUrl string, appProvisioner provisioner.Provisioner, ecsClient *ecs.Client, statusManager *status.Manager) error {

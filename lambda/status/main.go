@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
+	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
@@ -16,7 +18,8 @@ import (
 	"strings"
 )
 
-// This Lambda listens for ECS state change events and logs them to DynamoDB
+// This Lambda listens for image build state changes (ECS tasks for kaniko,
+// CodeBuild builds for BuildKit) and records them in DynamoDB
 var stateChangeHandler *handler.DeployTaskStateChangeHandler
 
 func init() {
@@ -38,7 +41,11 @@ func init() {
 		ecs.NewFromConfig(awsConfig),
 		dynamodb.NewFromConfig(awsConfig),
 		applicationsTable,
-		deploymentsTable)
+		deploymentsTable).
+		WithCodeBuild(
+			codebuild.NewFromConfig(awsConfig),
+			cloudwatchlogs.NewFromConfig(awsConfig),
+			ssm.NewFromConfig(awsConfig))
 
 	// live status updates: AppSync Events where configured, otherwise Pusher
 	if strings.TrimSpace(os.Getenv(realtime.EnvEventsEndpoint)) != "" {
@@ -58,5 +65,5 @@ func init() {
 }
 
 func main() {
-	lambda.Start(stateChangeHandler.Handle)
+	lambda.Start(stateChangeHandler.HandleEvent)
 }

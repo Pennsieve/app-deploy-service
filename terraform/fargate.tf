@@ -3,19 +3,28 @@ data "template_file" "app_provisioner_ecs_task_definition" {
   template = file("${path.module}/task_definition.json.tpl")
 
   vars = {
-    appstore_private_ecr_url  = data.terraform_remote_state.platform_infrastructure.outputs.appstore_private_ecr_repository_url
-    aws_region                = data.aws_region.current_region.name
-    aws_region_shortname      = data.terraform_remote_state.region.outputs.aws_region_shortname
-    container_cpu             = var.container_cpu
-    container_memory          = var.container_memory
-    environment_name          = var.environment_name
-    docker_hub_credentials    = data.terraform_remote_state.platform_infrastructure.outputs.docker_hub_credentials_arn
-    image_tag                 = var.image_tag
-    image_url                 = var.image_url
-    service_name              = var.service_name
-    tier                      = var.tier
-    realtime_events_endpoint  = local.realtime_events_endpoint
+    appstore_private_ecr_url = data.terraform_remote_state.platform_infrastructure.outputs.appstore_private_ecr_repository_url
+    aws_region               = data.aws_region.current_region.name
+    aws_region_shortname     = data.terraform_remote_state.region.outputs.aws_region_shortname
+    container_cpu            = var.container_cpu
+    container_memory         = var.container_memory
+    environment_name         = var.environment_name
+    docker_hub_credentials   = data.terraform_remote_state.platform_infrastructure.outputs.docker_hub_credentials_arn
+    image_tag                = var.image_tag
+    image_url                = var.image_url
+    service_name             = var.service_name
+    tier                     = var.tier
+    realtime_events_endpoint = local.realtime_events_endpoint
+    image_builder            = var.image_builder
+    image_builder_project    = local.image_builder_project_name_or_empty
+    build_cache_ecr_url      = local.build_cache_ecr_url_or_empty
+    image_build_param_prefix = local.image_build_parameter_prefix
   }
+}
+
+locals {
+  # kaniko, pinned by digest (variables.tf)
+  deployer_image = var.deployer_image_digest != "" ? "${var.deployer_image_url}@${var.deployer_image_digest}" : "${var.deployer_image_url}:${var.deployer_image_tag}"
 }
 
 # Create Fargate Task Definition
@@ -38,15 +47,14 @@ data "template_file" "app_deployer_ecs_task_definition" {
   template = file("${path.module}/deployer_task_definition.json.tpl")
 
   vars = {
-    aws_region                = data.aws_region.current_region.name
-    aws_region_shortname      = data.terraform_remote_state.region.outputs.aws_region_shortname
-    container_cpu             = var.deployer_task_cpu
-    container_memory          = var.deployer_task_memory
-    environment_name          = var.environment_name
-    image_tag                 = var.deployer_image_tag
-    image_url                 = var.deployer_image_url
-    service_name              = var.service_name
-    tier                      = var.deployer_tier
+    aws_region           = data.aws_region.current_region.name
+    aws_region_shortname = data.terraform_remote_state.region.outputs.aws_region_shortname
+    container_cpu        = var.deployer_task_cpu
+    container_memory     = var.deployer_task_memory
+    environment_name     = var.environment_name
+    image                = local.deployer_image
+    service_name         = var.service_name
+    tier                 = var.deployer_tier
   }
 }
 
