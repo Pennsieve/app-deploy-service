@@ -168,14 +168,18 @@ container, privileged.
   - `ssm:GetParameters` on the token path;
   - with `image_builder_dockerhub_auth` (default true), read on the Docker
     Hub credentials secret;
-  - with `image_builder_dockerhub_cache` (default true), pull and import on
+  - with `image_builder_dockerhub_cache` (default false), pull and import on
     `repository/docker-hub/*`, the ECR pull-through cache for Docker Hub.
     build.sh makes it buildkitd's `docker.io` mirror (`DOCKERHUB_MIRROR`), so
     base images are pulled from Docker Hub once, with the platform's account,
     and read from ECR afterwards. On any mirror error buildkitd falls back to
     Docker Hub (checked locally: a 401 from the mirror moves on to
-    registry-1.docker.io). The rule reads a copy of the Docker Hub secret
-    named `ecr-pullthroughcache/...`, as ECR requires.
+    registry-1.docker.io). The rule itself is not created by this module:
+    it needs an upstream credential (`credential_arn`), which AWS provider 4.x
+    lacks, and the environments run this module on 4.67. Create it where the
+    provider is 5.x (platform-infrastructure), with a secret named
+    `ecr-pullthroughcache/...` holding `username` and `accessToken`, then turn
+    `image_builder_dockerhub_cache` on.
 
   The provisioner gains `codebuild:StartBuild` on the project, and
   `ssm:PutParameter` and `ssm:DeleteParameter` on the token path. The status

@@ -104,7 +104,7 @@ variable "image_builder" {
 
   validation {
     condition     = contains(["kaniko", "codebuild"], var.image_builder)
-    error_message = "image_builder must be \"kaniko\" or \"codebuild\"."
+    error_message = "The image_builder value must be \"kaniko\" or \"codebuild\"."
   }
 }
 
@@ -148,13 +148,15 @@ variable "image_builder_dockerhub_auth" {
   default = true
 }
 
-# Pull Docker Hub base images through an ECR pull-through cache in this
+# Pull Docker Hub base images through the ECR pull-through cache in this
 # account (prefix image_builder_dockerhub_cache_prefix): each image is pulled
 # from Docker Hub once, with the platform's account, and builds read the copy
-# in ECR. BuildKit falls back to Docker Hub itself when the cache fails.
+# in ECR. BuildKit falls back to Docker Hub itself when the cache fails. The
+# rule is created outside this module (codebuild.tf); turn this on once it
+# exists.
 variable "image_builder_dockerhub_cache" {
   type    = bool
-  default = true
+  default = false
 }
 
 variable "image_builder_dockerhub_cache_prefix" {

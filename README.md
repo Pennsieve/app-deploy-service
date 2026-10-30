@@ -53,7 +53,7 @@ Problems in app.yml or CITATION.cff are recorded on the version
 | `image_builder` | Builder | Notes |
 |---|---|---|
 | `kaniko` (default) | kaniko Fargate task, v1.24.0 pinned | kaniko is archived. It ignores Dockerfile heredocs and `RUN --mount`, so those releases are refused. No cache. |
-| `codebuild` | BuildKit v0.34.1 in a CodeBuild project | Same engine as `docker build`, with a per-app registry cache. Docker Hub base images come through an ECR pull-through cache, falling back to Docker Hub with authentication. |
+| `codebuild` | BuildKit v0.34.1 in a CodeBuild project | Same engine as `docker build`, with a per-app registry cache. Docker Hub is pulled with the platform's account; an ECR pull-through cache can be put in front (`image_builder_dockerhub_cache`). |
 
 Why CodeBuild and not BuildKit on Fargate: [buildkit-spike.md](docs/buildkit-spike.md).
 
@@ -102,7 +102,7 @@ The infrastructure repo calls the module once per environment, from
 |---|---|---|
 | `image_builder` | `kaniko` | `kaniko` or `codebuild` |
 | `image_builder_dockerhub_auth` | `true` | CodeBuild: pull from Docker Hub with the platform's account |
-| `image_builder_dockerhub_cache` | `true` | CodeBuild: use the ECR pull-through cache for Docker Hub |
+| `image_builder_dockerhub_cache` | `false` | CodeBuild: use the ECR pull-through cache for Docker Hub; the rule is created outside this module (see builds.md) |
 | `image_builder_compute_type`, `image_builder_timeout_minutes` | | CodeBuild size and timeout |
 | `build_cache_expiry_days` | `30` | drop an app's build cache after this many days without a release |
 | `app_manifest_validation` | `warn` | `warn` or `enforce` |
