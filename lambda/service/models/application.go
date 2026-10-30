@@ -177,6 +177,10 @@ type AppStoreVersion struct {
 	// Citation: the repository's CITATION.cff at this version; absent when
 	// there's none or it couldn't be read (see manifestProblems).
 	Citation *AppCitation `json:"citation,omitempty"`
+	// DefaultVariant and Variants are set only when the version's app.yml
+	// declares variants. Manifest and Status are then the default variant's.
+	DefaultVariant string            `json:"defaultVariant,omitempty"`
+	Variants       []AppStoreVariant `json:"variants,omitempty"`
 }
 
 // AppCitation is a version's CITATION.cff: its title, version, DOI and
@@ -221,6 +225,23 @@ type RelatedWork struct {
 	Source       string   `json:"source"`
 }
 
+// AppStoreVariant is one variant of a version, in app.yml order: a
+// separately built and runnable flavour of the app (e.g. CPU and GPU).
+type AppStoreVariant struct {
+	ID          string `json:"id"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	Default     bool   `json:"default"`
+	// Status is the variant's build: registering, deployed or error. Absent
+	// when no build is recorded for it.
+	Status string `json:"status,omitempty"`
+	// FailureReason: why the variant's build failed (status error).
+	FailureReason string `json:"failureReason,omitempty"`
+	// Manifest is the variant's resolved app.yml: the top level with the
+	// variant's runtime and parameter overrides.
+	Manifest *AppManifest `json:"manifest,omitempty"`
+}
+
 // AppManifest is a version's app.yml: what the app is, what it asks for, its
 // parameters, and what goes in and out.
 type AppManifest struct {
@@ -232,6 +253,16 @@ type AppManifest struct {
 	Parameters  []AppParameter  `json:"parameters"`
 	Inputs      []AppPort       `json:"inputs"`
 	Outputs     []AppPort       `json:"outputs"`
+	// Variant names the variant this manifest was resolved for; absent for
+	// an app without variants.
+	Variant *AppManifestVariant `json:"variant,omitempty"`
+}
+
+// AppManifestVariant is the variant a resolved manifest belongs to.
+type AppManifestVariant struct {
+	ID          string `json:"id"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // AppRuntime: CPU units and MiB, compute types and timeout; 0 or empty when

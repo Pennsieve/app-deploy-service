@@ -12,6 +12,9 @@ type Deployment struct {
 	TaskArn       string    `json:"taskArn"`
 	SourceUrl     string    `json:"sourceUrl,omitempty"`
 	Tag           string    `json:"tag,omitempty"`
+	// Variant is the app variant this deployment builds; absent for an app
+	// without variants.
+	Variant string `json:"variant,omitempty"`
 
 	// UpdatedAt is not in the reference. Assume it is the time this state change happened.
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
