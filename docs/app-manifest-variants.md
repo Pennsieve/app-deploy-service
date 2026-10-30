@@ -8,7 +8,8 @@ them is read and stored exactly as before.
 The design (identity, builds, the registry API, workflows and the UI) is in
 workflow-service `docs/app-variants.md`. This page covers what app.yml may say and what
 registration stores. **Today only the default variant's image is built**; building every
-variant, per-variant build status and asking the registry for a variant come later.
+variant and per-variant build status come later. The registry already takes a variant
+(below).
 
 ## Example
 
@@ -125,3 +126,26 @@ that doesn't know about variants (the app's version manifest, workflow-service, 
 backfill) sees the default. Build status per variant is added with the variant builds.
 
 `backfill-manifests` resolves variants the same way.
+
+## The API
+
+`GET /applications/store/{id}` and `GET /applications/store` list each version with
+`defaultVariant` and `variants: [{id, name, description, default, status, failureReason,
+manifest}]` in app.yml order. Neither is present for a version without variants. A
+variant's `status` is its own build's; the default variant's falls back to the version's,
+and another variant without a recorded build has none. Deployments carry `variant` once
+the builds record it.
+
+`GET /applications/store/registry?sourceUrl=…&version=…&variant=…` (what compute nodes
+call) takes an optional `variant`:
+
+| Request | Result |
+|---|---|
+| no `variant` (or empty) | the version's image and status, which are the default variant's: unchanged for every app |
+| `variant` on a version without variants | 404 `version <tag> has no variants` |
+| a `variant` the version doesn't have | 404 `variant <id> not found for this version` |
+| a variant whose build failed (`error`) | 404 `variant <id> of <tag> failed to build` |
+| a variant not deployed, or a non-default one with no recorded status | 404 `variant <id> of <tag> is not yet deployed` |
+| a deployed variant | its image: `<hash>-<tag>` for the default, `<hash>-<tag>--<id>` for the others (its own `destinationUrl` when recorded), SOCI-resolved as before |
+
+Archiving and access are checked on the application, as before.

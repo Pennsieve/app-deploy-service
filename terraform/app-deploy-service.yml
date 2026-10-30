@@ -197,6 +197,9 @@ components:
           type: string
         errored:
           type: boolean
+        variant:
+          type: string
+          description: The app variant this deployment builds (app.yml variants[].id). Absent for an app without variants.
     AppStoreVersion:
       type: object
       properties:
@@ -226,6 +229,35 @@ components:
         license:
           type: string
           description: The repository's license at this version, an SPDX id (e.g. "MIT"), as GitHub reads its LICENSE file. Absent when there's none or it's unknown.
+        defaultVariant:
+          type: string
+          description: The id of the default variant. Absent when the version's app.yml declares no variants; manifest and status are then the default variant's.
+        variants:
+          type: array
+          description: The version's variants in app.yml order (separately built flavours of the app, e.g. CPU and GPU). Absent when its app.yml declares none.
+          items:
+            $ref: '#/components/schemas/AppStoreVariant'
+    AppStoreVariant:
+      type: object
+      properties:
+        id:
+          type: string
+          description: The variant's id (app.yml variants[].id); what a workflow step and the registry's variant parameter refer to.
+        name:
+          type: string
+        description:
+          type: string
+        default:
+          type: boolean
+          description: True for the variant a step without a variant runs.
+        status:
+          type: string
+          description: The variant's build status (registering, deployed, error). Absent when no build is recorded for it.
+        failureReason:
+          type: string
+          description: Why the variant's build failed, when status is error.
+        manifest:
+          $ref: '#/components/schemas/AppManifest'
     AppManifest:
       type: object
       description: The version's app.yml, parsed when it was registered. Absent for an app without an app.yml.
@@ -301,6 +333,16 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AppPort'
+        variant:
+          type: object
+          description: The variant this manifest was resolved for. Absent for an app without variants.
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            description:
+              type: string
     AppPort:
       type: object
       properties:
@@ -1059,6 +1101,15 @@ paths:
           schema:
             type: string
           description: The specific version tag (e.g. v1.0.7)
+        - in: query
+          name: variant
+          required: false
+          schema:
+            type: string
+          description: >
+            The app variant (app.yml variants[].id). Empty or absent is the
+            version's default variant, the image every caller got before
+            variants. A version without variants accepts no variant.
       responses:
         '200':
           description: User is authorized to pull the image
@@ -1075,7 +1126,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/RegistryImageDeniedResponse'
         '404':
-          description: Application or version not found, or version not yet deployed
+          description: >
+            Application or version not found, or not yet deployed. Messages:
+            "application not found in app store", "version not found for this
+            application", "version is not yet deployed"; with a variant:
+            "version <tag> has no variants", "variant <id> not found for this
+            version", "variant <id> of <tag> is not yet deployed", "variant
+            <id> of <tag> failed to build".
           content:
             application/json:
               schema:

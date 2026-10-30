@@ -25,11 +25,14 @@ import (
 // Query parameters:
 //   - sourceUrl: the git repository URL identifying the application
 //   - version: the specific version tag (e.g., "v1.0.7")
+//   - variant: optional; the app variant (app.yml variants[].id). Empty or
+//     absent is the version's default variant, which is today's image.
 func GetAppStoreRegistryHandler(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	handlerName := "GetAppStoreRegistryHandler"
 
 	sourceUrl := request.QueryStringParameters["sourceUrl"]
 	version := request.QueryStringParameters["version"]
+	variant := request.QueryStringParameters["variant"]
 
 	if sourceUrl == "" || version == "" {
 		log.Printf("%s: missing required query parameters: sourceUrl=%q, version=%q", handlerName, sourceUrl, version)
@@ -112,14 +115,16 @@ func GetAppStoreRegistryHandler(ctx context.Context, request events.APIGatewayV2
 	}
 
 	ver := versions[0]
-	if ver.DestinationUrl == "" || ver.Status != "deployed" {
+	destinationUrl, refusal := registryDestination(ver, variant)
+	if refusal != nil {
+		log.Printf("%s: refused %s@%s variant %q: %s", handlerName, sourceUrl, version, variant, refusal.Message)
 		resp := models.RegistryImageResponse{
 			Authorized: false,
-			Message:    "version is not yet deployed",
+			Message:    refusal.Message,
 		}
 		m, _ := json.Marshal(resp)
 		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusNotFound,
+			StatusCode: refusal.Status,
 			Body:       string(m),
 		}, nil
 	}
@@ -146,15 +151,15 @@ func GetAppStoreRegistryHandler(ctx context.Context, request events.APIGatewayV2
 		}, nil
 	}
 
-	log.Printf("%s: authorizing image %s (source: %s, version: %s)",
-		handlerName, ver.DestinationUrl, sourceUrl, version)
+	log.Printf("%s: authorizing image %s (source: %s, version: %s, variant: %q)",
+		handlerName, destinationUrl, sourceUrl, version, variant)
 
 	// Prefer the SOCI-enabled image (digest of the "<tag>-soci" manifest) when one
 	// exists, so Fargate lazy-loads the image instead of full-pulling it. Returns
 	// the original URL unchanged when no SOCI index is present. Same-account
 	// lookup (this handler runs in the appstore ECR's account).
 	ecrClient := ecr.NewFromConfig(cfg)
-	imageUrl := resolveAppStoreImageURL(ctx, ecrClient, ver.DestinationUrl)
+	imageUrl := resolveAppStoreImageURL(ctx, ecrClient, destinationUrl)
 
 	resp := models.RegistryImageResponse{
 		Authorized: true,

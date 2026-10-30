@@ -152,6 +152,17 @@ type AppVariant struct {
 	Description string       `dynamodbav:"description,omitempty"`
 	Manifest    *AppManifest `dynamodbav:"manifest,omitempty"`
 	Build       *AppBuild    `dynamodbav:"build,omitempty"`
+	// DestinationUrl, Status, DeploymentId and FailureReason are the
+	// variant's own build: its image (<hash>-<tag> for the default,
+	// <hash>-<tag>--<id> for the others), its status (registering, deployed,
+	// error), the deployment record that builds it, and why it failed. They
+	// are written by the per-variant builds; until then they are absent, and
+	// the registry treats a non-default variant without a status as not yet
+	// deployed.
+	DestinationUrl string `dynamodbav:"destinationUrl,omitempty"`
+	Status         string `dynamodbav:"status,omitempty"`
+	DeploymentId   string `dynamodbav:"deploymentId,omitempty"`
+	FailureReason  string `dynamodbav:"failureReason,omitempty"`
 }
 
 // AppBuild is how an image is built: Docker build args, the stage to build
