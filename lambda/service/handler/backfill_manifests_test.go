@@ -67,6 +67,9 @@ func (f *fakeVersions) SetManifest(_ context.Context, uuid string, m *store_dyna
 func (f *fakeVersions) SetRegistrationDetails(context.Context, string, string, []string) error {
 	return nil
 }
+func (f *fakeVersions) SetCitation(context.Context, string, *store_dynamodb.AppCitation) error {
+	return nil
+}
 
 func TestBackfillManifests(t *testing.T) {
 	apps := &fakeApps{
