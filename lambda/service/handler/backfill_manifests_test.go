@@ -41,6 +41,7 @@ func (f *fakeApps) UpdateSummary(_ context.Context, uuid string, summary string,
 type fakeVersions struct {
 	versions  []store_dynamodb.AppStoreVersion
 	manifests map[string]*store_dynamodb.AppManifest
+	variants  map[string]store_dynamodb.VersionVariants
 }
 
 func (f *fakeVersions) GetById(context.Context, string) (*store_dynamodb.AppStoreVersion, error) {
@@ -70,6 +71,13 @@ func (f *fakeVersions) SetRegistrationDetails(context.Context, string, string, [
 func (f *fakeVersions) SetCitation(context.Context, string, *store_dynamodb.AppCitation) error {
 	return nil
 }
+func (f *fakeVersions) SetVariants(_ context.Context, uuid string, v store_dynamodb.VersionVariants) error {
+	if f.variants == nil {
+		f.variants = map[string]store_dynamodb.VersionVariants{}
+	}
+	f.variants[uuid] = v
+	return nil
+}
 
 func TestBackfillManifests(t *testing.T) {
 	apps := &fakeApps{
@@ -85,11 +93,11 @@ func TestBackfillManifests(t *testing.T) {
 		},
 		manifests: map[string]*store_dynamodb.AppManifest{},
 	}
-	read := func(_ context.Context, sourceUrl, tag string) (*store_dynamodb.AppManifest, bool) {
+	read := func(_ context.Context, sourceUrl, tag string) (storedManifest, bool) {
 		if sourceUrl == "https://github.com/o/b" {
-			return nil, false // no app.yml
+			return storedManifest{}, false // no app.yml
 		}
-		return &store_dynamodb.AppManifest{Name: tag, Parameters: []store_dynamodb.AppParameter{{Name: "new"}}}, true
+		return storedManifest{Manifest: &store_dynamodb.AppManifest{Name: tag, Parameters: []store_dynamodb.AppParameter{{Name: "new"}}}}, true
 	}
 
 	res, err := BackfillManifests(context.Background(), apps, versions, read, false, func(string, ...any) {})
@@ -99,6 +107,7 @@ func TestBackfillManifests(t *testing.T) {
 	assert.NotContains(t, versions.manifests, "a1", "a stored manifest is kept")
 	assert.Equal(t, "new", apps.params["a"][0].Name, "the app's params come from its newest version")
 	assert.NotContains(t, apps.params, "b", "an app without app.yml keeps its params")
+	assert.Empty(t, versions.variants, "an app.yml without variants records none")
 
 	// A dry run writes nothing.
 	versions.manifests, apps.params = map[string]*store_dynamodb.AppManifest{}, map[string][]store_dynamodb.AppParameter{}

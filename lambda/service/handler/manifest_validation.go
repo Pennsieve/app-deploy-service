@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/pennsieve/app-deploy-service/service/manifestschema"
@@ -39,5 +41,96 @@ func manifestProblems(appYml []byte) []string {
 	for i, p := range ps {
 		out[i] = p.String()
 	}
+	// What the schema can't say about variants is checked here, in the
+	// same "path: reason" form and with the same warn/enforce handling.
+	if c, err := parseAppConfig(appYml); err == nil {
+		out = append(out, variantProblems(c)...)
+	}
 	return out
+}
+
+// variantProblems are the checks on app.yml's variants that JSON Schema
+// can't express: ids are unique, and each parameter override names a
+// top-level parameter whose resulting defaultValue is one of its validValues
+// and within its min and max (overridden or inherited).
+func variantProblems(c appConfig) []string {
+	var out []string
+	params := map[string]appParameter{}
+	for _, p := range c.Parameters {
+		if _, dup := params[p.Name]; p.Name != "" && !dup {
+			params[p.Name] = p
+		}
+	}
+	seen := map[string]int{}
+	for i, v := range c.Variants {
+		path := fmt.Sprintf("/variants/%d", i)
+		if first, dup := seen[v.ID]; dup && v.ID != "" {
+			out = append(out, fmt.Sprintf("%s/id: %q is already the id of variant %d; variant ids must be unique", path, v.ID, first))
+		} else {
+			seen[v.ID] = i
+		}
+		for _, name := range sortedKeys(v.Parameters) {
+			o := v.Parameters[name]
+			ppath := path + "/parameters/" + jsonPointerEscape(name)
+			p, ok := params[name]
+			if !ok {
+				out = append(out, fmt.Sprintf("%s: there is no top-level parameter %q; a variant can only override existing parameters", ppath, name))
+				continue
+			}
+			if o.DefaultValue == nil && o.ValidValues == nil {
+				continue
+			}
+			eff := p.withOverride(o)
+			if eff.DefaultValue == "" && o.DefaultValue == nil {
+				continue // no default to check
+			}
+			if len(eff.ValidValues) > 0 && !containsValue(eff.ValidValues, eff.DefaultValue) {
+				out = append(out, fmt.Sprintf("%s/defaultValue: %q is not one of the parameter's validValues %v", ppath, eff.DefaultValue, eff.ValidValues))
+			}
+			if eff.Min != nil || eff.Max != nil {
+				n, err := strconv.ParseFloat(strings.TrimSpace(eff.DefaultValue), 64)
+				switch {
+				case err != nil:
+					out = append(out, fmt.Sprintf("%s/defaultValue: %q is not a number, but the parameter has a min or max", ppath, eff.DefaultValue))
+				case eff.Min != nil && n < *eff.Min:
+					out = append(out, fmt.Sprintf("%s/defaultValue: %v is less than the parameter's min %v", ppath, n, *eff.Min))
+				case eff.Max != nil && n > *eff.Max:
+					out = append(out, fmt.Sprintf("%s/defaultValue: %v is more than the parameter's max %v", ppath, n, *eff.Max))
+				}
+			}
+		}
+	}
+	return out
+}
+
+// containsValue: v is one of values, compared as written or, for numbers,
+// by value (1 and 1.0 are the same choice).
+func containsValue(values []string, v string) bool {
+	n, numErr := strconv.ParseFloat(strings.TrimSpace(v), 64)
+	for _, x := range values {
+		if x == v {
+			return true
+		}
+		if numErr == nil {
+			if m, err := strconv.ParseFloat(strings.TrimSpace(x), 64); err == nil && m == n {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// jsonPointerEscape escapes a key for a JSON pointer ("~" and "/").
+func jsonPointerEscape(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "~", "~0"), "/", "~1")
+}
+
+// variantTagProblem refuses a release tag containing "--" for an app with
+// variants: "--" separates the tag from the variant id in image tags
+// (<hash>-<tag>--<id>). Refused in either validation mode.
+func variantTagProblem(c appConfig, tag string) string {
+	if len(c.Variants) == 0 || !strings.Contains(tag, "--") {
+		return ""
+	}
+	return fmt.Sprintf("release tag %q contains \"--\", which an app with variants can't use: \"--\" separates the tag from the variant in image tags", tag)
 }

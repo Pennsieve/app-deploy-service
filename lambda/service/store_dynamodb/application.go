@@ -136,6 +136,18 @@ type AppStoreVersion struct {
 	// application.relations applied). Nil when there's none or it can't be
 	// read; its problems are among ManifestProblems.
 	Citation *AppCitation `dynamodbav:"citation,omitempty"`
+	// DefaultVariant, VariantOrder and Variants are set only when the
+	// version's app.yml declares variants (docs/app-manifest-variants.md).
+	// Manifest is then the default variant's resolved manifest, so readers
+	// that don't know about variants see the default. Variants is a map,
+	// keyed by variant id, so one variant can be updated on its own.
+	DefaultVariant string                `dynamodbav:"defaultVariant,omitempty"`
+	VariantOrder   []string              `dynamodbav:"variantOrder,omitempty"`
+	Variants       map[string]AppVariant `dynamodbav:"variants,omitempty"`
+	// Build is the image's build settings from app.yml's top-level build,
+	// for a version without variants (each variant has its own); nil when
+	// app.yml has none.
+	Build *AppBuild `dynamodbav:"build,omitempty"`
 }
 
 // AppCitation is a version's CITATION.cff as stored.
@@ -180,6 +192,37 @@ type RelatedWork struct {
 	Source       string   `dynamodbav:"source"`
 }
 
+// AppVariant is one variant of a version: its label, its resolved manifest
+// (the top level with the variant's overrides) and how its image is built.
+type AppVariant struct {
+	Name        string       `dynamodbav:"name,omitempty"`
+	Description string       `dynamodbav:"description,omitempty"`
+	Manifest    *AppManifest `dynamodbav:"manifest,omitempty"`
+	Build       *AppBuild    `dynamodbav:"build,omitempty"`
+}
+
+// AppBuild is how an image is built: Docker build args, the stage to build
+// (empty: the last) and the Dockerfile's path in the repository (empty:
+// Dockerfile).
+type AppBuild struct {
+	Args       map[string]string `dynamodbav:"args,omitempty"`
+	Target     string            `dynamodbav:"target,omitempty"`
+	Dockerfile string            `dynamodbav:"dockerfile,omitempty"`
+}
+
+// VersionVariants is what SetVariants records on a version.
+type VersionVariants struct {
+	DefaultVariant string
+	VariantOrder   []string
+	Variants       map[string]AppVariant
+	Build          *AppBuild
+}
+
+// Empty is true for an app.yml without variants or a build: nothing to record.
+func (v VersionVariants) Empty() bool {
+	return v.DefaultVariant == "" && len(v.VariantOrder) == 0 && len(v.Variants) == 0 && v.Build == nil
+}
+
 // AppManifest is a version's app.yml as stored.
 type AppManifest struct {
 	Name        string          `dynamodbav:"name,omitempty"`
@@ -190,6 +233,16 @@ type AppManifest struct {
 	Parameters  []AppParameter  `dynamodbav:"parameters,omitempty"`
 	Inputs      []AppPort       `dynamodbav:"inputs,omitempty"`
 	Outputs     []AppPort       `dynamodbav:"outputs,omitempty"`
+	// Variant names the variant this manifest was resolved for; nil for an
+	// app without variants.
+	Variant *AppManifestVariant `dynamodbav:"variant,omitempty"`
+}
+
+// AppManifestVariant is the variant a resolved manifest belongs to.
+type AppManifestVariant struct {
+	ID          string `dynamodbav:"id"`
+	Name        string `dynamodbav:"name,omitempty"`
+	Description string `dynamodbav:"description,omitempty"`
 }
 
 // AppRuntime is what a version asks for to run: CPU units and MiB, the

@@ -46,6 +46,51 @@ type appConfig struct {
 	Parameters []appParameter `yaml:"parameters"`
 	Inputs     []appPort      `yaml:"inputs"`
 	Outputs    []appPort      `yaml:"outputs"`
+	// Build is how the image is built (build args, target stage,
+	// Dockerfile); nil when app.yml doesn't say.
+	Build *appBuild `yaml:"build"`
+	// Variants are flavours of the app built from the same release, each the
+	// top level with its own overrides (resolveVariants); none for most apps.
+	Variants []appVariant `yaml:"variants"`
+}
+
+// appBuild is app.yml's `build`, at the top level or on a variant.
+type appBuild struct {
+	Args       map[string]string `yaml:"args"`
+	Target     string            `yaml:"target"`
+	Dockerfile string            `yaml:"dockerfile"`
+}
+
+// appVariant is one of app.yml's `variants`: what it changes about the top
+// level. Pointers and nil slices mean "not overridden".
+type appVariant struct {
+	ID          string                          `yaml:"id"`
+	Name        string                          `yaml:"name"`
+	Description string                          `yaml:"description"`
+	Default     bool                            `yaml:"default"`
+	Build       *appBuild                       `yaml:"build"`
+	Runtime     appVariantRuntime               `yaml:"runtime"`
+	Parameters  map[string]appParameterOverride `yaml:"parameters"`
+}
+
+// appVariantRuntime is the runtime fields a variant may replace.
+// interactive, sessionType and kernel are the top level's only.
+type appVariantRuntime struct {
+	CPU            *int     `yaml:"cpu"`
+	Memory         *int     `yaml:"memory"`
+	ComputeTypes   []string `yaml:"computeTypes"`
+	TimeoutSeconds *int     `yaml:"timeoutSeconds"`
+	LLM            *bool    `yaml:"llm"`
+}
+
+// appParameterOverride is what a variant changes about one top-level
+// parameter, keyed by its name.
+type appParameterOverride struct {
+	Label        *string  `yaml:"label"`
+	Description  *string  `yaml:"description"`
+	Required     *bool    `yaml:"required"`
+	DefaultValue *string  `yaml:"defaultValue"`
+	ValidValues  []string `yaml:"validValues"`
 }
 
 // appInfo is what the app is, under `application:`.
@@ -110,14 +155,18 @@ func (l stringList) trimmed() []string {
 }
 
 // appParameter mirrors a single entry of app.yml's `parameters` list.
-// Required defaults to false when omitted.
+// Required defaults to false when omitted. Label, Min and Max are read to
+// check variants' overrides against; they aren't stored.
 type appParameter struct {
 	Name         string   `yaml:"name"`
 	Type         string   `yaml:"type"`
+	Label        string   `yaml:"label"`
 	Required     bool     `yaml:"required"`
 	Description  string   `yaml:"description"`
 	DefaultValue string   `yaml:"defaultValue"`
 	ValidValues  []string `yaml:"validValues"`
+	Min          *float64 `yaml:"min"`
+	Max          *float64 `yaml:"max"`
 }
 
 func (c appConfig) needsGPU() bool {
