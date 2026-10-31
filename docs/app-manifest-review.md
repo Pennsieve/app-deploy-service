@@ -29,10 +29,9 @@ outputs:
   - name: metadata
 review:
   version: 1
-  inputs:
-    fcs:
-      generate:
-        command: python tests/make_fixture.py "$REVIEW_INPUT_DIR"
+  generate:
+    command: python -m tests.make_fixture "$REVIEW_INPUT_DIR"
+    root: linked/fcs
   parameters:
     MAX_EVENTS_PER_SAMPLE: 2000
 ```
@@ -42,8 +41,10 @@ review:
 | Field | What it says |
 | --- | --- |
 | `version` | Required. The block's format: `1`. |
-| `inputs.<port>` | Where a review run gets the data for one input port, by the port's name. Exactly one of `generate`, `files` or `dataset`. Ports not listed are left to the platform (and the review may ask the author). |
-| `inputs.<port>.generate` | `command`, run with `sh -c` from the repository root, writes the input into `$REVIEW_INPUT_DIR`; it must not delete or replace that directory. It runs in a platform generator image, `image: python` (the default; Python 3.12 with numpy 2, pandas, scipy, h5py, anndata, zarr, FlowIO, edfio, nibabel, pyarrow) or `r` (base R), not the app's own image (which usually doesn't contain `tests/`). The repository is read-only and there is no network. A generator that needs public data names it as `source` (a `dataset`, below): the platform fetches it first and mounts it read-only at `$REVIEW_SOURCE_DIR`. |
+| `generate` | A command that writes the whole input directory, laid out as the app reads `INPUT_DIR`: ports with `placement: subfolder` in their own folders. Most apps' test fixture generators already write this. Fields as for `inputs.<port>.generate` below. |
+| `generate.root` | The folder within what the command wrote that becomes the input directory, e.g. `linked` when a generator writes `linked/` and `flat/` layouts. Default: all of it. |
+| `inputs.<port>` | Where a review run gets the data for one input port, by the port's name: exactly one of `generate`, `files` or `dataset`. A port listed here is taken from its source rather than from the top-level `generate`. Ports in neither are left to the platform (and the review may ask the author). |
+| `inputs.<port>.generate` | `command`, run with `sh -c` from the repository root, writes the input into `$REVIEW_INPUT_DIR`; it must not delete or replace that directory. It runs in a platform generator image, `image: python` (the default; Python 3.12 with numpy 2, pandas, scipy, h5py, anndata, zarr, scanpy, FlowIO, edfio, nibabel, pyarrow, openpyxl) or `r` (base R), not the app's own image (which usually doesn't contain `tests/`). The repository is read-only and there is no network. A generator that needs public data names it as `source` (a `dataset`, below): the platform fetches it first and mounts it read-only at `$REVIEW_SOURCE_DIR`. |
 | `inputs.<port>.files` | Files or glob patterns committed in the repository, relative to its root, without `..`. |
 | `inputs.<port>.dataset` | A public dataset: `doi` (e.g. `10.5281/zenodo.15388817`) or an `https` `url`, and optionally `files` (patterns within it). The platform fetches it from an allowed host (Zenodo, Figshare, OSF, OpenNeuro), with a size limit. |
 | `parameters.<name>` | A value for the review run only, e.g. a smaller sample. It must be one of the parameter's `validValues` and within its `min` and `max`. Other parameters keep their `defaultValue`. |
@@ -80,6 +81,7 @@ mode (`APP_MANIFEST_VALIDATION`).
 
 - **A generator** when the repository already makes a test fixture (`make fixture`),
   and the generator needs nothing but the repository and common Python or R packages.
+  Use the top-level `generate` when it writes every port; most do.
 - **Committed files** when the fixture is small (a few MB) or the generator needs more
   than the generator image has.
 - **A generator with a `source`** when the fixture is a subsample of public data, as the

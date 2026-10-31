@@ -232,10 +232,16 @@ func TestReviewIsValid(t *testing.T) {
         source: { doi: 10.5281/zenodo.15388817, files: ["*.fcs"] }
 `),
 		"an OpenNeuro dataset": reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.18112/openneuro.ds000117.v1.0.6, files: [sub-01/anat/*] }\n"),
-		"an R generator":       reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { image: r, command: Rscript tests/fixture.R }\n"),
-		"committed files":      reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [tests/fixtures/*.fcs, tests/fixtures/samples.csv]\n"),
-		"a dataset by DOI":     reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.5281/zenodo.15388817, files: [\"B01_*.fcs\"] }\n"),
-		"a dataset by URL":     reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { url: \"https://zenodo.org/records/15388817\" }\n"),
+		"one generator for the whole input directory": reviewYML(`  version: 1
+  generate:
+    command: python -m tests.make_fixture "$REVIEW_INPUT_DIR" --layout linked
+    root: linked
+`),
+		"a generator plus a dataset for one port": reviewYML("  version: 1\n  generate: { command: python -m tests.make_fixture \"$REVIEW_INPUT_DIR\", root: linked }\n  inputs:\n    fcs:\n      dataset: { doi: 10.5281/zenodo.15388817 }\n"),
+		"an R generator":   reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { image: r, command: Rscript tests/fixture.R }\n"),
+		"committed files":  reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [tests/fixtures/*.fcs, tests/fixtures/samples.csv]\n"),
+		"a dataset by DOI": reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.5281/zenodo.15388817, files: [\"B01_*.fcs\"] }\n"),
+		"a dataset by URL": reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { url: \"https://zenodo.org/records/15388817\" }\n"),
 	}
 	for name, yml := range cases {
 		ps, err := Validate([]byte(yml))
@@ -264,6 +270,9 @@ func TestReviewProblems(t *testing.T) {
 		{"a dataset with both", reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.5281/zenodo.1, url: \"https://zenodo.org/records/1\" }\n"), "/review/inputs/fcs/dataset"},
 		{"a generator source with neither DOI nor URL", reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { command: make fixture, source: { files: [a] } }\n"), "/review/inputs/fcs/generate/source"},
 		{"an unknown generator field", reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { command: make fixture, network: true }\n"), "network"},
+		{"a top-level generator without a command", reviewYML("  version: 1\n  generate: { root: linked }\n"), "command"},
+		{"an absolute root", reviewYML("  version: 1\n  generate: { command: make fixture, root: /out }\n"), "/review/generate/root"},
+		{"a root outside the output", reviewYML("  version: 1\n  generate: { command: make fixture, root: ../x }\n"), "/review/generate/root"},
 		{"a DOI that isn't one", reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: zenodo.1 }\n"), "/review/inputs/fcs/dataset/doi"},
 		{"a URL that isn't https", reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { url: \"http://zenodo.org/records/1\" }\n"), "/review/inputs/fcs/dataset/url"},
 		{"a parameter that isn't a scalar", reviewYML("  version: 1\n  parameters:\n    N: [1, 2]\n"), "/review/parameters/N"},
