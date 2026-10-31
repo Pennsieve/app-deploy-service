@@ -52,6 +52,20 @@ type appConfig struct {
 	// Variants are flavours of the app built from the same release, each the
 	// top level with its own overrides (resolveVariants); none for most apps.
 	Variants []appVariant `yaml:"variants"`
+	// Review is how a release is tested before it's made public; nil when
+	// app.yml doesn't say.
+	Review *appReview `yaml:"review"`
+}
+
+// appReview is app.yml's `review`: per input port where a review run gets
+// its data, and review-only parameter values. (Which outputs a run must fill
+// is the outputs' own `required`.)
+// Values are kept as YAML nodes so a malformed block (which the schema
+// reports) doesn't fail reading the rest of app.yml.
+type appReview struct {
+	Version    int                  `yaml:"version"`
+	Inputs     map[string]yaml.Node `yaml:"inputs"`
+	Parameters map[string]yaml.Node `yaml:"parameters"`
 }
 
 // appBuild is app.yml's `build`, at the top level or on a variant.

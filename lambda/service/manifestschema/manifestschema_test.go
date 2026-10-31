@@ -206,3 +206,75 @@ func TestVariantProblems(t *testing.T) {
 		}
 	}
 }
+
+// reviewYML is a minimal app with an input, an output and a parameter, for
+// review cases.
+func reviewYML(review string) string {
+	return "application:\n  name: a\nparameters:\n  - name: N\n    type: integer\ninputs:\n  - name: fcs\noutputs:\n  - name: metadata\nreview:\n" + review
+}
+
+func TestReviewIsValid(t *testing.T) {
+	cases := map[string]string{
+		"only a version": reviewYML("  version: 1\n"),
+		"a generator, as fcs-prep would": reviewYML(`  version: 1
+  inputs:
+    fcs:
+      generate:
+        command: python tests/make_fixture.py "$REVIEW_INPUT_DIR"
+  parameters:
+    N: 2000
+`),
+		"a generator reading a public dataset": reviewYML(`  version: 1
+  inputs:
+    fcs:
+      generate:
+        command: python tests/make_fixture.py "$REVIEW_SOURCE_DIR" "$REVIEW_INPUT_DIR" --events 2000
+        source: { doi: 10.5281/zenodo.15388817, files: ["*.fcs"] }
+`),
+		"an OpenNeuro dataset": reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.18112/openneuro.ds000117.v1.0.6, files: [sub-01/anat/*] }\n"),
+		"an R generator":       reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { image: r, command: Rscript tests/fixture.R }\n"),
+		"committed files":      reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [tests/fixtures/*.fcs, tests/fixtures/samples.csv]\n"),
+		"a dataset by DOI":     reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.5281/zenodo.15388817, files: [\"B01_*.fcs\"] }\n"),
+		"a dataset by URL":     reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { url: \"https://zenodo.org/records/15388817\" }\n"),
+	}
+	for name, yml := range cases {
+		ps, err := Validate([]byte(yml))
+		if err != nil || len(ps) > 0 {
+			t.Errorf("%s: err %v, problems %s", name, err, Summary(ps))
+		}
+	}
+}
+
+func TestReviewProblems(t *testing.T) {
+	cases := []struct {
+		name, yml, want string
+	}{
+		{"no version", reviewYML("  inputs:\n    fcs:\n      files: [a.fcs]\n"), "version"},
+		{"version 2", reviewYML("  version: 2\n"), "/review/version"},
+		{"an unknown field", reviewYML("  version: 1\n  timeout: 60\n"), "timeout"},
+		{"expected outputs, which the outputs' required says", reviewYML("  version: 1\n  expect:\n    outputs: [metadata]\n"), "expect"},
+		{"no inputs in the map", reviewYML("  version: 1\n  inputs: {}\n"), "/review/inputs"},
+		{"two sources for one port", reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [a.fcs]\n      dataset: { doi: 10.5281/zenodo.1 }\n"), "/review/inputs/fcs"},
+		{"no source", reviewYML("  version: 1\n  inputs:\n    fcs: {}\n"), "/review/inputs/fcs"},
+		{"a generator without a command", reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { image: python }\n"), "command"},
+		{"an unknown generator image", reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { image: ubuntu, command: make fixture }\n"), "/review/inputs/fcs/generate/image"},
+		{"an absolute file", reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [/etc/passwd]\n"), "/review/inputs/fcs/files/0"},
+		{"a file outside the repository", reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [tests/../../secret]\n"), "/review/inputs/fcs/files/0"},
+		{"a dataset with neither DOI nor URL", reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { files: [a] }\n"), "/review/inputs/fcs/dataset"},
+		{"a dataset with both", reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.5281/zenodo.1, url: \"https://zenodo.org/records/1\" }\n"), "/review/inputs/fcs/dataset"},
+		{"a generator source with neither DOI nor URL", reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { command: make fixture, source: { files: [a] } }\n"), "/review/inputs/fcs/generate/source"},
+		{"an unknown generator field", reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { command: make fixture, network: true }\n"), "network"},
+		{"a DOI that isn't one", reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: zenodo.1 }\n"), "/review/inputs/fcs/dataset/doi"},
+		{"a URL that isn't https", reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { url: \"http://zenodo.org/records/1\" }\n"), "/review/inputs/fcs/dataset/url"},
+		{"a parameter that isn't a scalar", reviewYML("  version: 1\n  parameters:\n    N: [1, 2]\n"), "/review/parameters/N"},
+	}
+	for _, c := range cases {
+		ps, err := Validate([]byte(c.yml))
+		if err != nil {
+			t.Fatalf("%s: %v", c.name, err)
+		}
+		if len(ps) == 0 || !strings.Contains(Summary(ps), c.want) {
+			t.Errorf("%s: problems %q, want one mentioning %q", c.name, Summary(ps), c.want)
+		}
+	}
+}
