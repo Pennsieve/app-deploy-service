@@ -398,9 +398,13 @@
       "required": ["version"],
       "properties": {
         "version": { "const": 1, "description": "The version of this block's format: 1." },
+        "generate": {
+          "$ref": "#/$defs/reviewGenerate",
+          "description": "A command that writes the whole input directory, as the app reads INPUT_DIR. Ports listed under inputs are taken from there instead."
+        },
         "inputs": {
           "type": "object",
-          "description": "Per input port (by name), where a review run gets its data.",
+          "description": "Per input port (by name), where a review run gets its data, instead of (or without) review.generate.",
           "minProperties": 1,
           "additionalProperties": { "$ref": "#/$defs/reviewInput" }
         },
@@ -418,25 +422,7 @@
       "maxProperties": 1,
       "additionalProperties": false,
       "properties": {
-        "generate": {
-          "type": "object",
-          "description": "A command that writes the input into $REVIEW_INPUT_DIR, run from the repository root (read-only) in a platform generator image, with no network.",
-          "additionalProperties": false,
-          "required": ["command"],
-          "properties": {
-            "image": {
-              "type": "string",
-              "enum": ["python", "r"],
-              "default": "python",
-              "description": "The platform generator image: python (Python 3.12 with numpy 2, pandas, scipy, h5py, anndata, zarr, FlowIO, edfio, nibabel and pyarrow) or r (base R). The image version a review used is recorded with it."
-            },
-            "command": { "type": "string", "minLength": 1, "description": "The command, run with sh -c, e.g. python tests/make_fixture.py \"$REVIEW_INPUT_DIR\". It writes into $REVIEW_INPUT_DIR and must not delete or replace that directory." },
-            "source": {
-              "$ref": "#/$defs/reviewDataset",
-              "description": "A public dataset the generator reads, e.g. to subsample: fetched by the platform first and mounted read-only at $REVIEW_SOURCE_DIR."
-            }
-          }
-        },
+        "generate": { "$ref": "#/$defs/reviewGenerate" },
         "files": {
           "type": "array",
           "minItems": 1,
@@ -444,6 +430,32 @@
           "items": { "type": "string", "minLength": 1, "not": { "pattern": "^/|(^|/)\\.\\.(/|$)" }, "$comment": "Relative, without .. segments." }
         },
         "dataset": { "$ref": "#/$defs/reviewDataset" }
+      }
+    },
+    "reviewGenerate": {
+      "type": "object",
+      "description": "A command that writes review input into $REVIEW_INPUT_DIR, run from the repository root (read-only) in a platform generator image, with no network. Under review it writes the whole input directory (every port, in subfolders for placement: subfolder ports); under review.inputs.<port> it writes that port's input.",
+      "additionalProperties": false,
+      "required": ["command"],
+      "properties": {
+        "image": {
+          "type": "string",
+          "enum": ["python", "r"],
+          "default": "python",
+          "description": "The platform generator image: python (Python 3.12 with numpy 2, pandas, scipy, h5py, anndata, zarr, FlowIO, edfio, nibabel and pyarrow) or r (base R). The image version a review used is recorded with it."
+        },
+        "command": { "type": "string", "minLength": 1, "description": "The command, run with sh -c, e.g. python tests/make_fixture.py \"$REVIEW_INPUT_DIR\". It writes into $REVIEW_INPUT_DIR and must not delete or replace that directory." },
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "default": ".",
+          "not": { "pattern": "^/|(^|/)\\.\\.(/|$)" },
+          "description": "The folder within what the command wrote that is used, e.g. linked when a generator writes linked/ and flat/ layouts. Default: all of it."
+        },
+        "source": {
+          "$ref": "#/$defs/reviewDataset",
+          "description": "A public dataset the generator reads, e.g. to subsample: fetched by the platform first and mounted read-only at $REVIEW_SOURCE_DIR."
+        }
       }
     },
     "reviewDataset": {
