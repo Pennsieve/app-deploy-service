@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/pennsieve/app-deploy-service/service/manifestschema"
+	"gopkg.in/yaml.v3"
 )
 
 // How registration treats an app.yml that doesn't follow the schema
@@ -45,6 +46,7 @@ func manifestProblems(appYml []byte) []string {
 	// same "path: reason" form and with the same warn/enforce handling.
 	if c, err := parseAppConfig(appYml); err == nil {
 		out = append(out, variantProblems(c)...)
+		out = append(out, reviewProblems(c)...)
 	}
 	return out
 }
@@ -97,6 +99,60 @@ func variantProblems(c appConfig) []string {
 				case eff.Max != nil && n > *eff.Max:
 					out = append(out, fmt.Sprintf("%s/defaultValue: %v is more than the parameter's max %v", ppath, n, *eff.Max))
 				}
+			}
+		}
+	}
+	return out
+}
+
+// reviewProblems are the checks on app.yml's review block that JSON Schema
+// can't express: its inputs and parameters name the app's own ports and
+// parameters, and a review parameter value is one of the
+// parameter's validValues and within its min and max.
+func reviewProblems(c appConfig) []string {
+	if c.Review == nil {
+		return nil
+	}
+	var out []string
+	inputs := map[string]bool{}
+	for _, p := range c.Inputs {
+		inputs[p.Name] = true
+	}
+	for _, name := range sortedKeys(c.Review.Inputs) {
+		if !inputs[name] {
+			out = append(out, fmt.Sprintf("/review/inputs/%s: there is no input %q", jsonPointerEscape(name), name))
+		}
+	}
+	params := map[string]appParameter{}
+	for _, p := range c.Parameters {
+		if _, dup := params[p.Name]; p.Name != "" && !dup {
+			params[p.Name] = p
+		}
+	}
+	for _, name := range sortedKeys(c.Review.Parameters) {
+		ppath := "/review/parameters/" + jsonPointerEscape(name)
+		p, ok := params[name]
+		if !ok {
+			out = append(out, fmt.Sprintf("%s: there is no parameter %q", ppath, name))
+			continue
+		}
+		node := c.Review.Parameters[name]
+		if node.Kind != yaml.ScalarNode {
+			continue // the schema reports it
+		}
+		v := node.Value
+		if len(p.ValidValues) > 0 && !containsValue(p.ValidValues, v) {
+			out = append(out, fmt.Sprintf("%s: %q is not one of the parameter's validValues %v", ppath, v, p.ValidValues))
+		}
+		if p.Min != nil || p.Max != nil {
+			n, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+			switch {
+			case err != nil:
+				out = append(out, fmt.Sprintf("%s: %q is not a number, but the parameter has a min or max", ppath, v))
+			case p.Min != nil && n < *p.Min:
+				out = append(out, fmt.Sprintf("%s: %v is less than the parameter's min %v", ppath, n, *p.Min))
+			case p.Max != nil && n > *p.Max:
+				out = append(out, fmt.Sprintf("%s: %v is more than the parameter's max %v", ppath, n, *p.Max))
 			}
 		}
 	}

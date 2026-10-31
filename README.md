@@ -38,6 +38,7 @@ variant. Workflow-service reads the versions table for manifests.
 |---|---|---|
 | `app.yml` | name, description, runtime (cpu, memory, compute types, GPU, storage, LLM opt-in), parameters, input/output ports and folders | [app-manifest-folders.md](docs/app-manifest-folders.md); the JSON Schema is published to `schemas.<domain>/app-manifest/v1.json` |
 | `app.yml` `variants` / `build` | several images from one release (e.g. CPU and GPU), with build args, target and Dockerfile | [app-manifest-variants.md](docs/app-manifest-variants.md) |
+| `app.yml` `review` | the inputs and review-only parameters for reviewing a release before it is made public | [app-manifest-review.md](docs/app-manifest-review.md) |
 | `CITATION.cff` | authors (with ORCID), preferred citation, related works typed for DataCite; `application.relations` in app.yml overrides types | parsed with pennsieve-go-core `pkg/citation` |
 | `LICENSE` | SPDX id, as GitHub reads it | |
 
