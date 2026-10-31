@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// githubAPIURL is where repository licenses are read; a test points it at a
-// fake.
+// githubAPIURL is where repository licenses and release commits are read; a
+// test points it at a fake.
 var githubAPIURL = "https://api.github.com"
 
 // repoLicense is the repository's license at a tag, as GitHub detects it
@@ -61,6 +61,48 @@ func repoLicense(ctx context.Context, sourceUrl, tag, authToken string) (string,
 		return "", nil
 	}
 	return id, nil
+}
+
+// releaseCommit is the commit SHA a release tag points to, so the version
+// records exactly which code it was built from. "" with an error when the
+// lookup fails (for the log); a failure never blocks a registration.
+func releaseCommit(ctx context.Context, sourceUrl, tag, authToken string) (string, error) {
+	owner, repo, ok := ownerRepo(sourceUrl)
+	if !ok {
+		return "", fmt.Errorf("not a GitHub repository URL: %s", sourceUrl)
+	}
+	if tag == "" {
+		return "", fmt.Errorf("no tag to resolve")
+	}
+	u := fmt.Sprintf("%s/repos/%s/%s/commits/%s", githubAPIURL, url.PathEscape(owner), url.PathEscape(repo), url.PathEscape(tag))
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+authToken)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitHub answered %d for the commit of %s/%s %s", resp.StatusCode, owner, repo, tag)
+	}
+	var body struct {
+		SHA string `json:"sha"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return "", fmt.Errorf("reading GitHub's commit answer: %w", err)
+	}
+	if body.SHA == "" {
+		return "", fmt.Errorf("GitHub gave no commit for %s/%s %s", owner, repo, tag)
+	}
+	return body.SHA, nil
 }
 
 // ownerRepo reads owner and repository from a GitHub URL

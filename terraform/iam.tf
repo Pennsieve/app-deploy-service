@@ -308,6 +308,15 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
     resources = ["*"]
   }
 
+  # The digest of each App Store image built, recorded on its version
+  # (lambda/status/handler/image_digest.go).
+  statement {
+    sid       = "StatusLambdaImageDigests"
+    effect    = "Allow"
+    actions   = ["ecr:DescribeImages"]
+    resources = ["arn:aws:ecr:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:repository/*"]
+  }
+
   # CodeBuild image builds (codebuild.tf): look up a build, read a failed
   # build's log for its error, delete its GitHub token parameter.
   dynamic "statement" {

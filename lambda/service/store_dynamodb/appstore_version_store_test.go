@@ -358,6 +358,28 @@ func TestAppStoreVersionDatabaseStore_SetCitation(t *testing.T) {
 	assert.Nil(t, api.UpdateItemInput.ExpressionAttributeValues)
 }
 
+func TestAppStoreVersionDatabaseStore_SetReview(t *testing.T) {
+	api := &ArgCaptureAppStoreVersionTableAPI{}
+	store := NewAppStoreVersionDatabaseStore(api, "versions")
+
+	review := &AppReview{
+		Version: 1,
+		Generate: &ReviewGenerate{Command: "python -m tests.make_fixture \"$REVIEW_INPUT_DIR\"", Root: "linked",
+			Source: &ReviewDataset{DOI: "10.5281/zenodo.15388817", Files: []string{"*.fcs"}}},
+		Inputs:     map[string]ReviewInput{"fcs": {Files: []string{"tests/fixtures/*.fcs"}}},
+		Parameters: map[string]string{"N": "2000"},
+	}
+	require.NoError(t, store.SetReview(context.Background(), "v1", review))
+	assert.Equal(t, "set review = :r", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	var got AppReview
+	require.NoError(t, attributevalue.Unmarshal(api.UpdateItemInput.ExpressionAttributeValues[":r"], &got))
+	assert.Equal(t, *review, got)
+
+	require.NoError(t, store.SetReview(context.Background(), "v1", nil))
+	assert.Equal(t, "remove review", aws.ToString(api.UpdateItemInput.UpdateExpression))
+	assert.Nil(t, api.UpdateItemInput.ExpressionAttributeValues)
+}
+
 func dynasdVariants() VersionVariants {
 	cpu := &AppManifest{Name: "DynaSD", Runtime: AppRuntime{CPU: 4096, Memory: 8192, ComputeTypes: []string{"standard"}},
 		Parameters: []AppParameter{{Name: "MODEL", DefaultValue: "lindda", ValidValues: []string{"lindda", "oncet"}}},

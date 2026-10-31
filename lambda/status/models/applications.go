@@ -19,3 +19,9 @@ func ApplicationKey(applicationId string) map[string]types.AttributeValue {
 const VariantsField = "variants"
 const VariantStatusField = "status"
 const VariantFailureReasonField = "failureReason"
+
+// What the status lambda records about an App Store version's image: the
+// version's destinationUrl (its image, which the provisioner sets) and the
+// digest of what was pushed there, on the version and on a variant.
+const ApplicationDestinationUrlField = "destinationUrl"
+const ImageDigestField = "imageDigest"

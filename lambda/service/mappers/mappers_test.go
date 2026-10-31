@@ -144,3 +144,47 @@ func TestAppStoreVersionToModel_NoVariantsJSONUnchanged(t *testing.T) {
 	d = DeploymentItemToModel(store_dynamodb.Deployment{Variant: "gpu"})
 	assert.Equal(t, "gpu", d.Variant)
 }
+
+func TestAppStoreVersionToModel_ReviewCommitAndDigests(t *testing.T) {
+	v := store_dynamodb.AppStoreVersion{
+		Uuid: "u", Version: "v1.0.0", CommitSha: "3f786850e387550fdab836ed7e6dc881de23001b", ImageDigest: "sha256:aaa",
+		DefaultVariant: "cpu", VariantOrder: []string{"cpu", "gpu"},
+		Variants: map[string]store_dynamodb.AppVariant{
+			"cpu": {Name: "CPU", ImageDigest: "sha256:aaa"},
+			"gpu": {Name: "GPU", ImageDigest: "sha256:bbb"},
+		},
+		Review: &store_dynamodb.AppReview{
+			Version:  1,
+			Generate: &store_dynamodb.ReviewGenerate{Command: "make fixture", Root: "linked"},
+			Inputs: map[string]store_dynamodb.ReviewInput{
+				"fcs": {Dataset: &store_dynamodb.ReviewDataset{DOI: "10.5281/zenodo.15388817", Files: []string{"*.fcs"}}},
+			},
+			Parameters: map[string]string{"N": "2000"},
+		},
+	}
+	m := AppStoreVersionToModel(v)
+	assert.Equal(t, "3f786850e387550fdab836ed7e6dc881de23001b", m.CommitSha)
+	assert.Equal(t, "sha256:aaa", m.ImageDigest)
+	assert.Equal(t, "sha256:aaa", m.Variants[0].ImageDigest)
+	assert.Equal(t, "sha256:bbb", m.Variants[1].ImageDigest)
+	assert.Equal(t, &models.AppReview{
+		Version:  1,
+		Generate: &models.ReviewGenerate{Command: "make fixture", Root: "linked"},
+		Inputs: map[string]models.ReviewInput{
+			"fcs": {Dataset: &models.ReviewDataset{DOI: "10.5281/zenodo.15388817", Files: []string{"*.fcs"}}},
+		},
+		Parameters: map[string]string{"N": "2000"},
+	}, m.Review)
+
+	b, err := json.Marshal(m)
+	require.NoError(t, err)
+	assert.Contains(t, string(b), `"commitSha":"3f786850e387550fdab836ed7e6dc881de23001b"`)
+	assert.Contains(t, string(b), `"review":{"version":1,"generate":{"command":"make fixture","root":"linked"}`)
+
+	// a version registered before these were kept has none of them
+	b, err = json.Marshal(AppStoreVersionToModel(store_dynamodb.AppStoreVersion{Uuid: "u"}))
+	require.NoError(t, err)
+	for _, key := range []string{"review", "commitSha", "imageDigest"} {
+		assert.NotContains(t, string(b), key)
+	}
+}

@@ -30,6 +30,7 @@ type AppStoreVersionDBStore interface {
 	SetManifest(ctx context.Context, uuid string, manifest *AppManifest) error
 	SetRegistrationDetails(ctx context.Context, uuid string, license string, manifestProblems []string) error
 	SetCitation(ctx context.Context, uuid string, citation *AppCitation) error
+	SetReview(ctx context.Context, uuid string, review *AppReview) error
 	SetVariants(ctx context.Context, uuid string, variants VersionVariants) error
 }
 
@@ -302,6 +303,31 @@ func (r *AppStoreVersionDatabaseStore) SetCitation(ctx context.Context, uuid str
 	}
 	if _, err := r.api.UpdateItem(ctx, in); err != nil {
 		return fmt.Errorf("error setting appstore version citation: %w", err)
+	}
+	return nil
+}
+
+// SetReview records a version's app.yml review block; nil removes it.
+func (r *AppStoreVersionDatabaseStore) SetReview(ctx context.Context, uuid string, review *AppReview) error {
+	key, err := attributevalue.MarshalMap(ApplicationKey{Uuid: uuid})
+	if err != nil {
+		return fmt.Errorf("error marshaling key for appstore version review: %w", err)
+	}
+	in := &dynamodb.UpdateItemInput{
+		TableName:        aws.String(r.TableName),
+		Key:              key,
+		UpdateExpression: aws.String("remove review"),
+	}
+	if review != nil {
+		value, err := attributevalue.Marshal(review)
+		if err != nil {
+			return fmt.Errorf("error marshaling appstore version review: %w", err)
+		}
+		in.UpdateExpression = aws.String("set review = :r")
+		in.ExpressionAttributeValues = map[string]types.AttributeValue{":r": value}
+	}
+	if _, err := r.api.UpdateItem(ctx, in); err != nil {
+		return fmt.Errorf("error setting appstore version review: %w", err)
 	}
 	return nil
 }

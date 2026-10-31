@@ -57,15 +57,94 @@ type appConfig struct {
 	Review *appReview `yaml:"review"`
 }
 
-// appReview is app.yml's `review`: per input port where a review run gets
-// its data, and review-only parameter values. (Which outputs a run must fill
+// appReview is app.yml's `review`: a command that generates the whole input
+// directory, per input port where a review run gets its data instead, and
+// review-only parameter values (as written). (Which outputs a run must fill
 // is the outputs' own `required`.)
-// Values are kept as YAML nodes so a malformed block (which the schema
-// reports) doesn't fail reading the rest of app.yml.
+// It's read leniently (UnmarshalYAML) so a malformed block, which the schema
+// reports, doesn't fail reading the rest of app.yml: what doesn't parse is
+// left out.
+// The yaml tags aren't used for decoding; they name the fields for the
+// schema drift test (TestParserFieldsAreInTheSchema).
 type appReview struct {
-	Version    int                  `yaml:"version"`
-	Inputs     map[string]yaml.Node `yaml:"inputs"`
-	Parameters map[string]yaml.Node `yaml:"parameters"`
+	Version    int                       `yaml:"version"`
+	Generate   *appReviewGenerate        `yaml:"generate"`
+	Inputs     map[string]appReviewInput `yaml:"inputs"`
+	Parameters map[string]string         `yaml:"parameters"`
+	// otherParameters are the names of parameters whose value isn't a
+	// scalar (the schema reports them), so reviewProblems still checks
+	// the name.
+	otherParameters []string
+}
+
+// appReviewGenerate is a review `generate`, at the top of the block or for
+// one port.
+type appReviewGenerate struct {
+	Image   string            `yaml:"image"`
+	Command string            `yaml:"command"`
+	Root    string            `yaml:"root"`
+	Source  *appReviewDataset `yaml:"source"`
+}
+
+// appReviewInput is one of review.inputs: generate, files or dataset.
+type appReviewInput struct {
+	Generate *appReviewGenerate `yaml:"generate"`
+	Files    []string           `yaml:"files"`
+	Dataset  *appReviewDataset  `yaml:"dataset"`
+}
+
+// appReviewDataset is a public dataset, by doi or url.
+type appReviewDataset struct {
+	DOI   string   `yaml:"doi"`
+	URL   string   `yaml:"url"`
+	Files []string `yaml:"files"`
+}
+
+// UnmarshalYAML reads each part of the block on its own and never fails:
+// a part that doesn't parse is skipped (an input port is kept, empty, so
+// its name is still checked).
+func (r *appReview) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(value.Content); i += 2 {
+		v := value.Content[i+1]
+		switch value.Content[i].Value {
+		case "version":
+			_ = v.Decode(&r.Version)
+		case "generate":
+			var g appReviewGenerate
+			if v.Decode(&g) == nil {
+				r.Generate = &g
+			}
+		case "inputs":
+			if v.Kind != yaml.MappingNode {
+				continue
+			}
+			r.Inputs = map[string]appReviewInput{}
+			for j := 0; j+1 < len(v.Content); j += 2 {
+				var in appReviewInput
+				if v.Content[j+1].Decode(&in) != nil {
+					in = appReviewInput{}
+				}
+				r.Inputs[v.Content[j].Value] = in
+			}
+		case "parameters":
+			if v.Kind != yaml.MappingNode {
+				continue
+			}
+			r.Parameters = map[string]string{}
+			for j := 0; j+1 < len(v.Content); j += 2 {
+				name, p := v.Content[j].Value, v.Content[j+1]
+				if p.Kind == yaml.ScalarNode {
+					r.Parameters[name] = p.Value
+				} else {
+					r.otherParameters = append(r.otherParameters, name)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // appBuild is app.yml's `build`, at the top level or on a variant.
@@ -335,6 +414,54 @@ func appMaintainers(ms []appMaintainer) []store_dynamodb.AppMaintainer {
 		})
 	}
 	return out
+}
+
+// appReviewRecord is the version's record of app.yml's review block; nil
+// when there's none, or nothing of it could be read. An input port whose
+// source didn't parse is left out.
+func appReviewRecord(r *appReview) *store_dynamodb.AppReview {
+	if r == nil {
+		return nil
+	}
+	out := &store_dynamodb.AppReview{
+		Version:  r.Version,
+		Generate: reviewGenerateRecord(r.Generate),
+	}
+	for name, in := range r.Inputs {
+		rec := store_dynamodb.ReviewInput{
+			Generate: reviewGenerateRecord(in.Generate),
+			Files:    in.Files,
+			Dataset:  reviewDatasetRecord(in.Dataset),
+		}
+		if rec.Generate == nil && len(rec.Files) == 0 && rec.Dataset == nil {
+			continue
+		}
+		if out.Inputs == nil {
+			out.Inputs = map[string]store_dynamodb.ReviewInput{}
+		}
+		out.Inputs[name] = rec
+	}
+	if len(r.Parameters) > 0 {
+		out.Parameters = r.Parameters
+	}
+	if out.Version == 0 && out.Generate == nil && out.Inputs == nil && out.Parameters == nil {
+		return nil
+	}
+	return out
+}
+
+func reviewGenerateRecord(g *appReviewGenerate) *store_dynamodb.ReviewGenerate {
+	if g == nil {
+		return nil
+	}
+	return &store_dynamodb.ReviewGenerate{Image: g.Image, Command: g.Command, Root: g.Root, Source: reviewDatasetRecord(g.Source)}
+}
+
+func reviewDatasetRecord(d *appReviewDataset) *store_dynamodb.ReviewDataset {
+	if d == nil {
+		return nil
+	}
+	return &store_dynamodb.ReviewDataset{DOI: d.DOI, URL: d.URL, Files: d.Files}
 }
 
 // edamFormats keeps EDAM format ids short (format_3590), whether written so

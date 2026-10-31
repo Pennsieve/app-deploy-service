@@ -246,6 +246,22 @@ builds exactly as before: the same single build, tag, variables and statuses.
   variant in `variant`. Other variants' statuses are `application_variant_status_event`
   on the same channel, so a failed GPU build never reads as the version's status.
 
+## What a version records about its build
+
+So a review verdict can be tied to the exact code and image tested, a version records:
+
+| Field | Set by | What it is |
+|---|---|---|
+| `commitSha` | service lambda, at registration | The commit the release tag points to (GitHub `GET /repos/{owner}/{repo}/commits/{tag}`), so a tag moved later doesn't change what was built. Empty when GitHub couldn't say; a failed lookup is logged and never blocks the release. |
+| `imageDigest` | status lambda, when the build succeeds | The digest ECR gives the pushed tag (`DescribeImages`): the image of an app without variants, or of the default variant. |
+| `variants.<id>.imageDigest` | status lambda, when that variant's build succeeds | The variant's image digest (`<hash>-<tag>--<id>`; the default variant's is also the version's `imageDigest`). |
+| `review` | service lambda, at registration | app.yml's `review` block ([app-manifest-review.md](app-manifest-review.md)) as parsed: what a review run uses. Parts that don't parse are left out (the schema reports them). |
+
+The digest is the tag's at the moment the build ends, recorded before the status says
+`deployed`. A digest that can't be read (no `destinationUrl`, an ECR error, the tag not
+found) is logged as a warning and the build's status is recorded as usual. All four are
+in the API's version model. Versions registered before these were kept have none of them.
+
 ## Environments
 
 The module is environment-agnostic:

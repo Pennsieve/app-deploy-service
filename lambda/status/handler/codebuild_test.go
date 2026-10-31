@@ -98,6 +98,14 @@ func buildEvent(status string, withVariables bool) []byte {
 
 type recordingDynamoDB struct {
 	updates []*dynamodb.UpdateItemInput
+	// items are what GetItem answers, by table; none: an empty answer
+	items map[string]map[string]types.AttributeValue
+	gets  []*dynamodb.GetItemInput
+}
+
+func (r *recordingDynamoDB) GetItem(_ context.Context, in *dynamodb.GetItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error) {
+	r.gets = append(r.gets, in)
+	return &dynamodb.GetItemOutput{Item: r.items[aws.ToString(in.TableName)]}, nil
 }
 
 func (r *recordingDynamoDB) UpdateItem(_ context.Context, in *dynamodb.UpdateItemInput, _ ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error) {
