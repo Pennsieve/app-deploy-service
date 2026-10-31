@@ -442,7 +442,7 @@
           "type": "string",
           "enum": ["python", "r"],
           "default": "python",
-          "description": "The platform generator image: python (Python 3.12 with numpy 2, pandas, scipy, h5py, anndata, zarr, FlowIO, edfio, nibabel and pyarrow) or r (base R). The image version a review used is recorded with it."
+          "description": "The platform generator image: python (Python 3.12 with numpy 2, pandas, scipy, h5py, anndata, zarr, scanpy, FlowIO, edfio, nibabel, pyarrow and openpyxl) or r (base R). The image version a review used is recorded with it."
         },
         "command": { "type": "string", "minLength": 1, "description": "The command, run with sh -c, e.g. python tests/make_fixture.py \"$REVIEW_INPUT_DIR\". It writes into $REVIEW_INPUT_DIR and must not delete or replace that directory." },
         "root": {
