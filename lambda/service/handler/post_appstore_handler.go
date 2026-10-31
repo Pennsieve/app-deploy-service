@@ -159,6 +159,14 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		log.Printf("created new appstore application %s for sourceUrl %s", applicationId, application.Source.Url)
 	}
 
+	// The commit the tag points to now, so a review of this version is tied
+	// to the code that was built (a tag can be moved later). A failed lookup
+	// only logs.
+	commitSha, err := releaseCommit(ctx, application.Source.Url, application.Source.Tag, application.Source.AuthToken)
+	if err != nil {
+		log.Printf("warning: unable to resolve the commit of %s %s: %v", application.Source.Url, application.Source.Tag, err)
+	}
+
 	// Always create a new version entry
 	versionUuid := uuid.NewString()
 	versionRecord := store_dynamodb.AppStoreVersion{
@@ -168,6 +176,7 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		ReleaseId:     application.Release.ID,
 		CreatedAt:     time.Now().UTC().String(),
 		Status:        "registering",
+		CommitSha:     commitSha,
 	}
 	if err := versionStore.Insert(ctx, versionRecord); err != nil {
 		log.Println("error inserting appstore version: ", err.Error())
@@ -297,6 +306,12 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	if haveAppCfg {
 		if err := versionStore.SetManifest(ctx, versionUuid, resolved.versionManifest()); err != nil {
 			log.Printf("warning: unable to persist the manifest of %s %s: %v", applicationId, application.Source.Tag, err)
+		}
+		// app.yml's review block, for the review of this release
+		if review := appReviewRecord(appCfg.Review); review != nil {
+			if err := versionStore.SetReview(ctx, versionUuid, review); err != nil {
+				log.Printf("warning: unable to persist the review block of %s %s: %v", applicationId, application.Source.Tag, err)
+			}
 		}
 		if vv := resolved.versionVariants(); !vv.Empty() {
 			planned := planVariantBuilds(&vv, resolved, deploymentId, buildAllVariants, uuid.NewString)

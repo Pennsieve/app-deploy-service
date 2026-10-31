@@ -8,7 +8,9 @@ the outputs themselves (below).
 
 The review itself (where it runs, its states, the report and the gate) is designed in
 "Automated app review: design"; reviews don't run yet. Registration already reads and
-checks the block, so apps can add it now.
+checks the block, and stores it on the version (`review`, with the release's commit and
+each image's digest: [builds.md](builds.md#what-a-version-records-about-its-build)), so
+apps can add it now.
 
 ## Example
 

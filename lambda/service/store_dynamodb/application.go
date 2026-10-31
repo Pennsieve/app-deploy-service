@@ -148,6 +148,52 @@ type AppStoreVersion struct {
 	// for a version without variants (each variant has its own); nil when
 	// app.yml has none.
 	Build *AppBuild `dynamodbav:"build,omitempty"`
+	// Review is app.yml's review block (docs/app-manifest-review.md): how
+	// the release is tested before it's made public. Nil when app.yml has
+	// none, or none of it could be read (the schema reports why).
+	Review *AppReview `dynamodbav:"review,omitempty"`
+	// CommitSha is the commit the release tag pointed to at registration, so
+	// a review is tied to the code that was built; empty when GitHub
+	// couldn't say.
+	CommitSha string `dynamodbav:"commitSha,omitempty"`
+	// ImageDigest is the digest of the image built for this version (the
+	// default variant's, with variants), recorded by the status lambda when
+	// the build succeeds; empty until then, or when it couldn't be read.
+	ImageDigest string `dynamodbav:"imageDigest,omitempty"`
+}
+
+// AppReview is a version's app.yml review block as stored. Parameters are
+// kept as written, as strings.
+type AppReview struct {
+	Version    int                    `dynamodbav:"version"`
+	Generate   *ReviewGenerate        `dynamodbav:"generate,omitempty"`
+	Inputs     map[string]ReviewInput `dynamodbav:"inputs,omitempty"`
+	Parameters map[string]string      `dynamodbav:"parameters,omitempty"`
+}
+
+// ReviewGenerate is a command that writes review input, run in a platform
+// generator image (Image empty: python), with Source mounted when given.
+type ReviewGenerate struct {
+	Image   string         `dynamodbav:"image,omitempty"`
+	Command string         `dynamodbav:"command,omitempty"`
+	Root    string         `dynamodbav:"root,omitempty"`
+	Source  *ReviewDataset `dynamodbav:"source,omitempty"`
+}
+
+// ReviewInput is where one input port's review data comes from: one of
+// Generate, Files or Dataset.
+type ReviewInput struct {
+	Generate *ReviewGenerate `dynamodbav:"generate,omitempty"`
+	Files    []string        `dynamodbav:"files,omitempty"`
+	Dataset  *ReviewDataset  `dynamodbav:"dataset,omitempty"`
+}
+
+// ReviewDataset is a public dataset by DOI or URL, optionally some of its
+// files.
+type ReviewDataset struct {
+	DOI   string   `dynamodbav:"doi,omitempty"`
+	URL   string   `dynamodbav:"url,omitempty"`
+	Files []string `dynamodbav:"files,omitempty"`
 }
 
 // AppCitation is a version's CITATION.cff as stored.
@@ -214,6 +260,9 @@ type AppVariant struct {
 	// its computeTypes include gpu); 0 for the builder's default. Set at
 	// registration for the provisioner, never shown.
 	BuildStorageGiB int32 `dynamodbav:"buildStorageGiB,omitempty"`
+	// ImageDigest is the digest of the variant's image, recorded by the
+	// status lambda when its build succeeds.
+	ImageDigest string `dynamodbav:"imageDigest,omitempty"`
 }
 
 // AppBuild is how an image is built: Docker build args, the stage to build

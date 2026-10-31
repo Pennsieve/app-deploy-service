@@ -206,3 +206,46 @@ func TestRepoLicense(t *testing.T) {
 		t.Error("not a GitHub URL")
 	}
 }
+
+func TestReleaseCommit(t *testing.T) {
+	const sha = "3f786850e387550fdab836ed7e6dc881de23001b"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/repos/o/app/commits/v1.0.0":
+			if r.Header.Get("Authorization") != "Bearer tok" {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			_, _ = w.Write([]byte(`{"sha":"` + sha + `","commit":{"message":"release"}}`))
+		case "/repos/o/broken/commits/v1.0.0":
+			w.WriteHeader(http.StatusInternalServerError)
+		case "/repos/o/garbled/commits/v1.0.0":
+			_, _ = w.Write([]byte(`{"sha":`))
+		default:
+			w.WriteHeader(http.StatusUnprocessableEntity) // GitHub's answer for an unknown ref
+		}
+	}))
+	defer srv.Close()
+	saved := githubAPIURL
+	githubAPIURL = srv.URL
+	t.Cleanup(func() { githubAPIURL = saved })
+
+	cases := []struct {
+		name, url, tag, token string
+		want                  string
+		wantErr               bool
+	}{
+		{"found", "https://github.com/o/app.git", "v1.0.0", "tok", sha, false},
+		{"no such tag", "https://github.com/o/app", "v9.9.9", "tok", "", true},
+		{"GitHub fails", "https://github.com/o/broken", "v1.0.0", "", "", true},
+		{"an answer that isn't JSON", "https://github.com/o/garbled", "v1.0.0", "", "", true},
+		{"no tag", "https://github.com/o/app", "", "tok", "", true},
+		{"not GitHub", "https://gitlab.com/o/app", "v1.0.0", "", "", true},
+	}
+	for _, c := range cases {
+		got, err := releaseCommit(context.Background(), c.url, c.tag, c.token)
+		if (err != nil) != c.wantErr || got != c.want {
+			t.Errorf("%s: %q, %v", c.name, got, err)
+		}
+	}
+}

@@ -71,6 +71,9 @@ func (f *fakeVersions) SetRegistrationDetails(context.Context, string, string, [
 func (f *fakeVersions) SetCitation(context.Context, string, *store_dynamodb.AppCitation) error {
 	return nil
 }
+func (f *fakeVersions) SetReview(context.Context, string, *store_dynamodb.AppReview) error {
+	return nil
+}
 func (f *fakeVersions) SetVariants(_ context.Context, uuid string, v store_dynamodb.VersionVariants) error {
 	if f.variants == nil {
 		f.variants = map[string]store_dynamodb.VersionVariants{}

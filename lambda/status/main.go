@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/pennsieve/app-deploy-service/status/handler"
@@ -45,7 +46,8 @@ func init() {
 		WithCodeBuild(
 			codebuild.NewFromConfig(awsConfig),
 			cloudwatchlogs.NewFromConfig(awsConfig),
-			ssm.NewFromConfig(awsConfig))
+			ssm.NewFromConfig(awsConfig)).
+		WithECR(ecr.NewFromConfig(awsConfig))
 
 	// live status updates: AppSync Events where configured, otherwise Pusher
 	if strings.TrimSpace(os.Getenv(realtime.EnvEventsEndpoint)) != "" {

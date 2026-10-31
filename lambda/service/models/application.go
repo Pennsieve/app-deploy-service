@@ -181,6 +181,47 @@ type AppStoreVersion struct {
 	// declares variants. Manifest and Status are then the default variant's.
 	DefaultVariant string            `json:"defaultVariant,omitempty"`
 	Variants       []AppStoreVariant `json:"variants,omitempty"`
+	// Review: app.yml's review block (docs/app-manifest-review.md); absent
+	// when app.yml has none.
+	Review *AppReview `json:"review,omitempty"`
+	// CommitSha: the commit the release tag pointed to at registration.
+	CommitSha string `json:"commitSha,omitempty"`
+	// ImageDigest: the digest of the image built for this version (the
+	// default variant's, with variants); absent until its build succeeds.
+	ImageDigest string `json:"imageDigest,omitempty"`
+}
+
+// AppReview is a version's app.yml review block: per input port where a
+// review run gets its data, a command that generates all of it, and
+// review-only parameter values (as written, as strings).
+type AppReview struct {
+	Version    int                    `json:"version"`
+	Generate   *ReviewGenerate        `json:"generate,omitempty"`
+	Inputs     map[string]ReviewInput `json:"inputs,omitempty"`
+	Parameters map[string]string      `json:"parameters,omitempty"`
+}
+
+// ReviewGenerate is a command that writes review input in a platform
+// generator image (image absent: python), with source fetched first.
+type ReviewGenerate struct {
+	Image   string         `json:"image,omitempty"`
+	Command string         `json:"command,omitempty"`
+	Root    string         `json:"root,omitempty"`
+	Source  *ReviewDataset `json:"source,omitempty"`
+}
+
+// ReviewInput is one input port's review data: generate, files or dataset.
+type ReviewInput struct {
+	Generate *ReviewGenerate `json:"generate,omitempty"`
+	Files    []string        `json:"files,omitempty"`
+	Dataset  *ReviewDataset  `json:"dataset,omitempty"`
+}
+
+// ReviewDataset is a public dataset by doi or url, optionally some files.
+type ReviewDataset struct {
+	DOI   string   `json:"doi,omitempty"`
+	URL   string   `json:"url,omitempty"`
+	Files []string `json:"files,omitempty"`
 }
 
 // AppCitation is a version's CITATION.cff: its title, version, DOI and
@@ -240,6 +281,9 @@ type AppStoreVariant struct {
 	// Manifest is the variant's resolved app.yml: the top level with the
 	// variant's runtime and parameter overrides.
 	Manifest *AppManifest `json:"manifest,omitempty"`
+	// ImageDigest: the digest of the variant's image; absent until its
+	// build succeeds.
+	ImageDigest string `json:"imageDigest,omitempty"`
 }
 
 // AppManifest is a version's app.yml: what the app is, what it asks for, its

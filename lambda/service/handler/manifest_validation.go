@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/pennsieve/app-deploy-service/service/manifestschema"
-	"gopkg.in/yaml.v3"
 )
 
 // How registration treats an app.yml that doesn't follow the schema
@@ -129,18 +129,20 @@ func reviewProblems(c appConfig) []string {
 			params[p.Name] = p
 		}
 	}
-	for _, name := range sortedKeys(c.Review.Parameters) {
+	names := sortedKeys(c.Review.Parameters)
+	names = append(names, c.Review.otherParameters...)
+	sort.Strings(names)
+	for _, name := range names {
 		ppath := "/review/parameters/" + jsonPointerEscape(name)
 		p, ok := params[name]
 		if !ok {
 			out = append(out, fmt.Sprintf("%s: there is no parameter %q", ppath, name))
 			continue
 		}
-		node := c.Review.Parameters[name]
-		if node.Kind != yaml.ScalarNode {
+		v, scalar := c.Review.Parameters[name]
+		if !scalar {
 			continue // the schema reports it
 		}
-		v := node.Value
 		if len(p.ValidValues) > 0 && !containsValue(p.ValidValues, v) {
 			out = append(out, fmt.Sprintf("%s: %q is not one of the parameter's validValues %v", ppath, v, p.ValidValues))
 		}

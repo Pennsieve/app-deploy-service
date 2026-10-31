@@ -26,6 +26,17 @@ type DeployTaskStateChangeHandler struct {
 	CodeBuildApi external.CodeBuildApi
 	LogsApi      external.LogsApi
 	SSMApi       external.SSMApi
+
+	// ECRApi reads the digest of an App Store build's image; nil where
+	// unused (then no digest is recorded).
+	ECRApi external.ECRApi
+}
+
+// WithECR lets the handler record the digest of each App Store image it sees
+// built.
+func (h *DeployTaskStateChangeHandler) WithECR(ecrApi external.ECRApi) *DeployTaskStateChangeHandler {
+	h.ECRApi = ecrApi
+	return h
 }
 
 // WithCodeBuild lets the handler follow CodeBuild image builds: look up a
@@ -123,6 +134,12 @@ func (h *DeployTaskStateChangeHandler) recordStateChange(ctx context.Context, id
 	final := IsFinalState(event)
 	if final == nil {
 		return nil
+	}
+	// The digest of the image an App Store build pushed, before the status
+	// says deployed, so a deployed version names the exact image. Best
+	// effort: it never fails the event.
+	if !final.Errored && h.isAppStoreBuild(ids) {
+		h.recordImageDigest(ctx, ids, applicationsTable)
 	}
 	if ids.Variant == "" {
 		// an app without variants (or not an App Store build): as always

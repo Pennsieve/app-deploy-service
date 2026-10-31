@@ -145,7 +145,46 @@ func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVer
 		Citation:         AppCitationToModel(v.Citation),
 		DefaultVariant:   v.DefaultVariant,
 		Variants:         appStoreVariantsToModels(v),
+		Review:           AppReviewToModel(v.Review),
+		CommitSha:        v.CommitSha,
+		ImageDigest:      v.ImageDigest,
 	}
+}
+
+func AppReviewToModel(r *store_dynamodb.AppReview) *models.AppReview {
+	if r == nil {
+		return nil
+	}
+	out := &models.AppReview{
+		Version:    r.Version,
+		Generate:   reviewGenerateToModel(r.Generate),
+		Parameters: r.Parameters,
+	}
+	if len(r.Inputs) > 0 {
+		out.Inputs = make(map[string]models.ReviewInput, len(r.Inputs))
+		for name, in := range r.Inputs {
+			out.Inputs[name] = models.ReviewInput{
+				Generate: reviewGenerateToModel(in.Generate),
+				Files:    in.Files,
+				Dataset:  reviewDatasetToModel(in.Dataset),
+			}
+		}
+	}
+	return out
+}
+
+func reviewGenerateToModel(g *store_dynamodb.ReviewGenerate) *models.ReviewGenerate {
+	if g == nil {
+		return nil
+	}
+	return &models.ReviewGenerate{Image: g.Image, Command: g.Command, Root: g.Root, Source: reviewDatasetToModel(g.Source)}
+}
+
+func reviewDatasetToModel(d *store_dynamodb.ReviewDataset) *models.ReviewDataset {
+	if d == nil {
+		return nil
+	}
+	return &models.ReviewDataset{DOI: d.DOI, URL: d.URL, Files: d.Files}
 }
 
 func AppCitationToModel(c *store_dynamodb.AppCitation) *models.AppCitation {
@@ -215,6 +254,7 @@ func appStoreVariantsToModels(v store_dynamodb.AppStoreVersion) []models.AppStor
 			Status:        status,
 			FailureReason: sv.FailureReason,
 			Manifest:      AppManifestToModel(sv.Manifest),
+			ImageDigest:   sv.ImageDigest,
 		})
 	}
 	return out
