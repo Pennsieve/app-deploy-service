@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 )
 
 // appReference is one entry of app.yml's references: shared, published data
@@ -268,4 +270,31 @@ func describeQuery(r appReference, id referenceIdentity) string {
 		return "any"
 	}
 	return strings.Join(parts, ", ")
+}
+
+// storedReferences is app.yml's references as the version records them.
+func storedReferences(refs []appReference) []store_dynamodb.AppReference {
+	if len(refs) == 0 {
+		return nil
+	}
+	annotation := func(a *referenceAnnotation) *store_dynamodb.ReferenceAnnotation {
+		if a == nil {
+			return nil
+		}
+		return &store_dynamodb.ReferenceAnnotation{Provider: a.Provider, Version: a.Version}
+	}
+	out := make([]store_dynamodb.AppReference, 0, len(refs))
+	for _, r := range refs {
+		s := store_dynamodb.AppReference{
+			Name: r.Name, Description: r.Description, Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion,
+			Choice: r.Choice, TaxonomyID: r.TaxonomyID, Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation),
+			Organisms: r.Organisms, Source: r.Source, SHA256: r.SHA256, License: r.License,
+		}
+		if r.Default != nil {
+			s.Default = &store_dynamodb.ReferenceIdentity{TaxonomyID: r.Default.TaxonomyID, Assembly: r.Default.Assembly,
+				Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation)}
+		}
+		out = append(out, s)
+	}
+	return out
 }

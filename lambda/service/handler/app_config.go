@@ -384,6 +384,7 @@ func appManifest(c appConfig) *store_dynamodb.AppManifest {
 		Parameters: appParameters(c),
 		Inputs:     appPorts(c.Inputs),
 		Outputs:    appPorts(c.Outputs),
+		References: storedReferences(c.References),
 	}
 }
 

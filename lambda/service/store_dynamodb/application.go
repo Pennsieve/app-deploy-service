@@ -300,6 +300,43 @@ type AppManifest struct {
 	// Variant names the variant this manifest was resolved for; nil for an
 	// app without variants.
 	Variant *AppManifestVariant `dynamodbav:"variant,omitempty"`
+	// References are the shared, published data the app reads (app.yml
+	// references), in public identifiers; workflow-service resolves them in
+	// environments-service's catalog when a run starts.
+	References []AppReference `dynamodbav:"references,omitempty"`
+}
+
+// AppReference is one app.yml reference as stored.
+type AppReference struct {
+	Name        string               `dynamodbav:"name"`
+	Description string               `dynamodbav:"description,omitempty"`
+	Kind        string               `dynamodbav:"kind"`
+	AssetClass  string               `dynamodbav:"assetClass"`
+	ToolVersion string               `dynamodbav:"toolVersion,omitempty"`
+	Choice      string               `dynamodbav:"choice"`
+	TaxonomyID  int                  `dynamodbav:"taxonomyId,omitempty"`
+	Assembly    string               `dynamodbav:"assembly,omitempty"`
+	Seqcol      string               `dynamodbav:"seqcol,omitempty"`
+	Annotation  *ReferenceAnnotation `dynamodbav:"annotation,omitempty"`
+	Organisms   []int                `dynamodbav:"organisms,omitempty"`
+	Default     *ReferenceIdentity   `dynamodbav:"default,omitempty"`
+	Source      string               `dynamodbav:"source,omitempty"`
+	SHA256      string               `dynamodbav:"sha256,omitempty"`
+	License     string               `dynamodbav:"license,omitempty"`
+}
+
+// ReferenceAnnotation is an annotation release: GENCODE 50.
+type ReferenceAnnotation struct {
+	Provider string `dynamodbav:"provider"`
+	Version  string `dynamodbav:"version"`
+}
+
+// ReferenceIdentity names one reference: a choice: user reference's default.
+type ReferenceIdentity struct {
+	TaxonomyID int                  `dynamodbav:"taxonomyId,omitempty"`
+	Assembly   string               `dynamodbav:"assembly,omitempty"`
+	Seqcol     string               `dynamodbav:"seqcol,omitempty"`
+	Annotation *ReferenceAnnotation `dynamodbav:"annotation,omitempty"`
 }
 
 // AppManifestVariant is the variant a resolved manifest belongs to.

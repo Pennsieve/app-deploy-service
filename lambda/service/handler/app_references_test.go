@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/pennsieve/app-deploy-service/service/mappers"
 )
 
 // rnaseqQuant is rnaseq-quant's app.yml with its salmon index as a
@@ -170,5 +172,28 @@ func TestHTTPCatalog(t *testing.T) {
 	_, err = cat.Count(context.Background(), url.Values{"kind": {"genome"}, "toolVersion": {"~2"}})
 	if _, ok := err.(catalogRefusal); !ok {
 		t.Errorf("bad query: %v", err)
+	}
+}
+
+func TestStoredManifestKeepsReferences(t *testing.T) {
+	cfg, err := parseAppConfig([]byte(rnaseqQuant + "variants:\n  - id: big\n    name: Big\n    default: true\n    runtime:\n      memory: 32768\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := resolveVariants(cfg).versionManifest()
+	if len(m.References) != 1 {
+		t.Fatalf("stored references = %+v", m.References)
+	}
+	r := m.References[0]
+	if r.Name != "SALMON_INDEX" || r.ToolVersion != ">=2 <3" || len(r.Organisms) != 2 || r.Default == nil ||
+		r.Default.Annotation == nil || r.Default.Annotation.Version != "50" || m.Variant == nil || m.Variant.ID != "big" {
+		t.Errorf("stored reference = %+v (variant %+v)", r, m.Variant)
+	}
+	api := mappers.AppManifestToModel(m)
+	if len(api.References) != 1 || api.References[0].Default.Assembly != "GCA_000001405.29" || api.References[0].Choice != "user" {
+		t.Errorf("API references = %+v", api.References)
+	}
+	if appManifest(appConfig{}).References != nil {
+		t.Error("an app without references stores some")
 	}
 }
