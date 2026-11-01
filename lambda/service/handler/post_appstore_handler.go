@@ -206,6 +206,9 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		problems = manifestProblems(appYml)
 		if c, err := parseAppConfig(appYml); err == nil {
 			appCfg, haveAppCfg = c, true
+			// Each reference must resolve in environments-service's
+			// catalog; reported like the schema's problems.
+			problems = append(problems, referenceCatalogProblems(ctx, catalogFromEnv(), c)...)
 		} else {
 			log.Printf("warning: unable to parse the app.yml of %s %s: %v", application.Source.Url, application.Source.Tag, err)
 		}

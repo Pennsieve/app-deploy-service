@@ -47,6 +47,7 @@ func manifestProblems(appYml []byte) []string {
 	if c, err := parseAppConfig(appYml); err == nil {
 		out = append(out, variantProblems(c)...)
 		out = append(out, reviewProblems(c)...)
+		out = append(out, referenceProblems(c)...)
 	}
 	return out
 }
