@@ -300,16 +300,10 @@ type AppManifest struct {
 	// Variant names the variant this manifest was resolved for; nil for an
 	// app without variants.
 	Variant *AppManifestVariant `dynamodbav:"variant,omitempty"`
-	// References are the shared, published data the app reads (app.yml
-	// references), in public identifiers; workflow-service resolves them in
-	// environments-service's catalog when a run starts.
-	References []AppReference `dynamodbav:"references,omitempty"`
 }
 
-// AppReference is one app.yml reference as stored.
-type AppReference struct {
-	Name        string               `dynamodbav:"name"`
-	Description string               `dynamodbav:"description,omitempty"`
+// PortReference is an input's reference (app.yml inputs[].reference) as stored.
+type PortReference struct {
 	Kind        string               `dynamodbav:"kind"`
 	AssetClass  string               `dynamodbav:"assetClass"`
 	ToolVersion string               `dynamodbav:"toolVersion,omitempty"`
@@ -377,13 +371,14 @@ type AppMaintainer struct {
 // (file or directory) and ConformsTo (folder structures such as bids@1.9,
 // outermost first) are empty when app.yml doesn't set them.
 type AppPort struct {
-	Name        string   `dynamodbav:"name"`
-	Description string   `dynamodbav:"description,omitempty"`
-	MediaTypes  []string `dynamodbav:"mediaTypes,omitempty"`
-	Formats     []string `dynamodbav:"formats,omitempty"`
-	Container   string   `dynamodbav:"container,omitempty"`
-	ConformsTo  []string `dynamodbav:"conformsTo,omitempty"`
-	Placement   string   `dynamodbav:"placement,omitempty"`
+	Name        string         `dynamodbav:"name"`
+	Description string         `dynamodbav:"description,omitempty"`
+	MediaTypes  []string       `dynamodbav:"mediaTypes,omitempty"`
+	Formats     []string       `dynamodbav:"formats,omitempty"`
+	Container   string         `dynamodbav:"container,omitempty"`
+	ConformsTo  []string       `dynamodbav:"conformsTo,omitempty"`
+	Placement   string         `dynamodbav:"placement,omitempty"`
+	Reference   *PortReference `dynamodbav:"reference,omitempty"`
 }
 
 func (i AppStoreVersion) GetKey() map[string]types.AttributeValue {

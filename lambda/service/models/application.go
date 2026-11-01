@@ -300,16 +300,11 @@ type AppManifest struct {
 	// Variant names the variant this manifest was resolved for; absent for
 	// an app without variants.
 	Variant *AppManifestVariant `json:"variant,omitempty"`
-	// References are the shared, published data the app reads (app.yml
-	// references), in public identifiers.
-	References []AppReference `json:"references,omitempty"`
 }
 
-// AppReference is one app.yml reference: what the app reads from the folder
-// in the variable Name, described by public identifiers.
-type AppReference struct {
-	Name        string               `json:"name"`
-	Description string               `json:"description,omitempty"`
+// PortReference is an input's reference (app.yml inputs[].reference): what
+// fills it from Pennsieve's reference catalog, in public identifiers.
+type PortReference struct {
 	Kind        string               `json:"kind"`
 	AssetClass  string               `json:"assetClass"`
 	ToolVersion string               `json:"toolVersion,omitempty"`
@@ -374,13 +369,14 @@ type AppMaintainer struct {
 // (any file). Container and ConformsTo are omitted when app.yml doesn't set
 // them; no container means file.
 type AppPort struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description,omitempty"`
-	MediaTypes  []string `json:"mediaTypes"`
-	Formats     []string `json:"formats,omitempty"`
-	Container   string   `json:"container,omitempty"`
-	ConformsTo  []string `json:"conformsTo,omitempty"`
-	Placement   string   `json:"placement,omitempty"`
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	MediaTypes  []string       `json:"mediaTypes"`
+	Formats     []string       `json:"formats,omitempty"`
+	Container   string         `json:"container,omitempty"`
+	ConformsTo  []string       `json:"conformsTo,omitempty"`
+	Placement   string         `json:"placement,omitempty"`
+	Reference   *PortReference `json:"reference,omitempty"`
 }
 
 type AppStoreApplicationDetail struct {

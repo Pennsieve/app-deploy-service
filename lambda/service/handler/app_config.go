@@ -55,9 +55,6 @@ type appConfig struct {
 	// Review is how a release is tested before it's made public; nil when
 	// app.yml doesn't say.
 	Review *appReview `yaml:"review"`
-	// References are shared, published data the app reads besides its
-	// inputs (a genome index), in public identifiers (app_references.go).
-	References []appReference `yaml:"references"`
 }
 
 // appReview is app.yml's `review`: a command that generates the whole input
@@ -220,6 +217,9 @@ type appPort struct {
 	Container   string     `yaml:"container"`
 	ConformsTo  stringList `yaml:"conformsTo"`
 	Placement   string     `yaml:"placement"`
+	// Reference fills the input from Pennsieve's reference catalog
+	// (app_references.go).
+	Reference *portReference `yaml:"reference"`
 }
 
 // stringList reads one string or a list of them (conformsTo: bids, or
@@ -384,7 +384,6 @@ func appManifest(c appConfig) *store_dynamodb.AppManifest {
 		Parameters: appParameters(c),
 		Inputs:     appPorts(c.Inputs),
 		Outputs:    appPorts(c.Outputs),
-		References: storedReferences(c.References),
 	}
 }
 
@@ -398,7 +397,7 @@ func appPorts(ports []appPort) []store_dynamodb.AppPort {
 			continue
 		}
 		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes, Formats: edamFormats(p.Formats),
-			Container: strings.TrimSpace(p.Container), ConformsTo: p.ConformsTo.trimmed(),
+			Container: strings.TrimSpace(p.Container), ConformsTo: p.ConformsTo.trimmed(), Reference: storedReference(p.Reference),
 			Placement: strings.TrimSpace(p.Placement)})
 	}
 	return out
