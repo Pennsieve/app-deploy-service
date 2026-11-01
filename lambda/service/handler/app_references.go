@@ -15,13 +15,12 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 )
 
-// appReference is one entry of app.yml's references: shared, published data
-// the app reads from the folder path in its Name variable, described by public
-// identifiers so the app isn't tied to Pennsieve. On Pennsieve it resolves to
-// an official reference in environments-service's catalog.
-type appReference struct {
-	Name        string               `yaml:"name"`
-	Description string               `yaml:"description"`
+// portReference is an input port's reference (app.yml inputs[].reference):
+// shared, published data the port is filled with from Pennsieve's catalog,
+// described by public identifiers so the app isn't tied to Pennsieve. A
+// run's reference source fills it (the default when the workflow has none),
+// unpacked into the input's folder.
+type portReference struct {
 	Kind        string               `yaml:"kind"`
 	AssetClass  string               `yaml:"assetClass"`
 	ToolVersion string               `yaml:"toolVersion"`
@@ -51,50 +50,46 @@ type referenceIdentity struct {
 	Annotation *referenceAnnotation `yaml:"annotation"`
 }
 
-// Variables the platform sets, which a reference can't take.
-var reservedReferenceNames = map[string]bool{"INPUT_DIR": true, "OUTPUT_DIR": true, "REFERENCES_DIR": true}
-
-// referenceProblems are the checks on app.yml's references that JSON Schema
-// can't express: names are unique and aren't a parameter's or the platform's,
-// a choice: user default is one of its organisms, and the app (and each
-// variant) runs somewhere references are delivered, not only on Lambda.
+// referenceProblems are the checks on inputs' references that JSON Schema
+// can't express: only inputs take them, each in its own folder (placement:
+// subfolder), a choice: user default is one of its organisms, and the app
+// (and each variant) runs somewhere references are delivered, not only on
+// Lambda.
 func referenceProblems(c appConfig) []string {
-	if len(c.References) == 0 {
-		return nil
-	}
 	var out []string
-	params := map[string]bool{}
-	for _, p := range c.Parameters {
-		params[p.Name] = true
-	}
-	seen := map[string]int{}
-	for i, r := range c.References {
-		path := fmt.Sprintf("/references/%d", i)
-		if first, dup := seen[r.Name]; dup && r.Name != "" {
-			out = append(out, fmt.Sprintf("%s/name: %q is already the name of reference %d; reference names must be unique", path, r.Name, first))
-		} else {
-			seen[r.Name] = i
+	has := false
+	for i, p := range c.Inputs {
+		r := p.Reference
+		if r == nil {
+			continue
 		}
-		if params[r.Name] {
-			out = append(out, fmt.Sprintf("%s/name: %q is also a parameter's name; a reference needs its own variable", path, r.Name))
-		}
-		if reservedReferenceNames[r.Name] {
-			out = append(out, fmt.Sprintf("%s/name: %q is set by the platform", path, r.Name))
+		has = true
+		path := fmt.Sprintf("/inputs/%d", i)
+		if p.Placement != "subfolder" {
+			out = append(out, fmt.Sprintf("%s/placement: an input filled from the reference catalog needs placement: subfolder (the reference is unpacked into its folder)", path))
 		}
 		if r.Choice == "user" && r.Default != nil && r.Default.TaxonomyID != 0 && len(r.Organisms) > 0 && !containsInt(r.Organisms, r.Default.TaxonomyID) {
-			out = append(out, fmt.Sprintf("%s/default/taxonomyId: %d is not one of the reference's organisms %v", path, r.Default.TaxonomyID, r.Organisms))
+			out = append(out, fmt.Sprintf("%s/reference/default/taxonomyId: %d is not one of the reference's organisms %v", path, r.Default.TaxonomyID, r.Organisms))
 		}
 		if r.Choice == "user" && r.TaxonomyID != 0 {
-			out = append(out, fmt.Sprintf("%s/taxonomyId: a choice: user reference lists the organisms a run may pick in organisms", path))
+			out = append(out, fmt.Sprintf("%s/reference/taxonomyId: a choice: user reference lists the organisms a run may pick in organisms", path))
 		}
+	}
+	for i, p := range c.Outputs {
+		if p.Reference != nil {
+			out = append(out, fmt.Sprintf("/outputs/%d/reference: only inputs are filled from the reference catalog", i))
+		}
+	}
+	if !has {
+		return out
 	}
 	// References are delivered to ECS steps (standard, gpu), not Lambda ones.
 	if lambdaOnly(defaultComputeTypes(c.Runtime.ComputeTypes)) {
-		out = append(out, "/runtime/computeTypes: an app with references can't run only on lambda; references are delivered to standard and gpu steps")
+		out = append(out, "/runtime/computeTypes: an app with reference inputs can't run only on lambda; references are delivered to standard and gpu steps")
 	}
 	for i, v := range c.Variants {
 		if v.Runtime.ComputeTypes != nil && lambdaOnly(v.Runtime.ComputeTypes) {
-			out = append(out, fmt.Sprintf("/variants/%d/runtime/computeTypes: an app with references can't run only on lambda; references are delivered to standard and gpu steps", i))
+			out = append(out, fmt.Sprintf("/variants/%d/runtime/computeTypes: an app with reference inputs can't run only on lambda; references are delivered to standard and gpu steps", i))
 		}
 	}
 	return out
@@ -178,7 +173,7 @@ func (e catalogRefusal) Error() string { return string(e) }
 
 // referenceQuery is the catalog query for an entry, narrowed to one identity
 // (a pinned reference, a default, or one organism).
-func referenceQuery(r appReference, id referenceIdentity) url.Values {
+func referenceQuery(r portReference, id referenceIdentity) url.Values {
 	q := url.Values{"kind": {r.Kind}, "assetClass": {r.AssetClass}}
 	if r.ToolVersion != "" {
 		q.Set("toolVersion", r.ToolVersion)
@@ -199,17 +194,21 @@ func referenceQuery(r appReference, id referenceIdentity) url.Values {
 	return q
 }
 
-// referenceCatalogProblems checks that each reference resolves in the
-// catalog: a pinned one to a reference, a choice: user one to at least one
-// per organism it offers, and its default to one. A catalog that can't be
-// reached is logged and not held against the app.
+// referenceCatalogProblems checks that each input's reference resolves in
+// the catalog: a pinned one to a reference, a choice: user one to at least
+// one per organism it offers, and its default to one. A catalog that can't
+// be reached is logged and not held against the app.
 func referenceCatalogProblems(ctx context.Context, cat referenceCatalog, c appConfig) []string {
-	if cat == nil || len(c.References) == 0 {
+	if cat == nil {
 		return nil
 	}
 	var out []string
-	for i, r := range c.References {
-		path := fmt.Sprintf("/references/%d", i)
+	for i, p := range c.Inputs {
+		if p.Reference == nil {
+			continue
+		}
+		r := *p.Reference
+		path := fmt.Sprintf("/inputs/%d/reference", i)
 		type check struct {
 			path string
 			id   referenceIdentity
@@ -249,7 +248,7 @@ func referenceCatalogProblems(ctx context.Context, cat referenceCatalog, c appCo
 }
 
 // describeQuery is an entry's identity as a problem message shows it.
-func describeQuery(r appReference, id referenceIdentity) string {
+func describeQuery(r portReference, id referenceIdentity) string {
 	var parts []string
 	if id.TaxonomyID != 0 {
 		parts = append(parts, "taxonomy "+strconv.Itoa(id.TaxonomyID))
@@ -272,9 +271,9 @@ func describeQuery(r appReference, id referenceIdentity) string {
 	return strings.Join(parts, ", ")
 }
 
-// storedReferences is app.yml's references as the version records them.
-func storedReferences(refs []appReference) []store_dynamodb.AppReference {
-	if len(refs) == 0 {
+// storedReference is an input's reference as the version records it.
+func storedReference(r *portReference) *store_dynamodb.PortReference {
+	if r == nil {
 		return nil
 	}
 	annotation := func(a *referenceAnnotation) *store_dynamodb.ReferenceAnnotation {
@@ -283,18 +282,14 @@ func storedReferences(refs []appReference) []store_dynamodb.AppReference {
 		}
 		return &store_dynamodb.ReferenceAnnotation{Provider: a.Provider, Version: a.Version}
 	}
-	out := make([]store_dynamodb.AppReference, 0, len(refs))
-	for _, r := range refs {
-		s := store_dynamodb.AppReference{
-			Name: r.Name, Description: r.Description, Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion,
-			Choice: r.Choice, TaxonomyID: r.TaxonomyID, Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation),
-			Organisms: r.Organisms, Source: r.Source, SHA256: r.SHA256, License: r.License,
-		}
-		if r.Default != nil {
-			s.Default = &store_dynamodb.ReferenceIdentity{TaxonomyID: r.Default.TaxonomyID, Assembly: r.Default.Assembly,
-				Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation)}
-		}
-		out = append(out, s)
+	s := &store_dynamodb.PortReference{
+		Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion, Choice: r.Choice, TaxonomyID: r.TaxonomyID,
+		Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation), Organisms: r.Organisms,
+		Source: r.Source, SHA256: r.SHA256, License: r.License,
 	}
-	return out
+	if r.Default != nil {
+		s.Default = &store_dynamodb.ReferenceIdentity{TaxonomyID: r.Default.TaxonomyID, Assembly: r.Default.Assembly,
+			Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation)}
+	}
+	return s
 }

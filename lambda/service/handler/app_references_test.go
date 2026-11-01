@@ -12,8 +12,8 @@ import (
 	"github.com/pennsieve/app-deploy-service/service/mappers"
 )
 
-// rnaseqQuant is rnaseq-quant's app.yml with its salmon index as a
-// choice: user reference (human or mouse).
+// rnaseqQuant is rnaseq-quant's app.yml: its index input is filled from the
+// reference catalog, human or mouse.
 const rnaseqQuant = `schemaVersion: "1.0"
 application:
   name: rnaseq-quant
@@ -24,33 +24,37 @@ parameters:
   - name: THREADS
     type: integer
     defaultValue: 0
-references:
-  - name: SALMON_INDEX
+inputs:
+  - name: reads
+    placement: subfolder
+  - name: index
     description: Salmon index of the genome the reads come from.
-    kind: genome
-    assetClass: salmon-index
-    toolVersion: ">=2 <3"
-    choice: user
-    organisms: [9606, 10090]
-    default:
-      taxonomyId: 9606
-      assembly: GCA_000001405.29
-      annotation: {provider: GENCODE, version: "50"}
-    source: https://github.com/pennsieve-apps/rnaseq-index
-    license: LicenseRef-GENCODE
+    placement: subfolder
+    reference:
+      kind: genome
+      assetClass: salmon-index
+      toolVersion: ">=2 <3"
+      choice: user
+      organisms: [9606, 10090]
+      default:
+        taxonomyId: 9606
+        assembly: GCA_000001405.29
+        annotation: {provider: GENCODE, version: "50"}
+      source: https://github.com/pennsieve-apps/rnaseq-index
+      license: LicenseRef-GENCODE
 `
 
 func TestReferencesFollowTheSchema(t *testing.T) {
 	if ps := manifestProblems([]byte(rnaseqQuant)); len(ps) != 0 {
-		t.Fatalf("rnaseq-quant's references: %v", ps)
+		t.Fatalf("rnaseq-quant's reference input: %v", ps)
 	}
 	bad := map[string]string{
-		"lowercase name":   strings.Replace(rnaseqQuant, "name: SALMON_INDEX", "name: salmon_index", 1),
-		"unknown kind":     strings.Replace(rnaseqQuant, "kind: genome", "kind: model", 1),
-		"bad toolVersion":  strings.Replace(rnaseqQuant, `">=2 <3"`, `"~2"`, 1),
-		"bad assembly":     strings.Replace(rnaseqQuant, "assembly: GCA_000001405.29", "assembly: hg38", 1),
-		"unknown field":    strings.Replace(rnaseqQuant, "    license:", "    genomeBuild: hg38\n    license:", 1),
-		"pinned, no build": strings.Replace(rnaseqQuant, "choice: user", "choice: app", 1),
+		"unknown kind":       strings.Replace(rnaseqQuant, "kind: genome", "kind: model", 1),
+		"bad toolVersion":    strings.Replace(rnaseqQuant, `">=2 <3"`, `"~2"`, 1),
+		"bad assembly":       strings.Replace(rnaseqQuant, "assembly: GCA_000001405.29", "assembly: hg38", 1),
+		"unknown field":      strings.Replace(rnaseqQuant, "      license:", "      genomeBuild: hg38\n      license:", 1),
+		"pinned, no build":   strings.Replace(rnaseqQuant, "choice: user", "choice: app", 1),
+		"old top-level list": rnaseqQuant + "references:\n  - name: SALMON_INDEX\n",
 	}
 	for name, yml := range bad {
 		if ps := manifestProblems([]byte(yml)); len(ps) == 0 {
@@ -65,14 +69,17 @@ func TestReferenceProblems(t *testing.T) {
 		with   string
 		want   string
 	}{
-		"parameter's name":    {"name: SALMON_INDEX", "name: THREADS", "also a parameter's name"},
-		"platform's name":     {"name: SALMON_INDEX", "name: INPUT_DIR", "set by the platform"},
-		"default not offered": {"organisms: [9606, 10090]", "organisms: [10090]", "not one of the reference's organisms"},
-		"lambda only":         {"computeTypes: [standard]", "computeTypes: [lambda]", "only on lambda"},
-		"taxonomy on user":    {"    organisms:", "    taxonomyId: 9606\n    organisms:", "lists the organisms"},
+		"not in its own folder": {"description: Salmon index of the genome the reads come from.\n    placement: subfolder", "description: Salmon index of the genome the reads come from.\n    placement: root", "placement: subfolder"},
+		"default not offered":   {"organisms: [9606, 10090]", "organisms: [10090]", "not one of the reference's organisms"},
+		"lambda only":           {"computeTypes: [standard]", "computeTypes: [lambda]", "only on lambda"},
+		"taxonomy on user":      {"      organisms:", "      taxonomyId: 9606\n      organisms:", "lists the organisms"},
 	}
 	for name, c := range cases {
-		cfg, err := parseAppConfig([]byte(strings.Replace(rnaseqQuant, c.change, c.with, 1)))
+		yml := strings.Replace(rnaseqQuant, c.change, c.with, 1)
+		if yml == rnaseqQuant {
+			t.Fatalf("%s: the change didn't apply", name)
+		}
+		cfg, err := parseAppConfig([]byte(yml))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,14 +88,17 @@ func TestReferenceProblems(t *testing.T) {
 			t.Errorf("%s: %v", name, ps)
 		}
 	}
-	// A variant that runs only on Lambda can't have the app's references.
-	cfg, _ := parseAppConfig([]byte(rnaseqQuant + "variants:\n  - id: small\n    name: Small\n    runtime:\n      computeTypes: [lambda]\n"))
+	cfg, _ := parseAppConfig([]byte(rnaseqQuant + "outputs:\n  - name: counts\n    reference: {kind: genome, assetClass: salmon-index, choice: user}\n"))
+	if ps := referenceProblems(cfg); len(ps) != 1 || !strings.Contains(ps[0], "only inputs") {
+		t.Errorf("output reference: %v", ps)
+	}
+	cfg, _ = parseAppConfig([]byte(rnaseqQuant + "variants:\n  - id: small\n    name: Small\n    runtime:\n      computeTypes: [lambda]\n"))
 	if ps := referenceProblems(cfg); len(ps) != 1 || !strings.Contains(ps[0], "/variants/0/runtime/computeTypes") {
 		t.Errorf("lambda variant: %v", ps)
 	}
-	cfg, _ = parseAppConfig([]byte(strings.Replace(rnaseqQuant, "references:", "unused:", 1)))
+	cfg, _ = parseAppConfig([]byte(strings.Replace(rnaseqQuant, "computeTypes: [standard]", "computeTypes: [lambda]", 1)[:strings.Index(rnaseqQuant, "  - name: index")]))
 	if ps := referenceProblems(cfg); ps != nil {
-		t.Errorf("no references: %v", ps)
+		t.Errorf("no reference inputs: %v", ps)
 	}
 }
 
@@ -130,7 +140,7 @@ func TestReferenceCatalogProblems(t *testing.T) {
 		}
 		return 1
 	}}
-	if ps := referenceCatalogProblems(ctx, noMouse, cfg); len(ps) != 1 || !strings.Contains(ps[0], "/references/0/organisms/1") || !strings.Contains(ps[0], "organism 10090") {
+	if ps := referenceCatalogProblems(ctx, noMouse, cfg); len(ps) != 1 || !strings.Contains(ps[0], "/inputs/1/reference/organisms/1") || !strings.Contains(ps[0], "organism 10090") {
 		t.Errorf("no mouse index: %v", ps)
 	}
 
@@ -181,19 +191,16 @@ func TestStoredManifestKeepsReferences(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := resolveVariants(cfg).versionManifest()
-	if len(m.References) != 1 {
-		t.Fatalf("stored references = %+v", m.References)
+	if len(m.Inputs) != 2 || m.Inputs[0].Reference != nil || m.Inputs[1].Reference == nil {
+		t.Fatalf("stored inputs = %+v", m.Inputs)
 	}
-	r := m.References[0]
-	if r.Name != "SALMON_INDEX" || r.ToolVersion != ">=2 <3" || len(r.Organisms) != 2 || r.Default == nil ||
+	r := m.Inputs[1].Reference
+	if r.AssetClass != "salmon-index" || r.ToolVersion != ">=2 <3" || len(r.Organisms) != 2 || r.Default == nil ||
 		r.Default.Annotation == nil || r.Default.Annotation.Version != "50" || m.Variant == nil || m.Variant.ID != "big" {
 		t.Errorf("stored reference = %+v (variant %+v)", r, m.Variant)
 	}
 	api := mappers.AppManifestToModel(m)
-	if len(api.References) != 1 || api.References[0].Default.Assembly != "GCA_000001405.29" || api.References[0].Choice != "user" {
-		t.Errorf("API references = %+v", api.References)
-	}
-	if appManifest(appConfig{}).References != nil {
-		t.Error("an app without references stores some")
+	if ref := api.Inputs[1].Reference; ref == nil || ref.Default.Assembly != "GCA_000001405.29" || ref.Choice != "user" {
+		t.Errorf("API reference = %+v", ref)
 	}
 }

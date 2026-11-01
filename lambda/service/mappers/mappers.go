@@ -292,12 +292,11 @@ func AppManifestToModel(m *store_dynamodb.AppManifest) *models.AppManifest {
 		Inputs:     appPortsToModels(m.Inputs),
 		Outputs:    appPortsToModels(m.Outputs),
 		Variant:    appManifestVariantToModel(m.Variant),
-		References: appReferencesToModels(m.References),
 	}
 }
 
-func appReferencesToModels(refs []store_dynamodb.AppReference) []models.AppReference {
-	if len(refs) == 0 {
+func portReferenceToModel(r *store_dynamodb.PortReference) *models.PortReference {
+	if r == nil {
 		return nil
 	}
 	annotation := func(a *store_dynamodb.ReferenceAnnotation) *models.ReferenceAnnotation {
@@ -306,20 +305,16 @@ func appReferencesToModels(refs []store_dynamodb.AppReference) []models.AppRefer
 		}
 		return &models.ReferenceAnnotation{Provider: a.Provider, Version: a.Version}
 	}
-	out := make([]models.AppReference, 0, len(refs))
-	for _, r := range refs {
-		m := models.AppReference{
-			Name: r.Name, Description: r.Description, Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion,
-			Choice: r.Choice, TaxonomyID: r.TaxonomyID, Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation),
-			Organisms: r.Organisms, Source: r.Source, SHA256: r.SHA256, License: r.License,
-		}
-		if r.Default != nil {
-			m.Default = &models.ReferenceIdentity{TaxonomyID: r.Default.TaxonomyID, Assembly: r.Default.Assembly,
-				Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation)}
-		}
-		out = append(out, m)
+	m := &models.PortReference{
+		Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion, Choice: r.Choice, TaxonomyID: r.TaxonomyID,
+		Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation), Organisms: r.Organisms,
+		Source: r.Source, SHA256: r.SHA256, License: r.License,
 	}
-	return out
+	if r.Default != nil {
+		m.Default = &models.ReferenceIdentity{TaxonomyID: r.Default.TaxonomyID, Assembly: r.Default.Assembly,
+			Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation)}
+	}
+	return m
 }
 
 func appManifestVariantToModel(v *store_dynamodb.AppManifestVariant) *models.AppManifestVariant {
@@ -337,7 +332,7 @@ func appPortsToModels(ports []store_dynamodb.AppPort) []models.AppPort {
 			media = []string{}
 		}
 		out = append(out, models.AppPort{Name: p.Name, Description: p.Description, MediaTypes: media, Formats: p.Formats,
-			Container: p.Container, ConformsTo: p.ConformsTo, Placement: p.Placement})
+			Container: p.Container, ConformsTo: p.ConformsTo, Placement: p.Placement, Reference: portReferenceToModel(p.Reference)})
 	}
 	return out
 }
