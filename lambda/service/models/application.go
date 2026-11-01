@@ -300,6 +300,43 @@ type AppManifest struct {
 	// Variant names the variant this manifest was resolved for; absent for
 	// an app without variants.
 	Variant *AppManifestVariant `json:"variant,omitempty"`
+	// References are the shared, published data the app reads (app.yml
+	// references), in public identifiers.
+	References []AppReference `json:"references,omitempty"`
+}
+
+// AppReference is one app.yml reference: what the app reads from the folder
+// in the variable Name, described by public identifiers.
+type AppReference struct {
+	Name        string               `json:"name"`
+	Description string               `json:"description,omitempty"`
+	Kind        string               `json:"kind"`
+	AssetClass  string               `json:"assetClass"`
+	ToolVersion string               `json:"toolVersion,omitempty"`
+	Choice      string               `json:"choice"`
+	TaxonomyID  int                  `json:"taxonomyId,omitempty"`
+	Assembly    string               `json:"assembly,omitempty"`
+	Seqcol      string               `json:"seqcol,omitempty"`
+	Annotation  *ReferenceAnnotation `json:"annotation,omitempty"`
+	Organisms   []int                `json:"organisms,omitempty"`
+	Default     *ReferenceIdentity   `json:"default,omitempty"`
+	Source      string               `json:"source,omitempty"`
+	SHA256      string               `json:"sha256,omitempty"`
+	License     string               `json:"license,omitempty"`
+}
+
+// ReferenceAnnotation is an annotation release: GENCODE 50.
+type ReferenceAnnotation struct {
+	Provider string `json:"provider"`
+	Version  string `json:"version"`
+}
+
+// ReferenceIdentity names one reference: a choice: user reference's default.
+type ReferenceIdentity struct {
+	TaxonomyID int                  `json:"taxonomyId,omitempty"`
+	Assembly   string               `json:"assembly,omitempty"`
+	Seqcol     string               `json:"seqcol,omitempty"`
+	Annotation *ReferenceAnnotation `json:"annotation,omitempty"`
 }
 
 // AppManifestVariant is the variant a resolved manifest belongs to.
