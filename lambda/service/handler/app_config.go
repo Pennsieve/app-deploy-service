@@ -55,6 +55,9 @@ type appConfig struct {
 	// Review is how a release is tested before it's made public; nil when
 	// app.yml doesn't say.
 	Review *appReview `yaml:"review"`
+	// References are shared, published data the app reads besides its
+	// inputs (a genome index), in public identifiers (app_references.go).
+	References []appReference `yaml:"references"`
 }
 
 // appReview is app.yml's `review`: a command that generates the whole input

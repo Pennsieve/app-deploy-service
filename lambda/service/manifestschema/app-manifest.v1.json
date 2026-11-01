@@ -50,7 +50,12 @@
       "deprecated": true,
       "description": "Deprecated and not read from app.yml."
     },
-    "review": { "$ref": "#/$defs/review" }
+    "review": { "$ref": "#/$defs/review" },
+    "references": {
+      "type": "array",
+      "description": "Shared, published data the app needs besides its inputs, such as a genome index: described by public identifiers and where to get it, so the app isn't tied to one platform. The processor reads each from a folder path in the variable it names. On Pennsieve each resolves to a reference in the catalog (checked on registration); elsewhere, mount a copy and set the variable. See https://github.com/Pennsieve/app-deploy-service/blob/main/docs/app-manifest-references.md.",
+      "items": { "$ref": "#/$defs/reference" }
+    }
   },
   "$defs": {
     "application": {
@@ -389,6 +394,85 @@
           "deprecated": true,
           "description": "Deprecated and unused."
         }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "description": "One reference the app reads. choice: app pins one (by assembly or seqcol, and annotation); choice: user lets a run pick among the matching ones (optionally of the given organisms), with a default.",
+      "additionalProperties": false,
+      "required": ["name", "kind", "assetClass", "choice"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "The environment variable the processor reads: the reference's folder path."
+        },
+        "description": { "type": "string", "description": "What the app uses it for." },
+        "kind": { "type": "string", "enum": ["genome"], "description": "genome: a genome asset, such as a FASTA or an aligner index." },
+        "assetClass": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the reference is, such as salmon-index; it names the files it holds.",
+          "examples": ["salmon-index"]
+        },
+        "toolVersion": {
+          "type": "string",
+          "pattern": "^\\s*(?:(?:>=|<=|==|>|<|=)?[0-9][0-9A-Za-z.]*\\s*)+$",
+          "description": "For an index: the versions of its tool the app can read, as space-separated comparisons that must all hold.",
+          "examples": [">=2 <3", ">=2.7.10a <2.8", "2.8.0"]
+        },
+        "choice": {
+          "type": "string",
+          "enum": ["app", "user"],
+          "description": "app: the app pins the reference. user: a run picks among the matching references."
+        },
+        "taxonomyId": { "type": "integer", "minimum": 1, "description": "choice app: the organism's NCBI taxonomy id." },
+        "assembly": { "$ref": "#/$defs/referenceAssembly" },
+        "seqcol": { "type": "string", "minLength": 1, "description": "The assembly's GA4GH sequence-collection digest." },
+        "annotation": { "$ref": "#/$defs/referenceAnnotation" },
+        "organisms": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "choice user: the NCBI taxonomy ids a run may pick from. Default: any.",
+          "items": { "type": "integer", "minimum": 1 }
+        },
+        "default": {
+          "type": "object",
+          "description": "choice user: the reference preselected for a run.",
+          "additionalProperties": false,
+          "properties": {
+            "taxonomyId": { "type": "integer", "minimum": 1 },
+            "assembly": { "$ref": "#/$defs/referenceAssembly" },
+            "seqcol": { "type": "string", "minLength": 1 },
+            "annotation": { "$ref": "#/$defs/referenceAnnotation" }
+          }
+        },
+        "source": { "type": "string", "description": "Where to get it outside Pennsieve: a URL, or how to build it." },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Of the pinned reference's archive, when the app pins one exact build." },
+        "license": { "type": "string", "description": "An SPDX id or expression; LicenseRef-<name> for other terms." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "choice": { "const": "app" } } },
+          "then": { "required": ["annotation"], "anyOf": [{ "required": ["assembly"] }, { "required": ["seqcol"] }] }
+        }
+      ]
+    },
+    "referenceAssembly": {
+      "type": "string",
+      "pattern": "^GC[AF]_[0-9]{9}\\.[0-9]+$",
+      "description": "An assembly accession, such as GCA_000001405.29 (GRCh38).",
+      "examples": ["GCA_000001405.29"]
+    },
+    "referenceAnnotation": {
+      "type": "object",
+      "description": "An annotation release: its provider and version, such as GENCODE 50.",
+      "additionalProperties": false,
+      "required": ["provider", "version"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1, "examples": ["GENCODE", "Ensembl"] },
+        "version": { "type": "string", "minLength": 1, "examples": ["50", "M39"] }
       }
     },
     "review": {
