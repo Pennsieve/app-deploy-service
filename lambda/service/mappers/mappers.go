@@ -307,12 +307,12 @@ func portReferenceToModel(r *store_dynamodb.PortReference) *models.PortReference
 	}
 	m := &models.PortReference{
 		Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion, Choice: r.Choice, TaxonomyID: r.TaxonomyID,
-		Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation), Organisms: r.Organisms,
-		Source: r.Source, SHA256: r.SHA256, License: r.License,
+		Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation), Properties: r.Properties,
+		Organisms: r.Organisms, Source: r.Source, SHA256: r.SHA256, License: r.License,
 	}
 	if r.Default != nil {
 		m.Default = &models.ReferenceIdentity{TaxonomyID: r.Default.TaxonomyID, Assembly: r.Default.Assembly,
-			Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation)}
+			Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation), Properties: r.Default.Properties}
 	}
 	return m
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -29,11 +30,13 @@ type portReference struct {
 	Assembly    string               `yaml:"assembly"`
 	Seqcol      string               `yaml:"seqcol"`
 	Annotation  *referenceAnnotation `yaml:"annotation"`
-	Organisms   []int                `yaml:"organisms"`
-	Default     *referenceIdentity   `yaml:"default"`
-	Source      string               `yaml:"source"`
-	SHA256      string               `yaml:"sha256"`
-	License     string               `yaml:"license"`
+	// Properties every match has (a template's space, resolution, desc).
+	Properties map[string]string  `yaml:"properties"`
+	Organisms  []int              `yaml:"organisms"`
+	Default    *referenceIdentity `yaml:"default"`
+	Source     string             `yaml:"source"`
+	SHA256     string             `yaml:"sha256"`
+	License    string             `yaml:"license"`
 }
 
 // referenceAnnotation is an annotation release: GENCODE 50.
@@ -48,6 +51,15 @@ type referenceIdentity struct {
 	Assembly   string               `yaml:"assembly"`
 	Seqcol     string               `yaml:"seqcol"`
 	Annotation *referenceAnnotation `yaml:"annotation"`
+	Properties map[string]string    `yaml:"properties"`
+}
+
+// choiceOf is a reference's choice: user unless it pins one (app).
+func choiceOf(r portReference) string {
+	if r.Choice == "" {
+		return "user"
+	}
+	return r.Choice
 }
 
 // referenceProblems are the checks on inputs' references that JSON Schema
@@ -68,10 +80,10 @@ func referenceProblems(c appConfig) []string {
 		if p.Placement != "subfolder" {
 			out = append(out, fmt.Sprintf("%s/placement: an input filled from the reference catalog needs placement: subfolder (the reference is unpacked into its folder)", path))
 		}
-		if r.Choice == "user" && r.Default != nil && r.Default.TaxonomyID != 0 && len(r.Organisms) > 0 && !containsInt(r.Organisms, r.Default.TaxonomyID) {
+		if choiceOf(*r) == "user" && r.Default != nil && r.Default.TaxonomyID != 0 && len(r.Organisms) > 0 && !containsInt(r.Organisms, r.Default.TaxonomyID) {
 			out = append(out, fmt.Sprintf("%s/reference/default/taxonomyId: %d is not one of the reference's organisms %v", path, r.Default.TaxonomyID, r.Organisms))
 		}
-		if r.Choice == "user" && r.TaxonomyID != 0 {
+		if choiceOf(*r) == "user" && r.TaxonomyID != 0 {
 			out = append(out, fmt.Sprintf("%s/reference/taxonomyId: a choice: user reference lists the organisms a run may pick in organisms", path))
 		}
 	}
@@ -150,8 +162,9 @@ func (c httpCatalog) Count(ctx context.Context, query url.Values) (int, error) {
 	}
 	defer resp.Body.Close()
 	var body struct {
-		Genomes []json.RawMessage `json:"genomes"`
-		Message string            `json:"message"`
+		References []json.RawMessage `json:"references"`
+		Genomes    []json.RawMessage `json:"genomes"`
+		Message    string            `json:"message"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return 0, fmt.Errorf("reading the catalog's answer (%d): %w", resp.StatusCode, err)
@@ -161,6 +174,10 @@ func (c httpCatalog) Count(ctx context.Context, query url.Values) (int, error) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("the catalog answered %d", resp.StatusCode)
+	}
+	// references: every kind; genomes: a genome catalog from before kinds.
+	if body.References != nil {
+		return len(body.References), nil
 	}
 	return len(body.Genomes), nil
 }
@@ -172,11 +189,17 @@ type catalogRefusal string
 func (e catalogRefusal) Error() string { return string(e) }
 
 // referenceQuery is the catalog query for an entry, narrowed to one identity
-// (a pinned reference, a default, or one organism).
+// (a pinned reference, a default, or one organism): the reference's
+// properties, and the identity's (property.<name>=<value>).
 func referenceQuery(r portReference, id referenceIdentity) url.Values {
 	q := url.Values{"kind": {r.Kind}, "assetClass": {r.AssetClass}}
 	if r.ToolVersion != "" {
 		q.Set("toolVersion", r.ToolVersion)
+	}
+	for _, props := range []map[string]string{r.Properties, id.Properties} {
+		for k, v := range props {
+			q.Set("property."+k, v)
+		}
 	}
 	if id.TaxonomyID != 0 {
 		q.Set("taxonomyId", strconv.Itoa(id.TaxonomyID))
@@ -215,9 +238,9 @@ func referenceCatalogProblems(ctx context.Context, cat referenceCatalog, c appCo
 			what string
 		}
 		var checks []check
-		switch r.Choice {
+		switch choiceOf(r) {
 		case "app":
-			checks = append(checks, check{path, referenceIdentity{r.TaxonomyID, r.Assembly, r.Seqcol, r.Annotation}, "the pinned reference"})
+			checks = append(checks, check{path, referenceIdentity{r.TaxonomyID, r.Assembly, r.Seqcol, r.Annotation, nil}, "the pinned reference"})
 		case "user":
 			if len(r.Organisms) == 0 {
 				checks = append(checks, check{path, referenceIdentity{}, "any reference"})
@@ -265,6 +288,15 @@ func describeQuery(r portReference, id referenceIdentity) string {
 	if r.ToolVersion != "" {
 		parts = append(parts, "tool version "+r.ToolVersion)
 	}
+	q := referenceQuery(r, id)
+	var props []string
+	for k := range q {
+		if name, ok := strings.CutPrefix(k, "property."); ok {
+			props = append(props, name+"="+q.Get(k))
+		}
+	}
+	sort.Strings(props)
+	parts = append(parts, props...)
 	if len(parts) == 0 {
 		return "any"
 	}
@@ -283,13 +315,13 @@ func storedReference(r *portReference) *store_dynamodb.PortReference {
 		return &store_dynamodb.ReferenceAnnotation{Provider: a.Provider, Version: a.Version}
 	}
 	s := &store_dynamodb.PortReference{
-		Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion, Choice: r.Choice, TaxonomyID: r.TaxonomyID,
-		Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation), Organisms: r.Organisms,
-		Source: r.Source, SHA256: r.SHA256, License: r.License,
+		Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion, Choice: choiceOf(*r), TaxonomyID: r.TaxonomyID,
+		Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation), Properties: r.Properties,
+		Organisms: r.Organisms, Source: r.Source, SHA256: r.SHA256, License: r.License,
 	}
 	if r.Default != nil {
 		s.Default = &store_dynamodb.ReferenceIdentity{TaxonomyID: r.Default.TaxonomyID, Assembly: r.Default.Assembly,
-			Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation)}
+			Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation), Properties: r.Default.Properties}
 	}
 	return s
 }
