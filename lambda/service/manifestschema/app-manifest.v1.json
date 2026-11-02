@@ -452,12 +452,21 @@
         {
           "if": { "required": ["choice", "kind"], "properties": { "choice": { "const": "app" }, "kind": { "const": "template" } } },
           "then": { "required": ["properties"] }
+        },
+        {
+          "if": { "required": ["kind"], "properties": { "kind": { "const": "template" } } },
+          "then": { "not": { "anyOf": [{ "required": ["taxonomyId"] }, { "required": ["assembly"] }, { "required": ["seqcol"] }, { "required": ["annotation"] }, { "required": ["organisms"] }] } }
+        },
+        {
+          "if": { "required": ["kind"], "properties": { "kind": { "const": "genome" } } },
+          "then": { "not": { "required": ["properties"] } }
         }
       ]
     },
     "referenceProperties": {
       "type": "object",
       "description": "What a reference is in its own terms, matched exactly: a template's space, resolution and desc (TemplateFlow's entities). On the reference, every match has them; on default, the default's.",
+      "minProperties": 1,
       "maxProperties": 20,
       "propertyNames": { "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,39}$" },
       "additionalProperties": { "type": "string", "minLength": 1, "maxLength": 200 },

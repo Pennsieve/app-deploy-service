@@ -55,7 +55,7 @@ A template is pinned by its properties, TemplateFlow's terms for it (processor-a
       source: https://www.templateflow.org
 ```
 
-The fewest fields are `kind` and `assetClass`: a run then picks among every match, and gets the newest by default.
+The fewest fields are `kind` and `assetClass`: a run then picks among every match. When exactly one matches, it's used; when several do, give a `default` (or the run links a reference source), because Pennsieve doesn't guess between different references. Property values are strings: quote numbers (`resolution: "1"`).
 
 ## Fields of `reference`
 
@@ -65,7 +65,7 @@ The fewest fields are `kind` and `assetClass`: a run then picks among every matc
 | `assetClass` | What the reference is; it names the files it holds. `salmon-index`: `salmon/`, `tx2gene.csv`, `genes.csv`, `index.json`. |
 | `toolVersion` | For an index: the tool versions the app can read, as space-separated comparisons that must all hold: `>=2 <3`, `>=2.7.10a <2.8`, `2.8.0`. |
 | `choice` | `app`: the app pins one reference: a genome with `assembly` or `seqcol`, and `annotation` (and usually `taxonomyId`); a template with `properties`. `user` (the default): a run picks among the matching references, optionally of `organisms`, with an optional `default`. |
-| `properties` | What every match is, in its own terms, matched exactly: a template's `space`, `resolution` and `desc`. `default` may carry its own. |
+| `properties` | A template's, not a genome's: what every match is, in its own terms, matched exactly (`space`, `resolution`, `desc`). `default` may carry its own, but not contradict these. |
 | `source`, `license`, `sha256` | Where to get it outside Pennsieve, its license (SPDX), and for a pinned reference the sha256 of one exact build. |
 
 The input needs `placement: subfolder`: the reference is unpacked into its folder.

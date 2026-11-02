@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -237,15 +238,67 @@ func TestTemplateReferencesFollowTheSchema(t *testing.T) {
 	if ps := manifestProblems([]byte(minimal)); len(ps) != 0 {
 		t.Errorf("kind and assetClass only: %v", ps)
 	}
+	props := "      properties: {space: MNI152NLin2009cAsym, resolution: \"1\", desc: brain}\n"
 	bad := map[string]string{
-		"pinned, no properties": strings.Replace(antsMni, "      properties: {space: MNI152NLin2009cAsym, resolution: \"1\", desc: brain}\n", "", 1),
-		"bad property name":     strings.Replace(antsMni, "desc: brain", "1desc: brain", 1),
-		"empty property":        strings.Replace(antsMni, "desc: brain", `desc: ""`, 1),
+		"pinned, no properties":    strings.Replace(antsMni, props, "", 1),
+		"pinned, empty properties": strings.Replace(antsMni, props, "      properties: {}\n", 1),
+		"bad property name":        strings.Replace(antsMni, "desc: brain", "1desc: brain", 1),
+		"empty property":           strings.Replace(antsMni, "desc: brain", `desc: ""`, 1),
+		"genome fields":            strings.Replace(antsMni, props, props+"      taxonomyId: 9606\n", 1),
+		"genome properties":        strings.Replace(rnaseqQuant, "      license:", "      properties: {x: y}\n      license:", 1),
 	}
 	for name, yml := range bad {
-		if ps := manifestProblems([]byte(yml)); len(ps) == 0 {
-			t.Errorf("%s: accepted", name)
+		ps := manifestProblems([]byte(yml))
+		if len(ps) == 0 || !strings.Contains(strings.Join(ps, " "), "/reference") {
+			t.Errorf("%s: %v", name, ps)
 		}
+	}
+}
+
+// A genome without choice is a run's choice (user): no longer forced to pin.
+func TestGenomeWithoutChoiceIsUser(t *testing.T) {
+	yml := strings.Replace(rnaseqQuant, "      choice: user\n", "", 1)
+	if ps := manifestProblems([]byte(yml)); len(ps) != 0 {
+		t.Fatalf("no choice: %v", ps)
+	}
+	cfg, _ := parseAppConfig([]byte(yml))
+	if cfg.Inputs[1].Reference.Choice != "user" {
+		t.Errorf("choice = %q", cfg.Inputs[1].Reference.Choice)
+	}
+}
+
+// The checks JSON Schema can't make, which also hold in warn mode: property
+// limits (a manifest out of them is neither checked against the catalog nor
+// stored with them), and a default contradicting the reference.
+func TestReferencePropertyProblems(t *testing.T) {
+	many := map[string]string{}
+	for i := 0; i < 21; i++ {
+		many[fmt.Sprintf("p%d", i)] = "x"
+	}
+	if ps := propertyProblems("/p", many); len(ps) != 1 || !strings.Contains(ps[0], "at most 20") {
+		t.Errorf("21 properties: %v", ps)
+	}
+	if ps := propertyProblems("/p", map[string]string{"desc": strings.Repeat("x", 201)}); len(ps) != 1 {
+		t.Errorf("long value: %v", ps)
+	}
+
+	cfg, _ := parseAppConfig([]byte(strings.Replace(antsMni, "desc: brain", "desc: \""+strings.Repeat("x", 300)+"\"", 1)))
+	asked := 0
+	cat := &fakeCatalog{matches: func(url.Values) int { asked++; return 1 }}
+	if ps := referenceProblems(cfg); len(ps) != 1 || !strings.Contains(ps[0], "/inputs/1/reference/properties/desc") {
+		t.Errorf("problems = %v", ps)
+	}
+	if referenceCatalogProblems(context.Background(), cat, cfg); asked != 0 {
+		t.Errorf("an invalid reference was sent to the catalog")
+	}
+	if r := resolveVariants(cfg).versionManifest().Inputs[1].Reference; r.Properties != nil {
+		t.Errorf("stored invalid properties: %v", r.Properties)
+	}
+
+	withDefault := strings.Replace(antsMni, "      choice: app\n", "      default: {properties: {space: MNI152NLin6Asym}}\n", 1)
+	cfg, _ = parseAppConfig([]byte(withDefault))
+	if ps := referenceProblems(cfg); len(ps) != 1 || !strings.Contains(ps[0], "contradicts") {
+		t.Errorf("contradicting default: %v", ps)
 	}
 }
 

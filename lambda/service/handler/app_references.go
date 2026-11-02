@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sort"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -54,12 +54,37 @@ type referenceIdentity struct {
 	Properties map[string]string    `yaml:"properties"`
 }
 
-// choiceOf is a reference's choice: user unless it pins one (app).
-func choiceOf(r portReference) string {
-	if r.Choice == "" {
-		return "user"
+// Limits on a reference's properties, as the schema states them; checked here
+// too, so a manifest stored in warn mode never carries more.
+const maxReferenceProperties = 20
+
+var validPropertyName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_-]{0,39}$`)
+
+// propertyProblems are what's wrong with a reference's properties (at path).
+func propertyProblems(path string, props map[string]string) []string {
+	var out []string
+	if len(props) > maxReferenceProperties {
+		out = append(out, fmt.Sprintf("%s: at most %d properties", path, maxReferenceProperties))
 	}
-	return r.Choice
+	for _, k := range sortedKeys(props) {
+		v := props[k]
+		if !validPropertyName.MatchString(k) {
+			out = append(out, fmt.Sprintf("%s: property name %q is a letter, then up to 39 letters, digits, '_' or '-'", path, k))
+		}
+		if strings.TrimSpace(v) == "" || len(v) > 200 {
+			out = append(out, fmt.Sprintf("%s/%s: a value is 1 to 200 characters", path, k))
+		}
+	}
+	return out
+}
+
+// validReference: its properties pass propertyProblems, so it may be checked
+// against the catalog and stored.
+func validReference(r portReference) bool {
+	if len(propertyProblems("", r.Properties)) > 0 {
+		return false
+	}
+	return r.Default == nil || len(propertyProblems("", r.Default.Properties)) == 0
 }
 
 // referenceProblems are the checks on inputs' references that JSON Schema
@@ -80,11 +105,22 @@ func referenceProblems(c appConfig) []string {
 		if p.Placement != "subfolder" {
 			out = append(out, fmt.Sprintf("%s/placement: an input filled from the reference catalog needs placement: subfolder (the reference is unpacked into its folder)", path))
 		}
-		if choiceOf(*r) == "user" && r.Default != nil && r.Default.TaxonomyID != 0 && len(r.Organisms) > 0 && !containsInt(r.Organisms, r.Default.TaxonomyID) {
+		if r.Choice == "user" && r.Default != nil && r.Default.TaxonomyID != 0 && len(r.Organisms) > 0 && !containsInt(r.Organisms, r.Default.TaxonomyID) {
 			out = append(out, fmt.Sprintf("%s/reference/default/taxonomyId: %d is not one of the reference's organisms %v", path, r.Default.TaxonomyID, r.Organisms))
 		}
-		if choiceOf(*r) == "user" && r.TaxonomyID != 0 {
+		if r.Choice == "user" && r.TaxonomyID != 0 {
 			out = append(out, fmt.Sprintf("%s/reference/taxonomyId: a choice: user reference lists the organisms a run may pick in organisms", path))
+		}
+		out = append(out, propertyProblems(path+"/reference/properties", r.Properties)...)
+		if r.Default != nil {
+			out = append(out, propertyProblems(path+"/reference/default/properties", r.Default.Properties)...)
+			// A default is one of the matches: it can't contradict the
+			// properties every match has.
+			for _, k := range sortedKeys(r.Default.Properties) {
+				if want, ok := r.Properties[k]; ok && want != r.Default.Properties[k] {
+					out = append(out, fmt.Sprintf("%s/reference/default/properties/%s: %q contradicts the reference's %q", path, k, r.Default.Properties[k], want))
+				}
+			}
 		}
 	}
 	for i, p := range c.Outputs {
@@ -175,7 +211,8 @@ func (c httpCatalog) Count(ctx context.Context, query url.Values) (int, error) {
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("the catalog answered %d", resp.StatusCode)
 	}
-	// references: every kind; genomes: a genome catalog from before kinds.
+	// references: every kind; genomes: a genome catalog from before kinds
+	// (drop once environments-service #7 is deployed everywhere).
 	if body.References != nil {
 		return len(body.References), nil
 	}
@@ -188,6 +225,18 @@ type catalogRefusal string
 
 func (e catalogRefusal) Error() string { return string(e) }
 
+// mergedProperties are an identity's properties with the reference's, which
+// every match has, winning (referenceProblems refuses a contradiction).
+func mergedProperties(r portReference, id referenceIdentity) map[string]string {
+	out := map[string]string{}
+	for _, props := range []map[string]string{id.Properties, r.Properties} {
+		for k, v := range props {
+			out[k] = v
+		}
+	}
+	return out
+}
+
 // referenceQuery is the catalog query for an entry, narrowed to one identity
 // (a pinned reference, a default, or one organism): the reference's
 // properties, and the identity's (property.<name>=<value>).
@@ -196,10 +245,8 @@ func referenceQuery(r portReference, id referenceIdentity) url.Values {
 	if r.ToolVersion != "" {
 		q.Set("toolVersion", r.ToolVersion)
 	}
-	for _, props := range []map[string]string{r.Properties, id.Properties} {
-		for k, v := range props {
-			q.Set("property."+k, v)
-		}
+	for k, v := range mergedProperties(r, id) {
+		q.Set("property."+k, v)
 	}
 	if id.TaxonomyID != 0 {
 		q.Set("taxonomyId", strconv.Itoa(id.TaxonomyID))
@@ -232,15 +279,18 @@ func referenceCatalogProblems(ctx context.Context, cat referenceCatalog, c appCo
 		}
 		r := *p.Reference
 		path := fmt.Sprintf("/inputs/%d/reference", i)
+		if !validReference(r) {
+			continue // referenceProblems reports it; nothing to ask the catalog
+		}
 		type check struct {
 			path string
 			id   referenceIdentity
 			what string
 		}
 		var checks []check
-		switch choiceOf(r) {
+		switch r.Choice {
 		case "app":
-			checks = append(checks, check{path, referenceIdentity{r.TaxonomyID, r.Assembly, r.Seqcol, r.Annotation, nil}, "the pinned reference"})
+			checks = append(checks, check{path, referenceIdentity{TaxonomyID: r.TaxonomyID, Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: r.Annotation}, "the pinned reference"})
 		case "user":
 			if len(r.Organisms) == 0 {
 				checks = append(checks, check{path, referenceIdentity{}, "any reference"})
@@ -288,15 +338,9 @@ func describeQuery(r portReference, id referenceIdentity) string {
 	if r.ToolVersion != "" {
 		parts = append(parts, "tool version "+r.ToolVersion)
 	}
-	q := referenceQuery(r, id)
-	var props []string
-	for k := range q {
-		if name, ok := strings.CutPrefix(k, "property."); ok {
-			props = append(props, name+"="+q.Get(k))
-		}
+	for _, k := range sortedKeys(mergedProperties(r, id)) {
+		parts = append(parts, k+"="+mergedProperties(r, id)[k])
 	}
-	sort.Strings(props)
-	parts = append(parts, props...)
 	if len(parts) == 0 {
 		return "any"
 	}
@@ -314,14 +358,22 @@ func storedReference(r *portReference) *store_dynamodb.PortReference {
 		}
 		return &store_dynamodb.ReferenceAnnotation{Provider: a.Provider, Version: a.Version}
 	}
+	props, defaultProps := r.Properties, map[string]string(nil)
+	if r.Default != nil {
+		defaultProps = r.Default.Properties
+	}
+	// Invalid properties (stored in warn mode) are dropped, never stored.
+	if !validReference(*r) {
+		props, defaultProps = nil, nil
+	}
 	s := &store_dynamodb.PortReference{
-		Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion, Choice: choiceOf(*r), TaxonomyID: r.TaxonomyID,
-		Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation), Properties: r.Properties,
+		Kind: r.Kind, AssetClass: r.AssetClass, ToolVersion: r.ToolVersion, Choice: r.Choice, TaxonomyID: r.TaxonomyID,
+		Assembly: r.Assembly, Seqcol: r.Seqcol, Annotation: annotation(r.Annotation), Properties: props,
 		Organisms: r.Organisms, Source: r.Source, SHA256: r.SHA256, License: r.License,
 	}
 	if r.Default != nil {
 		s.Default = &store_dynamodb.ReferenceIdentity{TaxonomyID: r.Default.TaxonomyID, Assembly: r.Default.Assembly,
-			Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation), Properties: r.Default.Properties}
+			Seqcol: r.Default.Seqcol, Annotation: annotation(r.Default.Annotation), Properties: defaultProps}
 	}
 	return s
 }
