@@ -279,6 +279,12 @@ func parseAppConfig(data []byte) (appConfig, error) {
 	if err := yaml.Unmarshal(data, &c); err != nil {
 		return appConfig{}, err
 	}
+	// A reference's choice is user (a run picks) unless it pins one (app).
+	for i := range c.Inputs {
+		if r := c.Inputs[i].Reference; r != nil && r.Choice == "" {
+			r.Choice = "user"
+		}
+	}
 	return c, nil
 }
 

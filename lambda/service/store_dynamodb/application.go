@@ -312,11 +312,13 @@ type PortReference struct {
 	Assembly    string               `dynamodbav:"assembly,omitempty"`
 	Seqcol      string               `dynamodbav:"seqcol,omitempty"`
 	Annotation  *ReferenceAnnotation `dynamodbav:"annotation,omitempty"`
-	Organisms   []int                `dynamodbav:"organisms,omitempty"`
-	Default     *ReferenceIdentity   `dynamodbav:"default,omitempty"`
-	Source      string               `dynamodbav:"source,omitempty"`
-	SHA256      string               `dynamodbav:"sha256,omitempty"`
-	License     string               `dynamodbav:"license,omitempty"`
+	// Properties every match has (a template's space, resolution, desc).
+	Properties map[string]string  `dynamodbav:"properties,omitempty"`
+	Organisms  []int              `dynamodbav:"organisms,omitempty"`
+	Default    *ReferenceIdentity `dynamodbav:"default,omitempty"`
+	Source     string             `dynamodbav:"source,omitempty"`
+	SHA256     string             `dynamodbav:"sha256,omitempty"`
+	License    string             `dynamodbav:"license,omitempty"`
 }
 
 // ReferenceAnnotation is an annotation release: GENCODE 50.
@@ -331,6 +333,7 @@ type ReferenceIdentity struct {
 	Assembly   string               `dynamodbav:"assembly,omitempty"`
 	Seqcol     string               `dynamodbav:"seqcol,omitempty"`
 	Annotation *ReferenceAnnotation `dynamodbav:"annotation,omitempty"`
+	Properties map[string]string    `dynamodbav:"properties,omitempty"`
 }
 
 // AppManifestVariant is the variant a resolved manifest belongs to.

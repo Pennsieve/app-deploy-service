@@ -313,11 +313,13 @@ type PortReference struct {
 	Assembly    string               `json:"assembly,omitempty"`
 	Seqcol      string               `json:"seqcol,omitempty"`
 	Annotation  *ReferenceAnnotation `json:"annotation,omitempty"`
-	Organisms   []int                `json:"organisms,omitempty"`
-	Default     *ReferenceIdentity   `json:"default,omitempty"`
-	Source      string               `json:"source,omitempty"`
-	SHA256      string               `json:"sha256,omitempty"`
-	License     string               `json:"license,omitempty"`
+	// Properties every match has (a template's space, resolution, desc).
+	Properties map[string]string  `json:"properties,omitempty"`
+	Organisms  []int              `json:"organisms,omitempty"`
+	Default    *ReferenceIdentity `json:"default,omitempty"`
+	Source     string             `json:"source,omitempty"`
+	SHA256     string             `json:"sha256,omitempty"`
+	License    string             `json:"license,omitempty"`
 }
 
 // ReferenceAnnotation is an annotation release: GENCODE 50.
@@ -332,6 +334,7 @@ type ReferenceIdentity struct {
 	Assembly   string               `json:"assembly,omitempty"`
 	Seqcol     string               `json:"seqcol,omitempty"`
 	Annotation *ReferenceAnnotation `json:"annotation,omitempty"`
+	Properties map[string]string    `json:"properties,omitempty"`
 }
 
 // AppManifestVariant is the variant a resolved manifest belongs to.
