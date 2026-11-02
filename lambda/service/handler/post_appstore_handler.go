@@ -206,9 +206,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		problems = manifestProblems(appYml)
 		if c, err := parseAppConfig(appYml); err == nil {
 			appCfg, haveAppCfg = c, true
-			// Each reference must resolve in environments-service's
-			// catalog; reported like the schema's problems.
-			problems = append(problems, referenceCatalogProblems(ctx, catalogFromEnv(), c)...)
 		} else {
 			log.Printf("warning: unable to parse the app.yml of %s %s: %v", application.Source.Url, application.Source.Tag, err)
 		}
@@ -263,6 +260,16 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			StatusCode: http.StatusUnprocessableEntity,
 			Body:       refusal.SetErrorStatus(ctx, errors.New(reason)),
 		}, nil
+	}
+
+	// References Pennsieve's catalog doesn't have: noted on the version, never
+	// refusing the release. A reference input describes a folder's contents;
+	// the catalog is one way to fill it, and runs ask for files otherwise.
+	if haveAppCfg {
+		if notes := referenceCatalogNotes(ctx, catalogFromEnv(), appCfg); len(notes) > 0 {
+			log.Printf("references of %s %s: %s", application.Source.Url, application.Source.Tag, strings.Join(notes, "; "))
+			problems = append(problems, notes...)
+		}
 	}
 
 	// The repository's CITATION.cff at this tag, typed by app.yml's

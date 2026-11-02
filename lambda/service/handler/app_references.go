@@ -264,11 +264,13 @@ func referenceQuery(r portReference, id referenceIdentity) url.Values {
 	return q
 }
 
-// referenceCatalogProblems checks that each input's reference resolves in
-// the catalog: a pinned one to a reference, a choice: user one to at least
-// one per organism it offers, and its default to one. A catalog that can't
-// be reached is logged and not held against the app.
-func referenceCatalogProblems(ctx context.Context, cat referenceCatalog, c appConfig) []string {
+// referenceCatalogNotes says which of the inputs' references Pennsieve's
+// catalog doesn't have: a pinned one, one per organism a choice: user one
+// offers, and its default. They're notes, not problems: the reference
+// describes what the input's folder holds, and a run on Pennsieve asks for
+// the files when the catalog has no match. A catalog that can't be reached
+// is logged and noted nothing.
+func referenceCatalogNotes(ctx context.Context, cat referenceCatalog, c appConfig) []string {
 	if cat == nil {
 		return nil
 	}
@@ -313,7 +315,7 @@ func referenceCatalogProblems(ctx context.Context, cat referenceCatalog, c appCo
 				return out
 			}
 			if n == 0 {
-				out = append(out, fmt.Sprintf("%s: Pennsieve's catalog has no %s %s for %s (%s)", ch.path, r.Kind, r.AssetClass, ch.what, describeQuery(r, ch.id)))
+				out = append(out, fmt.Sprintf("%s: Pennsieve's reference data has no %s %s for %s (%s); runs on Pennsieve ask for its files", ch.path, r.Kind, r.AssetClass, ch.what, describeQuery(r, ch.id)))
 			}
 		}
 	}

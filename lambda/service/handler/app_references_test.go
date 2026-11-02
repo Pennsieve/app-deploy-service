@@ -126,7 +126,7 @@ func TestReferenceCatalogProblems(t *testing.T) {
 	ctx := context.Background()
 
 	both := &fakeCatalog{matches: func(url.Values) int { return 1 }}
-	if ps := referenceCatalogProblems(ctx, both, cfg); len(ps) != 0 {
+	if ps := referenceCatalogNotes(ctx, both, cfg); len(ps) != 0 {
 		t.Errorf("both organisms in the catalog: %v", ps)
 	}
 	// One query per organism, then the default; each carries the class and range.
@@ -141,20 +141,20 @@ func TestReferenceCatalogProblems(t *testing.T) {
 		}
 		return 1
 	}}
-	if ps := referenceCatalogProblems(ctx, noMouse, cfg); len(ps) != 1 || !strings.Contains(ps[0], "/inputs/1/reference/organisms/1") || !strings.Contains(ps[0], "organism 10090") {
+	if ps := referenceCatalogNotes(ctx, noMouse, cfg); len(ps) != 1 || !strings.Contains(ps[0], "/inputs/1/reference/organisms/1") || !strings.Contains(ps[0], "organism 10090") {
 		t.Errorf("no mouse index: %v", ps)
 	}
 
 	down := &fakeCatalog{err: errors.New("connection refused")}
-	if ps := referenceCatalogProblems(ctx, down, cfg); len(ps) != 0 {
+	if ps := referenceCatalogNotes(ctx, down, cfg); len(ps) != 0 {
 		t.Errorf("an unreachable catalog was held against the app: %v", ps)
 	}
-	if ps := referenceCatalogProblems(ctx, nil, cfg); ps != nil {
+	if ps := referenceCatalogNotes(ctx, nil, cfg); ps != nil {
 		t.Errorf("no catalog configured: %v", ps)
 	}
 
 	refuses := &fakeCatalog{err: catalogRefusal("toolVersion: bad")}
-	if ps := referenceCatalogProblems(ctx, refuses, cfg); len(ps) != 1 || !strings.Contains(ps[0], "refused") {
+	if ps := referenceCatalogNotes(ctx, refuses, cfg); len(ps) != 1 || !strings.Contains(ps[0], "refused") {
 		t.Errorf("refused query: %v", ps)
 	}
 }
@@ -288,7 +288,7 @@ func TestReferencePropertyProblems(t *testing.T) {
 	if ps := referenceProblems(cfg); len(ps) != 1 || !strings.Contains(ps[0], "/inputs/1/reference/properties/desc") {
 		t.Errorf("problems = %v", ps)
 	}
-	if referenceCatalogProblems(context.Background(), cat, cfg); asked != 0 {
+	if referenceCatalogNotes(context.Background(), cat, cfg); asked != 0 {
 		t.Errorf("an invalid reference was sent to the catalog")
 	}
 	if r := resolveVariants(cfg).versionManifest().Inputs[1].Reference; r.Properties != nil {
@@ -309,7 +309,7 @@ func TestTemplateReferenceQueryAndStore(t *testing.T) {
 	}
 	var asked []url.Values
 	cat := &fakeCatalog{matches: func(q url.Values) int { asked = append(asked, q); return 1 }}
-	if ps := referenceCatalogProblems(context.Background(), cat, cfg); len(ps) != 0 {
+	if ps := referenceCatalogNotes(context.Background(), cat, cfg); len(ps) != 0 {
 		t.Fatalf("problems = %v", ps)
 	}
 	if len(asked) != 1 || asked[0].Get("kind") != "template" || asked[0].Get("property.space") != "MNI152NLin2009cAsym" ||
@@ -317,7 +317,7 @@ func TestTemplateReferenceQueryAndStore(t *testing.T) {
 		t.Errorf("asked = %v", asked)
 	}
 	none := &fakeCatalog{matches: func(url.Values) int { return 0 }}
-	ps := referenceCatalogProblems(context.Background(), none, cfg)
+	ps := referenceCatalogNotes(context.Background(), none, cfg)
 	if len(ps) != 1 || !strings.Contains(ps[0], "space=MNI152NLin2009cAsym") {
 		t.Errorf("no match: %v", ps)
 	}

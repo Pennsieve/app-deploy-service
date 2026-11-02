@@ -1,6 +1,6 @@
 # Reference inputs in app.yml
 
-Some apps need shared, published data besides the user's files: a genome index, or a brain template, for example. app.yml marks such an input with a **`reference`**. The data is described by public identifiers (organism, assembly, annotation release, what the asset is, which tool versions can read it) and where to get it, so the app isn't tied to Pennsieve. On Pennsieve the input is filled from the reference catalog. `reference` is optional; an app.yml without it is read and stored exactly as before.
+Some apps need shared, published data besides the user's files: a genome index, or a brain template, for example. app.yml marks such an input with a **`reference`**. The data is described by public identifiers (organism, assembly, annotation release, what the asset is, which tool versions can read it) and where to get it, so the app isn't tied to Pennsieve. On Pennsieve the input is filled from the reference catalog when it has a match; otherwise a run asks for the files. `reference` is optional; an app.yml without it is read and stored exactly as before.
 
 The design (the catalog, delivery to steps, standards) is in the design note [References in environments-service](https://claude.ai/artifact/Ak8u7r6H3tyxvuZQJDPMGk) and environments-service `docs/design.md`.
 
@@ -86,5 +86,6 @@ With the schema's other checks, and handled the same way (`APP_MANIFEST_VALIDATI
 - the reference follows the schema;
 - only inputs have one, each with `placement: subfolder`;
 - a `choice: user` default is one of its `organisms`;
-- the app and each variant run somewhere other than only `lambda`;
-- **the catalog has a match:** for a pinned reference, the reference; for `choice: user`, one per organism offered (or any, without `organisms`) and the default. The catalog does the matching, tool-version ranges included, so registration and runs agree. If the catalog can't be reached, this check is skipped and logged, not held against the app.
+- the app and each variant run somewhere other than only `lambda`.
+
+Separately, and **never refusing a release** in either mode, registration notes on the version when Pennsieve's catalog has **no match**: for a pinned reference, the reference; for `choice: user`, one per organism offered (or any, without `organisms`) and the default. A `reference` describes what the input's folder holds, in public identifiers; the catalog is one way to fill it. An app may describe data Pennsieve doesn't keep: on Pennsieve, a run then asks for the input's files (as for "Use your own files instead"). The catalog does the matching, tool-version ranges included, so the note and runs agree. If the catalog can't be reached, nothing is noted.
