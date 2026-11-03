@@ -47,15 +47,21 @@ login() { # <registry>
   aws ecr get-login-password --region "$region" | crane auth login "$1" -u AWS --password-stdin >/dev/null
 }
 
-# delete_tags <registry> <repo> <tag>... deletes the tags that exist.
+# delete_tags <registry> <repo> <tag>... deletes the tags that exist; fails,
+# printing why, when one that exists cannot be deleted (an image another
+# index still references, say).
 delete_tags() {
   _registry=$1; _repo=$2; shift 2
   _region=$(echo "$_registry" | cut -d. -f4)
   _ids=""
   for _t in "$@"; do _ids="$_ids imageTag=$_t"; done
   # shellcheck disable=SC2086
-  aws ecr batch-delete-image --region "$_region" --repository-name "$_repo" \
-    --image-ids $_ids --query 'failures[?failureCode!=`ImageNotFound`]' --output text
+  _failures=$(aws ecr batch-delete-image --region "$_region" --repository-name "$_repo" \
+    --image-ids $_ids --query 'failures[?failureCode!=`ImageNotFound`].[imageId.imageTag,failureReason]' --output text)
+  if [ -n "$_failures" ]; then
+    echo "$_failures" >&2
+    return 1
+  fi
 }
 
 login "${RUNTIME_IMAGE%%/*}"
@@ -65,6 +71,7 @@ log "runtime layer from $RUNTIME_IMAGE ($(wc -c <"$layer" | tr -d ' ') bytes)"
 
 logged=" "
 repos=" "
+failed=0
 while IFS= read -r image; do
   [ -n "$image" ] || continue
   registry=${image%%/*}
@@ -82,8 +89,20 @@ while IFS= read -r image; do
   tag=${repo_and_tag##*:}
   case "$repos" in *" $registry/$repo "*) ;; *) repos="$repos$registry/$repo " ;; esac
   temp="$image-rt"
-  crane mutate "$image" --append "$layer" --label "$label=$version" --tag "$temp" >/dev/null
-  delete_tags "$registry" "$repo" "$tag" "$tag-soci"
+  # The old image is untouched until the new one is in the repository, so a
+  # failure here (an image with no linux/amd64 manifest, say) leaves it as it
+  # was: log it and go on to the next.
+  if ! crane mutate "$image" --append "$layer" --label "$label=$version" --tag "$temp" >/dev/null; then
+    log "$image: FAILED, left as it was"
+    failed=$((failed + 1))
+    continue
+  fi
+  if ! delete_tags "$registry" "$repo" "$tag" "$tag-soci"; then
+    log "$image: FAILED, the old image cannot be deleted; left as it was"
+    delete_tags "$registry" "$repo" "$tag-rt" || true
+    failed=$((failed + 1))
+    continue
+  fi
   crane tag "$temp" "$tag" >/dev/null
   delete_tags "$registry" "$repo" "$tag-rt"
   log "$image: runtime $version appended"
@@ -101,3 +120,8 @@ for r in $repos; do
     log "$r:$t: stray index removed"
   done
 done
+
+if [ "$failed" -gt 0 ]; then
+  log "$failed image(s) failed"
+  exit 1
+fi
