@@ -158,6 +158,52 @@ label on Lambda ("rebuild the app").
   backfill is the versions whose `computeTypes` include `lambda`. Run it per
   environment before its nodes are updated.
 
+### Lambda eligibility
+
+Because every image carries the runtime, authors don't opt in to Lambda:
+app.yml's `runtime.computeTypes` declares only `standard` and/or `gpu`
+(`lambda` is still accepted, and no longer needed), and the platform decides
+from facts whether a version (each variant) also runs as a Lambda step. The
+author can opt out with `runtime.optimize: false` (top level or a variant's
+runtime; default true): the app then runs only as `computeTypes` declares it,
+never on a runtime Pennsieve picks (Lambda today, others later).
+
+When a build succeeds the status lambda reads the image it pushed, by digest
+(ECR `BatchGetImage`, the linux/amd64 manifest of an image index, then the
+config blob through `GetDownloadUrlForLayer`), and records `lambda` next to
+`imageDigest`, in the same update, on the version and/or `variants.<id>`:
+
+```json
+{"eligible": false, "reasons": ["it runs on GPU only"], "imageBytes": 2147483648, "checkedAt": "2026-11-03T12:00:00Z"}
+```
+
+`imageBytes` is the compressed size (the sum of the layers). A version is
+**not** eligible, with a reason for each that applies, when:
+
+| Rule | Reason |
+|---|---|
+| `runtime.optimize: false` | the app opts out of optimized runtimes (runtime.optimize: false) |
+| `computeTypes` is `[gpu]` | it runs on GPU only |
+| interactive | interactive sessions don't run on Lambda |
+| an input has a `reference` | it reads reference data, which a Lambda step can't |
+| `memory` > 10240 MiB | it needs N GB of memory; a Lambda step has at most 10 GB |
+| `cpu` > 6144 units | it needs N vCPU; a Lambda step has at most 6 |
+| `timeoutSeconds` > 840 (unset is fine) | it may run up to …; a Lambda step runs at most 14 minutes |
+| image > 10 GB compressed | the image is N GB; Lambda takes images up to 10 GB |
+| no `net.pennsieve.lambda-step-runtime` label | the image has no Lambda step runtime: rebuild the app |
+| not linux/amd64 | the image is not linux/amd64 |
+
+The image limits are the ones compute-node-aws-provisioner checks when it
+creates a step's function (`internal/aslconverter/lambda_image.go`); the rules
+are `lambda/status/lambdaeligibility`. A failure to read the image is logged
+and leaves `lambda` unset; the digest and the build's status are recorded as
+usual. Versions built before this are decided by
+`lambda/status/cmd/backfill-lambda-eligibility` (`APPSTORE_VERSIONS_TABLE=...
+go run ./cmd/backfill-lambda-eligibility [-dry-run]`), which reads each
+version's and variant's image by its recorded digest (else its tag); it can
+be rerun, and should be after `runtime.optimize` changes for a stored manifest
+(for example after `backfill-manifests`).
+
 ### Cache
 
 - One cache per app: the tag `app-<sha256(sourceUrl)[:40]>` in
@@ -312,11 +358,12 @@ So a review verdict can be tied to the exact code and image tested, a version re
 | `commitSha` | service lambda, at registration | The commit the release tag points to (GitHub `GET /repos/{owner}/{repo}/commits/{tag}`), so a tag moved later doesn't change what was built. Empty when GitHub couldn't say; a failed lookup is logged and never blocks the release. |
 | `imageDigest` | status lambda, when the build succeeds | The digest ECR gives the pushed tag (`DescribeImages`): the image of an app without variants, or of the default variant. |
 | `variants.<id>.imageDigest` | status lambda, when that variant's build succeeds | The variant's image digest (`<hash>-<tag>--<id>`; the default variant's is also the version's `imageDigest`). |
+| `lambda`, `variants.<id>.lambda` | status lambda, with the digest | Whether the version (variant) can run as a Lambda step, and why not ([Lambda eligibility](#lambda-eligibility)). |
 | `review` | service lambda, at registration | app.yml's `review` block ([app-manifest-review.md](app-manifest-review.md)) as parsed: what a review run uses. Parts that don't parse are left out (the schema reports them). |
 
 The digest is the tag's at the moment the build ends, recorded before the status says
 `deployed`. A digest that can't be read (no `destinationUrl`, an ECR error, the tag not
-found) is logged as a warning and the build's status is recorded as usual. All four are
+found) is logged as a warning and the build's status is recorded as usual. All of them are
 in the API's version model. Versions registered before these were kept have none of them.
 
 ## Environments

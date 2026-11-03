@@ -104,6 +104,10 @@ func resolveVariant(top appConfig, topBuild *appBuild, v appVariant) resolvedVar
 	if v.Runtime.LLM != nil {
 		cfg.Runtime.LLM = *v.Runtime.LLM
 	}
+	if v.Runtime.Optimize != nil {
+		optimize := *v.Runtime.Optimize
+		cfg.Runtime.Optimize = &optimize
+	}
 	if len(top.Parameters) > 0 {
 		cfg.Parameters = make([]appParameter, len(top.Parameters))
 		for i, p := range top.Parameters {

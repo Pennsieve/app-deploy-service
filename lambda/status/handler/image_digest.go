@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
+	"github.com/pennsieve/app-deploy-service/status/lambdaeligibility"
 	"github.com/pennsieve/app-deploy-service/status/models"
 )
 
@@ -38,50 +42,133 @@ func variantImage(destination string, ids DeploymentApplicationIds) string {
 // recordImageDigest records the digest of the image a successful App Store
 // build pushed: imageDigest on the version for an app without variants or
 // the default variant, variants.<id>.imageDigest for a variant (the default
-// gets both). Any failure is logged; it never fails the event or changes
-// the build's status.
+// gets both). With it, in the same update, it records whether the version
+// (variant) can run as a Lambda step (lambda), from its stored manifest's
+// runtime and the image (lambdaeligibility). Any failure is logged; it
+// never fails the event or changes the build's status, and a failure to
+// decide eligibility still records the digest.
 func (h *DeployTaskStateChangeHandler) recordImageDigest(ctx context.Context, ids DeploymentApplicationIds, tableName string) {
 	if h.ECRApi == nil {
 		return
 	}
 	logger := h.logger.With(slog.String("variant", ids.Variant))
-	destination, err := h.versionDestination(ctx, ids.ApplicationId, tableName)
+	rec, err := h.versionImageRecord(ctx, ids.ApplicationId, ids.Variant, tableName)
 	if err != nil {
 		logger.Warn("unable to read the version's image; its digest is not recorded", slog.Any("error", err))
 		return
 	}
-	image := variantImage(destination, ids)
+	image := variantImage(rec.Destination, ids)
 	digest, err := h.imageDigest(ctx, image)
 	if err != nil {
 		logger.Warn("unable to read the image's digest; it is not recorded", slog.String("image", image), slog.Any("error", err))
 		return
 	}
 	logger.Info("recording image digest", slog.String("image", image), slog.String("digest", digest))
+	facts, factsErr := lambdaeligibility.ReadImage(ctx, h.ECRApi, h.httpClient(), imageByDigest(image, digest))
+	if factsErr != nil {
+		logger.Warn("unable to read the image; its Lambda eligibility is not recorded", slog.String("image", image), slog.Any("error", factsErr))
+	}
+	eligibility := func(m *lambdaeligibility.Manifest) *lambdaeligibility.Eligibility {
+		if factsErr != nil {
+			return nil
+		}
+		e := decideEligibility(m, facts, time.Now())
+		logger.Info("recording Lambda eligibility", slog.Bool("eligible", e.Eligible), slog.Any("reasons", e.Reasons))
+		return &e
+	}
 	if ids.Variant == "" || ids.VariantDefault {
-		h.setImageDigest(ctx, logger, ids.ApplicationId, "", digest, tableName)
+		h.setImageDigest(ctx, logger, ids.ApplicationId, "", digest, eligibility(rec.Manifest), tableName)
 	}
 	if ids.Variant != "" {
-		h.setImageDigest(ctx, logger, ids.ApplicationId, ids.Variant, digest, tableName)
+		m := rec.VariantManifest
+		if m == nil {
+			m = rec.Manifest
+		}
+		h.setImageDigest(ctx, logger, ids.ApplicationId, ids.Variant, digest, eligibility(m), tableName)
 	}
 }
 
-// versionDestination is the version's destinationUrl: the image the
-// provisioner pushed the release (or its default variant) to.
-func (h *DeployTaskStateChangeHandler) versionDestination(ctx context.Context, versionId, tableName string) (string, error) {
+// decideEligibility is a manifest's (nil: an app without app.yml, which
+// declares nothing) eligibility with its image.
+func decideEligibility(m *lambdaeligibility.Manifest, facts lambdaeligibility.ImageFacts, now time.Time) lambdaeligibility.Eligibility {
+	var rt lambdaeligibility.Runtime
+	if m != nil {
+		rt = m.Runtime
+	}
+	return lambdaeligibility.Decide(rt, facts, m.HasReferenceInputs(), now)
+}
+
+// imageByDigest is the image by its digest: exactly what was pushed, even if
+// the tag moves.
+func imageByDigest(image, digest string) string {
+	if i := strings.LastIndex(image, ":"); i > strings.LastIndex(image, "/") {
+		image = image[:i]
+	}
+	return image + "@" + digest
+}
+
+func (h *DeployTaskStateChangeHandler) httpClient() lambdaeligibility.HTTPDoer {
+	if h.HTTPClient != nil {
+		return h.HTTPClient
+	}
+	return &http.Client{Timeout: 30 * time.Second}
+}
+
+// versionImage is what recording a build's image reads of its version: its
+// image and the manifests (the version's, the variant's) eligibility needs.
+type versionImage struct {
+	Destination     string
+	Manifest        *lambdaeligibility.Manifest
+	VariantManifest *lambdaeligibility.Manifest
+}
+
+// versionImageRecord reads the version's destinationUrl (the image the
+// provisioner pushed the release, or its default variant, to) and the
+// runtime and inputs of its manifest and of the variant's.
+func (h *DeployTaskStateChangeHandler) versionImageRecord(ctx context.Context, versionId, variant, tableName string) (versionImage, error) {
+	var rec versionImage
+	names := map[string]string{
+		"#d":  models.ApplicationDestinationUrlField,
+		"#m":  models.ManifestField,
+		"#rt": models.ManifestRuntimeField,
+		"#in": models.ManifestInputsField,
+	}
+	projection := "#d, #m.#rt, #m.#in"
+	if variant != "" {
+		names["#vs"], names["#v"] = models.VariantsField, variant
+		projection += ", #vs.#v.#m.#rt, #vs.#v.#m.#in"
+	}
 	out, err := h.DynamoDBApi.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName:                aws.String(tableName),
 		Key:                      models.ApplicationKey(versionId),
-		ProjectionExpression:     aws.String("#d"),
-		ExpressionAttributeNames: map[string]string{"#d": models.ApplicationDestinationUrlField},
+		ProjectionExpression:     aws.String(projection),
+		ExpressionAttributeNames: names,
 	})
 	if err != nil {
-		return "", fmt.Errorf("error reading version %s: %w", versionId, err)
+		return rec, fmt.Errorf("error reading version %s: %w", versionId, err)
 	}
 	d, ok := out.Item[models.ApplicationDestinationUrlField].(*types.AttributeValueMemberS)
 	if !ok || strings.TrimSpace(d.Value) == "" {
-		return "", fmt.Errorf("version %s has no destinationUrl", versionId)
+		return rec, fmt.Errorf("version %s has no destinationUrl", versionId)
 	}
-	return strings.TrimSpace(d.Value), nil
+	rec.Destination = strings.TrimSpace(d.Value)
+	var item struct {
+		Manifest *lambdaeligibility.Manifest `dynamodbav:"manifest"`
+		Variants map[string]struct {
+			Manifest *lambdaeligibility.Manifest `dynamodbav:"manifest"`
+		} `dynamodbav:"variants"`
+	}
+	// A manifest that can't be read is decided as one that declares
+	// nothing; its image still is.
+	if err := attributevalue.UnmarshalMap(out.Item, &item); err != nil {
+		h.logger.Warn("unable to read the version's manifest", slog.String("version", versionId), slog.Any("error", err))
+		return rec, nil
+	}
+	rec.Manifest = item.Manifest
+	if variant != "" {
+		rec.VariantManifest = item.Variants[variant].Manifest
+	}
+	return rec, nil
 }
 
 // imageDigest asks ECR for the digest an image tag points to. The image is
@@ -112,10 +199,10 @@ func (h *DeployTaskStateChangeHandler) imageDigest(ctx context.Context, image st
 	return "", fmt.Errorf("tag %s not found in %s", tag, repo)
 }
 
-// setImageDigest sets imageDigest on the version (variant "") or on one of
-// its variants, which must already be recorded.
-func (h *DeployTaskStateChangeHandler) setImageDigest(ctx context.Context, logger *slog.Logger, versionId, variant, digest, tableName string) {
-	in, err := ImageDigestUpdate(versionId, variant, digest, tableName)
+// setImageDigest sets imageDigest, and lambda when decided, on the version
+// (variant "") or on one of its variants, which must already be recorded.
+func (h *DeployTaskStateChangeHandler) setImageDigest(ctx context.Context, logger *slog.Logger, versionId, variant, digest string, lambda *lambdaeligibility.Eligibility, tableName string) {
+	in, err := ImageDigestUpdate(versionId, variant, digest, lambda, tableName)
 	if err == nil {
 		_, err = h.DynamoDBApi.UpdateItem(ctx, in)
 	}
@@ -124,16 +211,28 @@ func (h *DeployTaskStateChangeHandler) setImageDigest(ctx context.Context, logge
 	}
 }
 
-// ImageDigestUpdate is the update setImageDigest makes.
-func ImageDigestUpdate(versionId, variant, digest, tableName string) (*dynamodb.UpdateItemInput, error) {
-	field, exists := models.ImageDigestField, models.ApplicationKeyField
+// ImageDigestUpdate is the update setImageDigest makes: imageDigest (unless
+// digest is empty) and lambda (unless nil), on the version or a variant.
+func ImageDigestUpdate(versionId, variant, digest string, lambda *lambdaeligibility.Eligibility, tableName string) (*dynamodb.UpdateItemInput, error) {
+	prefix, exists := "", models.ApplicationKeyField
 	if variant != "" {
-		field = models.VariantsField + "." + variant + "." + models.ImageDigestField
+		prefix = models.VariantsField + "." + variant + "."
 		exists = models.VariantsField + "." + variant
+	}
+	var update expression.UpdateBuilder
+	set := false
+	if digest != "" {
+		update, set = update.Set(expression.Name(prefix+models.ImageDigestField), expression.Value(digest)), true
+	}
+	if lambda != nil {
+		update, set = update.Set(expression.Name(prefix+models.LambdaEligibilityField), expression.Value(lambda)), true
+	}
+	if !set {
+		return nil, fmt.Errorf("nothing to record on %s", versionId)
 	}
 	expressions, err := expression.NewBuilder().
 		WithCondition(expression.AttributeExists(expression.Name(exists))).
-		WithUpdate(expression.Set(expression.Name(field), expression.Value(digest))).Build()
+		WithUpdate(update).Build()
 	if err != nil {
 		return nil, fmt.Errorf("error building the image digest update of %s: %w", versionId, err)
 	}

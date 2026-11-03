@@ -189,6 +189,20 @@ type AppStoreVersion struct {
 	// ImageDigest: the digest of the image built for this version (the
 	// default variant's, with variants); absent until its build succeeds.
 	ImageDigest string `json:"imageDigest,omitempty"`
+	// Lambda: whether the version can run as a Lambda step, and why not;
+	// absent until its build succeeds.
+	Lambda *LambdaEligibility `json:"lambda,omitempty"`
+}
+
+// LambdaEligibility is the platform's decision whether a version (or a
+// variant) runs as a Lambda step. Reasons: why not, all that apply.
+// ImageBytes: the image's compressed size (the sum of its layers).
+// CheckedAt: when it was decided, RFC 3339.
+type LambdaEligibility struct {
+	Eligible   bool     `json:"eligible"`
+	Reasons    []string `json:"reasons,omitempty"`
+	ImageBytes int64    `json:"imageBytes,omitempty"`
+	CheckedAt  string   `json:"checkedAt"`
 }
 
 // AppReview is a version's app.yml review block: per input port where a
@@ -284,6 +298,9 @@ type AppStoreVariant struct {
 	// ImageDigest: the digest of the variant's image; absent until its
 	// build succeeds.
 	ImageDigest string `json:"imageDigest,omitempty"`
+	// Lambda: whether the variant can run as a Lambda step; absent until
+	// its build succeeds.
+	Lambda *LambdaEligibility `json:"lambda,omitempty"`
 }
 
 // AppManifest is a version's app.yml: what the app is, what it asks for, its
@@ -360,6 +377,10 @@ type AppRuntime struct {
 	Interactive bool   `json:"interactive,omitempty"`
 	SessionType string `json:"sessionType,omitempty"`
 	Kernel      string `json:"kernel,omitempty"`
+	// Optimize: app.yml's runtime.optimize; false runs the app only as
+	// computeTypes declares it, absent lets Pennsieve pick an optimized
+	// runtime it fits, such as Lambda.
+	Optimize *bool `json:"optimize,omitempty"`
 }
 
 type AppMaintainer struct {

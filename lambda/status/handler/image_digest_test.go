@@ -3,10 +3,14 @@ package handler
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	ecrtypes "github.com/aws/aws-sdk-go-v2/service/ecr/types"
@@ -26,6 +30,11 @@ type fakeECR struct {
 	digests map[string]string // tag → digest
 	err     error
 	calls   []*ecr.DescribeImagesInput
+	// images are manifests by tag or digest, blobs serves config blobs by
+	// digest: without them an image can't be read, so no eligibility.
+	images        map[string]string
+	blobs         *httptest.Server
+	manifestReads []*ecr.BatchGetImageInput
 }
 
 func (f *fakeECR) DescribeImages(_ context.Context, in *ecr.DescribeImagesInput, _ ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {
@@ -39,6 +48,22 @@ func (f *fakeECR) DescribeImages(_ context.Context, in *ecr.DescribeImagesInput,
 		return nil, &ecrtypes.ImageNotFoundException{Message: aws.String("not found")}
 	}
 	return &ecr.DescribeImagesOutput{ImageDetails: []ecrtypes.ImageDetail{{ImageDigest: aws.String(digest), ImageTags: []string{tag}}}}, nil
+}
+
+// BatchGetImage answers from images (tag or digest → manifest), or fails
+// like an image ECR doesn't have.
+func (f *fakeECR) BatchGetImage(_ context.Context, in *ecr.BatchGetImageInput, _ ...func(*ecr.Options)) (*ecr.BatchGetImageOutput, error) {
+	f.manifestReads = append(f.manifestReads, in)
+	key := aws.ToString(in.ImageIds[0].ImageTag) + aws.ToString(in.ImageIds[0].ImageDigest)
+	m, ok := f.images[key]
+	if !ok {
+		return nil, errors.New("AccessDeniedException")
+	}
+	return &ecr.BatchGetImageOutput{Images: []ecrtypes.Image{{ImageManifest: aws.String(m), ImageManifestMediaType: aws.String("application/vnd.oci.image.manifest.v1+json")}}}, nil
+}
+
+func (f *fakeECR) GetDownloadUrlForLayer(_ context.Context, in *ecr.GetDownloadUrlForLayerInput, _ ...func(*ecr.Options)) (*ecr.GetDownloadUrlForLayerOutput, error) {
+	return &ecr.GetDownloadUrlForLayerOutput{DownloadUrl: aws.String(f.blobs.URL + "/" + aws.ToString(in.LayerDigest))}, nil
 }
 
 // digestUpdates spells out the version updates that set an image digest,
@@ -203,4 +228,112 @@ func TestVariantImage(t *testing.T) {
 	for _, c := range cases {
 		assert.Equal(t, c.want, variantImage("repo:1-v1", DeploymentApplicationIds{Variant: c.variant, VariantDefault: c.isDefault}))
 	}
+}
+
+// fakeLambdaImage is an ECR whose images all have the Lambda step runtime,
+// 2 GB compressed, linux/amd64.
+func fakeLambdaImage(t *testing.T) *fakeECR {
+	blobs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"os":"linux","architecture":"amd64","config":{"Labels":{"net.pennsieve.lambda-step-runtime":"1.0.0"}}}`))
+	}))
+	t.Cleanup(blobs.Close)
+	manifest := `{"config":{"digest":"sha256:config"},"layers":[{"size":1500000000},{"size":500000000}]}`
+	return &fakeECR{
+		digests: map[string]string{testImageTag: "sha256:cpu", testImageTag + "--gpu": "sha256:gpu"},
+		images:  map[string]string{"sha256:cpu": manifest, "sha256:gpu": manifest},
+		blobs:   blobs,
+	}
+}
+
+func runtimeAV(fields map[string]types.AttributeValue) *types.AttributeValueMemberM {
+	return &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{"runtime": &types.AttributeValueMemberM{Value: fields}}}
+}
+
+// lambdaValue is the eligibility an update sets at path.
+func lambdaValue(t *testing.T, u *dynamodb.UpdateItemInput, path string) map[string]types.AttributeValue {
+	for _, m := range regexp.MustCompile(`((?:#\w+\.)*#\w+) = (:\w+)`).FindAllStringSubmatch(aws.ToString(u.UpdateExpression), -1) {
+		if readable(m[1], u) == path {
+			v, ok := u.ExpressionAttributeValues[m[2]].(*types.AttributeValueMemberM)
+			require.True(t, ok, "%s is a map", path)
+			return v.Value
+		}
+	}
+	t.Fatalf("no %s in %s", path, readable(aws.ToString(u.UpdateExpression), u))
+	return nil
+}
+
+func reasons(t *testing.T, l map[string]types.AttributeValue) []string {
+	r, ok := l["reasons"].(*types.AttributeValueMemberL)
+	if !ok {
+		return nil
+	}
+	var out []string
+	for _, v := range r.Value {
+		out = append(out, stringValue(t, v))
+	}
+	return out
+}
+
+// With the digest, the version (and a variant) records whether it can run
+// on Lambda: from the image (read by its digest) and its own manifest.
+func TestHandleBuild_RecordsLambdaEligibility(t *testing.T) {
+	h, db, _, _, _ := newBuildTestHandler()
+	db.items = map[string]map[string]types.AttributeValue{testVersionsTable: versionWithGPUVariant()}
+	fake := fakeLambdaImage(t)
+	h.WithECR(fake)
+	h.HTTPClient = fake.blobs.Client()
+
+	require.NoError(t, h.HandleEvent(context.Background(), buildEvent(models.BuildSucceeded, true)))
+	updates := db.tableUpdates(testVersionsTable)
+	require.Len(t, updates, 2)
+	l := lambdaValue(t, updates[0], "lambda")
+	assert.Equal(t, &types.AttributeValueMemberBOOL{Value: true}, l["eligible"])
+	assert.Equal(t, &types.AttributeValueMemberN{Value: "2000000000"}, l["imageBytes"])
+	assert.Nil(t, l["reasons"])
+	assert.Regexp(t, `^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$`, stringValue(t, l["checkedAt"]))
+	assert.Contains(t, readable(aws.ToString(updates[0].UpdateExpression), updates[0]), `imageDigest = "sha256:cpu"`)
+	require.NotEmpty(t, fake.manifestReads)
+	assert.Equal(t, "sha256:cpu", aws.ToString(fake.manifestReads[0].ImageIds[0].ImageDigest), "the image as pushed")
+	get := db.gets[0]
+	assert.Equal(t, "#d, #m.#rt, #m.#in", aws.ToString(get.ProjectionExpression))
+
+	// another variant: its own manifest
+	h, db, _, _, _ = newBuildTestHandler()
+	db.items = map[string]map[string]types.AttributeValue{testVersionsTable: versionWithGPUVariant()}
+	h.WithECR(fake)
+	h.HTTPClient = fake.blobs.Client()
+	require.NoError(t, h.HandleEvent(context.Background(), variantBuildEvent(models.BuildSucceeded, "gpu", false)))
+	updates = db.tableUpdates(testVersionsTable)
+	require.Len(t, updates, 2)
+	l = lambdaValue(t, updates[0], "variants.gpu.lambda")
+	assert.Equal(t, &types.AttributeValueMemberBOOL{Value: false}, l["eligible"])
+	assert.Equal(t, []string{"it runs on GPU only"}, reasons(t, l))
+	assert.Equal(t, "attribute_exists (variants.gpu)", readable(aws.ToString(updates[0].ConditionExpression), updates[0]))
+	assert.Equal(t, "#d, #m.#rt, #m.#in, #vs.#v.#m.#rt, #vs.#v.#m.#in", aws.ToString(db.gets[0].ProjectionExpression))
+	assert.Equal(t, "gpu", db.gets[0].ExpressionAttributeNames["#v"])
+}
+
+// versionWithGPUVariant is a version item: 4 GiB, with a GPU-only variant.
+func versionWithGPUVariant() map[string]types.AttributeValue {
+	return map[string]types.AttributeValue{
+		models.ApplicationDestinationUrlField: &types.AttributeValueMemberS{Value: testDestination},
+		"manifest":                            runtimeAV(map[string]types.AttributeValue{"memory": &types.AttributeValueMemberN{Value: "4096"}}),
+		"variants": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+			"gpu": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+				"manifest": runtimeAV(map[string]types.AttributeValue{
+					"computeTypes": &types.AttributeValueMemberL{Value: []types.AttributeValue{&types.AttributeValueMemberS{Value: "gpu"}}},
+				}),
+			}},
+		}},
+	}
+}
+
+func TestImageByDigest(t *testing.T) {
+	assert.Equal(t, "1.dkr.ecr.us-east-1.amazonaws.com/repo@sha256:a", imageByDigest("1.dkr.ecr.us-east-1.amazonaws.com/repo:tag--gpu", "sha256:a"))
+	assert.Equal(t, "localhost:5000/repo@sha256:a", imageByDigest("localhost:5000/repo", "sha256:a"))
+}
+
+func TestImageDigestUpdate_NothingToRecord(t *testing.T) {
+	_, err := ImageDigestUpdate("version-1", "", "", nil, testVersionsTable)
+	assert.Error(t, err)
 }

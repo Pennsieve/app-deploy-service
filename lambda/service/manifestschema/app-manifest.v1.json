@@ -148,13 +148,17 @@
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
-          "description": "The compute the app can run on: standard (a container), lambda, or gpu. Default: [standard].",
+          "description": "The compute the app can run on: standard (a container) or gpu. Default: [standard]. Whether the app also runs as a Lambda step is decided by the platform from its runtime and image (see optimize), so listing lambda is no longer needed; it is still accepted.",
           "items": { "type": "string", "enum": ["standard", "lambda", "gpu"] }
         },
         "timeoutSeconds": {
           "type": "integer",
           "minimum": 1,
           "description": "How long a run may take before it's stopped."
+        },
+        "optimize": {
+          "type": "boolean",
+          "description": "false runs the app only as computeTypes declares it; otherwise Pennsieve may run it on an optimized runtime it fits, such as Lambda. Default: true."
         },
         "llm": {
           "type": "boolean",
@@ -268,7 +272,8 @@
         "memory": { "$ref": "#/$defs/runtime/properties/memory" },
         "computeTypes": { "$ref": "#/$defs/runtime/properties/computeTypes" },
         "timeoutSeconds": { "$ref": "#/$defs/runtime/properties/timeoutSeconds" },
-        "llm": { "$ref": "#/$defs/runtime/properties/llm" }
+        "llm": { "$ref": "#/$defs/runtime/properties/llm" },
+        "optimize": { "$ref": "#/$defs/runtime/properties/optimize" }
       }
     },
     "parameterOverride": {

@@ -160,6 +160,23 @@ type AppStoreVersion struct {
 	// default variant's, with variants), recorded by the status lambda when
 	// the build succeeds; empty until then, or when it couldn't be read.
 	ImageDigest string `dynamodbav:"imageDigest,omitempty"`
+	// Lambda is whether the version's image (the default variant's, with
+	// variants) can run as a Lambda step, recorded by the status lambda
+	// with ImageDigest (docs/builds.md); nil until then.
+	Lambda *LambdaEligibility `dynamodbav:"lambda,omitempty"`
+}
+
+// LambdaEligibility is the platform's decision whether a version (or a
+// variant) runs as a Lambda step, from its runtime and its image. Reasons
+// are why it doesn't, all that apply; ImageBytes is the image's compressed
+// size (the sum of its layers); CheckedAt is when it was decided (RFC 3339).
+// The status lambda writes it (lambda/status/lambdaeligibility); this
+// service only reads it.
+type LambdaEligibility struct {
+	Eligible   bool     `dynamodbav:"eligible" json:"eligible"`
+	Reasons    []string `dynamodbav:"reasons,omitempty" json:"reasons,omitempty"`
+	ImageBytes int64    `dynamodbav:"imageBytes,omitempty" json:"imageBytes,omitempty"`
+	CheckedAt  string   `dynamodbav:"checkedAt" json:"checkedAt"`
 }
 
 // AppReview is a version's app.yml review block as stored. Parameters are
@@ -263,6 +280,9 @@ type AppVariant struct {
 	// ImageDigest is the digest of the variant's image, recorded by the
 	// status lambda when its build succeeds.
 	ImageDigest string `dynamodbav:"imageDigest,omitempty"`
+	// Lambda is whether the variant can run as a Lambda step, recorded
+	// with ImageDigest; nil until then.
+	Lambda *LambdaEligibility `dynamodbav:"lambda,omitempty"`
 }
 
 // AppBuild is how an image is built: Docker build args, the stage to build
@@ -359,6 +379,10 @@ type AppRuntime struct {
 	Interactive bool   `dynamodbav:"interactive,omitempty"`
 	SessionType string `dynamodbav:"sessionType,omitempty"`
 	Kernel      string `dynamodbav:"kernel,omitempty"`
+	// Optimize is app.yml's runtime.optimize: false runs the app only as
+	// ComputeTypes declares it; nil (unset) or true lets Pennsieve run it on
+	// an optimized runtime it fits, such as Lambda (LambdaEligibility).
+	Optimize *bool `dynamodbav:"optimize,omitempty" json:"optimize,omitempty"`
 }
 
 // AppMaintainer is one of the people maintaining an app; Orcid is the bare

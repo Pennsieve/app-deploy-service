@@ -42,6 +42,11 @@ type appConfig struct {
 		Interactive bool   `yaml:"interactive"`
 		SessionType string `yaml:"sessionType"`
 		Kernel      string `yaml:"kernel"`
+		// Optimize: false runs the app only as ComputeTypes declares it;
+		// unset (nil) or true lets Pennsieve run it on an optimized runtime
+		// it fits, such as Lambda (decided from the version's runtime and
+		// image: lambda eligibility).
+		Optimize *bool `yaml:"optimize"`
 	} `yaml:"runtime"`
 	Parameters []appParameter `yaml:"parameters"`
 	Inputs     []appPort      `yaml:"inputs"`
@@ -174,6 +179,7 @@ type appVariantRuntime struct {
 	ComputeTypes   []string `yaml:"computeTypes"`
 	TimeoutSeconds *int     `yaml:"timeoutSeconds"`
 	LLM            *bool    `yaml:"llm"`
+	Optimize       *bool    `yaml:"optimize"`
 }
 
 // appParameterOverride is what a variant changes about one top-level
@@ -386,6 +392,7 @@ func appManifest(c appConfig) *store_dynamodb.AppManifest {
 			Interactive:    c.Runtime.Interactive || c.Runtime.SessionType != "",
 			SessionType:    c.Runtime.SessionType,
 			Kernel:         c.Runtime.Kernel,
+			Optimize:       c.Runtime.Optimize,
 		},
 		Parameters: appParameters(c),
 		Inputs:     appPorts(c.Inputs),

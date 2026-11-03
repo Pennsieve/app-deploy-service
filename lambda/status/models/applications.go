@@ -25,3 +25,11 @@ const VariantFailureReasonField = "failureReason"
 // digest of what was pushed there, on the version and on a variant.
 const ApplicationDestinationUrlField = "destinationUrl"
 const ImageDigestField = "imageDigest"
+
+// What the status lambda reads of a version's manifest (and a variant's) to
+// decide whether it runs on Lambda, and the attribute it records the
+// decision in (next to imageDigest).
+const ManifestField = "manifest"
+const ManifestRuntimeField = "runtime"
+const ManifestInputsField = "inputs"
+const LambdaEligibilityField = "lambda"

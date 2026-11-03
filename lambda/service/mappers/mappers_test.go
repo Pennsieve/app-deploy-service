@@ -188,3 +188,26 @@ func TestAppStoreVersionToModel_ReviewCommitAndDigests(t *testing.T) {
 		assert.NotContains(t, string(b), key)
 	}
 }
+
+// The Lambda eligibility the status lambda records, on the version and each
+// variant, is in the API as lambda; runtime.optimize is in the manifest.
+func TestAppStoreVersionToModel_LambdaEligibility(t *testing.T) {
+	optOut := false
+	v := store_dynamodb.AppStoreVersion{
+		Uuid: "u", DefaultVariant: "cpu", VariantOrder: []string{"cpu", "gpu"},
+		Manifest: &store_dynamodb.AppManifest{Runtime: store_dynamodb.AppRuntime{Optimize: &optOut}},
+		Lambda:   &store_dynamodb.LambdaEligibility{Eligible: true, ImageBytes: 42, CheckedAt: "2026-11-03T12:00:00Z"},
+		Variants: map[string]store_dynamodb.AppVariant{
+			"cpu": {Lambda: &store_dynamodb.LambdaEligibility{Eligible: true, ImageBytes: 42, CheckedAt: "2026-11-03T12:00:00Z"}},
+			"gpu": {Lambda: &store_dynamodb.LambdaEligibility{Reasons: []string{"it runs on GPU only"}, CheckedAt: "2026-11-03T12:00:00Z"}},
+		},
+	}
+	m := AppStoreVersionToModel(v)
+	b, err := json.Marshal(m)
+	require.NoError(t, err)
+	assert.Contains(t, string(b), `"lambda":{"eligible":true,"imageBytes":42,"checkedAt":"2026-11-03T12:00:00Z"}`)
+	assert.Contains(t, string(b), `"lambda":{"eligible":false,"reasons":["it runs on GPU only"],"checkedAt":"2026-11-03T12:00:00Z"}`)
+	assert.Contains(t, string(b), `"runtime":{"optimize":false}`)
+
+	assert.Nil(t, AppStoreVersionToModel(store_dynamodb.AppStoreVersion{}).Lambda, "absent until recorded")
+}
