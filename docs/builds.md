@@ -101,6 +101,60 @@ status go through the same steps.
 
   It is capped at 3,500 characters.
 
+### The Lambda step runtime
+
+Every image the CodeBuild path builds carries the **Lambda step runtime**
+(compute-node-aws-provisioner-v2, `cmd/lambda-step-runtime`): a static binary
+at `/opt/pennsieve/lambda-step-runtime` and the label
+`net.pennsieve.lambda-step-runtime=<version>`. A compute node runs an image on
+Lambda by making the runtime the function's entrypoint; the runtime fetches
+the step's inputs into the function's `/tmp`, runs the image's own entrypoint
+and command exactly as an ECS step would be run, and pushes the outputs. An
+app needs no Lambda-specific code. A node refuses to run an image without the
+label on Lambda ("rebuild the app").
+
+- `lambda_step_runtime_version` (Terraform) names the provisioner release
+  whose layer image, `<registry>/pennsieve/lambda-step-runtime:<version>` in
+  pennsieve-cc ECR, is used. Empty (the default), images are built without
+  it. Bump it when the provisioner releases a new runtime; images already
+  built keep the version they were built with, which the node accepts.
+- build.sh reads the release's Dockerfile from a shallow clone of the context
+  (the private-repo token goes to git through `GIT_ASKPASS`) and adds two
+  lines at the end of the stage the build makes (`BUILD_TARGET`, else the
+  last stage):
+
+  ```
+  COPY --from=<registry>/pennsieve/lambda-step-runtime:<version> /opt/pennsieve/lambda-step-runtime /opt/pennsieve/lambda-step-runtime
+  LABEL net.pennsieve.lambda-step-runtime=<version>
+  ```
+
+  buildctl then takes the Dockerfile from that local directory
+  (`--local dockerfile=` with `--opt dockerfilekey=dockerfile`, which makes
+  the frontend read it there rather than from the remote context) while the
+  build context stays the git URL. Done in
+  the Dockerfile rather than after the push so the tag is pushed once, as the
+  final image: appstore-private's tags are immutable, and the SOCI index
+  builder indexes what was pushed.
+- **Refused** at build, with the reason in the version's status: a Dockerfile
+  whose built stage is based on an AWS Lambda base image
+  (`public.ecr.aws/lambda/...`, `amazon/aws-lambda-...`) without an
+  `ENTRYPOINT` of its own, or whose `ENTRYPOINT`/`CMD` runs `awslambdaric` or
+  `lambda-entrypoint.sh`. Under the runtime those start the Runtime Interface
+  Emulator and wait forever. An app that used such an image keeps working by
+  switching to a plain base image and a normal entrypoint.
+- The CodeBuild role gets pull on the runtime's repository
+  (`LambdaStepRuntimePull`); the repository's own policy admits any principal,
+  as the compute-node sidecars' do.
+- **kaniko builds get no runtime.** Environments still on `kaniko` must move
+  to `codebuild` before their compute nodes are updated to a provisioner
+  release that runs Lambda steps through the runtime.
+- **Backfill:** versions built before the runtime are given the layer in
+  place by `scripts/backfill-lambda-step-runtime.sh`, which appends the layer
+  and the label with `crane` and re-pushes the tag (deleting the old image
+  and its `-soci` index first, since tags are immutable; the SOCI index
+  builder re-indexes the push). Run it per environment before its nodes are
+  updated.
+
 ### Cache
 
 - One cache per app: the tag `app-<sha256(sourceUrl)[:40]>` in

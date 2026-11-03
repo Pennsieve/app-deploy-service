@@ -123,6 +123,21 @@ variable "image_builder_timeout_minutes" {
 
 # BuildKit release the builds run, checked against its sha256 (the
 # linux-amd64 tarball on github.com/moby/buildkit/releases).
+# The Lambda step runtime every App Store image gets at build
+# (image-builder/build.sh): the compute-node-aws-provisioner-v2 release whose
+# layer image, <registry>/pennsieve/lambda-step-runtime:<version>, is copied
+# into the built stage. Empty: images are built without it, and compute nodes
+# refuse to run them on Lambda.
+variable "lambda_step_runtime_version" {
+  type    = string
+  default = ""
+}
+
+variable "lambda_step_runtime_registry" {
+  type    = string
+  default = "932986170183.dkr.ecr.us-east-1.amazonaws.com" # pennsieve-cc
+}
+
 variable "buildkit_version" {
   type    = string
   default = "v0.34.1"

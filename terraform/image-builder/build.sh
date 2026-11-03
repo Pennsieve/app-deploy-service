@@ -21,6 +21,13 @@
 #   BUILD_TARGET     optional; the Dockerfile stage to build (default: the last)
 #   DOCKERFILE       optional; the Dockerfile's path in the repository
 #                    (default: Dockerfile)
+#   LAMBDA_STEP_RUNTIME_IMAGE
+#                    optional; the Lambda step runtime's layer image,
+#                    <registry>/pennsieve/lambda-step-runtime:<version>. Set,
+#                    the built stage gets the runtime binary and the label
+#                    that marks it (below). Its registry is logged in to.
+#   LAMBDA_STEP_RUNTIME_VERSION
+#                    optional; the label's value (default: the image's tag)
 #   VARIANT          optional; the app variant this build makes, for the log
 #   GIT_TOKEN        optional; token for a private GitHub repo
 #   BUILD_PLATFORM   optional; default linux/amd64 (what the runners run)
@@ -75,7 +82,7 @@ add_auth() { # <registry> <user> <password>
 }
 
 ecr_logged_in=" "
-for ref in "$DESTINATION" "${BUILD_CACHE_REF:-}" "${BUILD_CACHE_IMPORT_REF:-}" "${DOCKERHUB_MIRROR:-}"; do
+for ref in "$DESTINATION" "${BUILD_CACHE_REF:-}" "${BUILD_CACHE_IMPORT_REF:-}" "${DOCKERHUB_MIRROR:-}" "${LAMBDA_STEP_RUNTIME_IMAGE:-}"; do
   [ -n "$ref" ] || continue
   registry=${ref%%/*}
   case "$registry" in
@@ -150,6 +157,97 @@ fi
 log "buildkit: $(buildctl --version)"
 buildctl debug workers -v 2>/dev/null | grep -i -E 'snapshotter|platforms' | head -3 || true
 
+# --- the Lambda step runtime ----------------------------------------------
+# Every App Store image carries the Lambda step runtime
+# (compute-node-aws-provisioner-v2, cmd/lambda-step-runtime) at
+# /opt/pennsieve/lambda-step-runtime and a label naming its version: a
+# compute node runs the image on Lambda by making the runtime the function's
+# entrypoint, and the runtime runs the image's own entrypoint and command.
+# The two lines go into the Dockerfile, at the end of the stage the build
+# makes, so the image pushed is the final one: one push, one SOCI index, one
+# digest. The Dockerfile is read from a shallow clone of the context; the
+# build context itself is still the git URL.
+#
+# An image whose entrypoint is Lambda's own (the AWS Lambda base images'
+# /lambda-entrypoint.sh, or awslambdaric) is refused: under the runtime it
+# would start the Runtime Interface Emulator and wait forever.
+dockerfile_dir=""
+if [ -n "${LAMBDA_STEP_RUNTIME_IMAGE:-}" ]; then
+  runtime_version=${LAMBDA_STEP_RUNTIME_VERSION:-${LAMBDA_STEP_RUNTIME_IMAGE##*:}}
+  src=/tmp/build-src
+  rm -rf "$src"
+  ref=${fragment#\#}
+  log "reading ${DOCKERFILE:-Dockerfile} from $url${ref:+ at $ref}"
+  (
+    export GIT_TERMINAL_PROMPT=0
+    if [ -n "${GIT_TOKEN:-}" ]; then
+      # the token goes to git through askpass, never into a command line
+      askpass=/tmp/git-askpass.sh
+      (umask 077 && printf '#!/bin/sh\ncase "$1" in *sername*) echo x-access-token ;; *) echo "$GIT_TOKEN" ;; esac\n' > "$askpass")
+      chmod 700 "$askpass"
+      export GIT_ASKPASS="$askpass"
+    fi
+    git init -q "$src"
+    git -C "$src" remote add origin "$url"
+    git -C "$src" fetch -q --depth 1 origin "${ref:-HEAD}"
+    git -C "$src" checkout -q FETCH_HEAD
+  ) || die "could not read the Dockerfile from $url"
+  dockerfile="$src/${DOCKERFILE:-Dockerfile}"
+  [ -f "$dockerfile" ] || die "${DOCKERFILE:-Dockerfile} is not in the repository"
+
+  dockerfile_dir=/tmp/build-dockerfile
+  rm -rf "$dockerfile_dir"
+  mkdir -p "$dockerfile_dir"
+  awk -v target="${BUILD_TARGET:-}" -v image="$LAMBDA_STEP_RUNTIME_IMAGE" -v version="$runtime_version" '
+    function lower(s) { return tolower(s) }
+    function add() {
+      print ""
+      print "# Added by the Pennsieve App Store build: the Lambda step runtime (app-deploy-service, docs/builds.md)"
+      print "COPY --from=" image " /opt/pennsieve/lambda-step-runtime /opt/pennsieve/lambda-step-runtime"
+      print "LABEL net.pennsieve.lambda-step-runtime=" version
+      added = 1
+    }
+    # a FROM line starts a stage; the lines go at the end of the target stage
+    # (the last one when no target is named): before the next stage, or at EOF
+    lower($1) == "from" {
+      if (in_target) { add(); in_target = 0 }
+      n++
+      name = ""
+      for (i = 2; i < NF; i++) if (lower($i) == "as") name = $(i + 1)
+      base = $2
+      if (lower(base) ~ /^(public\.ecr\.aws\/lambda\/|amazon\/aws-lambda-)/) lambda_base[n] = 1
+      stage_base[n] = base; stage_name[n] = name
+      # a named target gets the lines before the stage after it; with no
+      # target they go at the end of the last stage, at EOF
+      if (target == "") target_n = n
+      else if (lower(target) == lower(name) || target == n - 1) { in_target = 1; target_n = n }
+      else in_target = 0
+      entrypoint_set[n] = 0
+    }
+    lower($1) == "entrypoint" || lower($1) == "cmd" {
+      if (lower($0) ~ /awslambdaric|lambda-entrypoint/) refused = "its " $1 " runs " ($0 ~ /awslambdaric/ ? "awslambdaric" : "lambda-entrypoint.sh")
+      if (lower($1) == "entrypoint") entrypoint_set[n] = 1
+    }
+    { print }
+    END {
+      if (!target_n) { print "build.sh: error: the Dockerfile has no stage " target > "/dev/stderr"; exit 3 }
+      if (!added && target_n == n) add()
+      # the target stage, or a stage it builds on, is a Lambda base image and
+      # nothing replaced the base entrypoint
+      s = target_n; ep = entrypoint_set[s]
+      while (!ep && s && (s in stage_base)) {
+        if (s in lambda_base) { refused = "it is built from the AWS Lambda base image " stage_base[s] " and sets no ENTRYPOINT of its own"; break }
+        next_s = 0
+        for (j = 1; j < s; j++) if (lower(stage_name[j]) == lower(stage_base[s])) next_s = j
+        s = next_s; if (s) ep = entrypoint_set[s]
+      }
+      if (refused != "") { print "build.sh: error: this image cannot run on Lambda through the Lambda step runtime: " refused ". Use a plain base image and a normal entrypoint; the runtime runs it on Lambda without any Lambda-specific code." > "/dev/stderr"; exit 4 }
+      if (!added) { print "build.sh: error: the runtime lines were not added" > "/dev/stderr"; exit 3 }
+    }
+  ' "$dockerfile" > "$dockerfile_dir/Dockerfile" || die "preparing the Dockerfile failed"
+  log "added the Lambda step runtime $runtime_version ($LAMBDA_STEP_RUNTIME_IMAGE) to the built stage"
+fi
+
 # --- build ----------------------------------------------------------------
 # No attestations: the pushed tag must stay one image manifest (not an index
 # with an attestation manifest), the shape the SOCI index builder and
@@ -190,7 +288,12 @@ fi
 if [ -n "${BUILD_TARGET:-}" ]; then
   set -- "$@" --opt "target=$BUILD_TARGET"
 fi
-if [ -n "${DOCKERFILE:-}" ]; then
+if [ -n "$dockerfile_dir" ]; then
+  # the Dockerfile with the runtime added; the context stays the git URL.
+  # Naming the Dockerfile's local explicitly (dockerfilekey) is what makes
+  # the frontend read it there rather than from the remote context.
+  set -- "$@" --local "dockerfile=$dockerfile_dir" --opt dockerfilekey=dockerfile --opt "filename=Dockerfile"
+elif [ -n "${DOCKERFILE:-}" ]; then
   # read from the git context, like the default Dockerfile
   set -- "$@" --opt "filename=$DOCKERFILE"
 fi
