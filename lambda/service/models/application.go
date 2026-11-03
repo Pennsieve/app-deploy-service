@@ -377,9 +377,10 @@ type AppRuntime struct {
 	Interactive bool   `json:"interactive,omitempty"`
 	SessionType string `json:"sessionType,omitempty"`
 	Kernel      string `json:"kernel,omitempty"`
-	// Lambda: app.yml's runtime.lambda; false means the app opts out of
-	// Lambda steps, absent leaves it to the platform.
-	Lambda *bool `json:"lambda,omitempty"`
+	// Optimize: app.yml's runtime.optimize; false runs the app only as
+	// computeTypes declares it, absent lets Pennsieve pick an optimized
+	// runtime it fits, such as Lambda.
+	Optimize *bool `json:"optimize,omitempty"`
 }
 
 type AppMaintainer struct {

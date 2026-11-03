@@ -52,9 +52,9 @@ type Runtime struct {
 	TimeoutSeconds int      `dynamodbav:"timeoutSeconds,omitempty"`
 	Interactive    bool     `dynamodbav:"interactive,omitempty"`
 	SessionType    string   `dynamodbav:"sessionType,omitempty"`
-	// Lambda is app.yml's runtime.lambda: false opts out; nil is the default
-	// (true).
-	Lambda *bool `dynamodbav:"lambda,omitempty"`
+	// Optimize is app.yml's runtime.optimize: false runs the app only as
+	// computeTypes declares it (no Lambda); nil is the default (true).
+	Optimize *bool `dynamodbav:"optimize,omitempty"`
 }
 
 // Manifest is what eligibility reads of a stored manifest: its runtime and
@@ -96,8 +96,8 @@ type ImageFacts struct {
 // Decide is the eligibility of a runtime and image, checked at now.
 func Decide(rt Runtime, img ImageFacts, hasReferenceInputs bool, now time.Time) Eligibility {
 	var reasons []string
-	if rt.Lambda != nil && !*rt.Lambda {
-		reasons = append(reasons, "the app opts out of Lambda (runtime.lambda: false)")
+	if rt.Optimize != nil && !*rt.Optimize {
+		reasons = append(reasons, "the app opts out of optimized runtimes (runtime.optimize: false)")
 	}
 	if gpuOnly(rt.ComputeTypes) {
 		reasons = append(reasons, "it runs on GPU only")

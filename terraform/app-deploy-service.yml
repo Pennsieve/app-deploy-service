@@ -418,9 +418,9 @@ components:
               type: integer
             llm:
               type: boolean
-            lambda:
+            optimize:
               type: boolean
-              description: app.yml's runtime.lambda. false means the app opts out of Lambda steps; absent leaves it to the platform.
+              description: app.yml's runtime.optimize. false runs the app only as computeTypes declares it; absent lets Pennsieve run it on an optimized runtime it fits, such as Lambda.
             interactive:
               type: boolean
               description: A human-in-the-loop app (e.g. a notebook kernel), run as a live session.

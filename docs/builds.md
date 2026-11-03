@@ -164,8 +164,9 @@ Because every image carries the runtime, authors don't opt in to Lambda:
 app.yml's `runtime.computeTypes` declares only `standard` and/or `gpu`
 (`lambda` is still accepted, and no longer needed), and the platform decides
 from facts whether a version (each variant) also runs as a Lambda step. The
-author can opt out with `runtime.lambda: false` (top level or a variant's
-runtime; default true).
+author can opt out with `runtime.optimize: false` (top level or a variant's
+runtime; default true): the app then runs only as `computeTypes` declares it,
+never on a runtime Pennsieve picks (Lambda today, others later).
 
 When a build succeeds the status lambda reads the image it pushed, by digest
 (ECR `BatchGetImage`, the linux/amd64 manifest of an image index, then the
@@ -181,7 +182,7 @@ config blob through `GetDownloadUrlForLayer`), and records `lambda` next to
 
 | Rule | Reason |
 |---|---|
-| `runtime.lambda: false` | the app opts out of Lambda (runtime.lambda: false) |
+| `runtime.optimize: false` | the app opts out of optimized runtimes (runtime.optimize: false) |
 | `computeTypes` is `[gpu]` | it runs on GPU only |
 | interactive | interactive sessions don't run on Lambda |
 | an input has a `reference` | it reads reference data, which a Lambda step can't |
@@ -200,7 +201,7 @@ usual. Versions built before this are decided by
 `lambda/status/cmd/backfill-lambda-eligibility` (`APPSTORE_VERSIONS_TABLE=...
 go run ./cmd/backfill-lambda-eligibility [-dry-run]`), which reads each
 version's and variant's image by its recorded digest (else its tag); it can
-be rerun, and should be after `runtime.lambda` changes for a stored manifest
+be rerun, and should be after `runtime.optimize` changes for a stored manifest
 (for example after `backfill-manifests`).
 
 ### Cache

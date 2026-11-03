@@ -333,36 +333,36 @@ func TestBackfillManifests_Variants(t *testing.T) {
 	assert.Equal(t, "lindda", apps.params["d"][0].DefaultValue, "the app's params are the default variant's")
 }
 
-// runtime.lambda: unset by default, false opts out, a variant may set its
+// runtime.optimize: unset by default, false opts out, a variant may set its
 // own; it is kept on each stored manifest for the status lambda's
 // eligibility (lambda/status/lambdaeligibility).
-func TestRuntimeLambda(t *testing.T) {
+func TestRuntimeOptimize(t *testing.T) {
 	yml := `application: {name: a}
 runtime:
   computeTypes: [standard]
-  lambda: false
+  optimize: false
 variants:
   - id: cpu
   - id: small
-    runtime: {lambda: true}
+    runtime: {optimize: true}
 `
-	assert.Empty(t, manifestProblems([]byte(yml)), "runtime.lambda is in the schema, top level and variants")
-	assert.NotEmpty(t, manifestProblems([]byte("application: {name: a}\nruntime: {lambda: yes please}\n")), "a boolean")
+	assert.Empty(t, manifestProblems([]byte(yml)), "runtime.optimize is in the schema, top level and variants")
+	assert.NotEmpty(t, manifestProblems([]byte("application: {name: a}\nruntime: {optimize: yes please}\n")), "a boolean")
 
 	cfg, err := parseAppConfig([]byte(yml))
 	require.NoError(t, err)
 	r := resolveVariants(cfg)
 	require.Len(t, r.Variants, 2)
-	assert.Equal(t, aws.Bool(false), r.versionManifest().Runtime.Lambda)
-	assert.Equal(t, aws.Bool(false), r.Variants[0].manifest().Runtime.Lambda, "inherited")
-	assert.Equal(t, aws.Bool(true), r.Variants[1].manifest().Runtime.Lambda)
-	assert.False(t, *cfg.Runtime.Lambda, "the top level isn't changed by resolving")
+	assert.Equal(t, aws.Bool(false), r.versionManifest().Runtime.Optimize)
+	assert.Equal(t, aws.Bool(false), r.Variants[0].manifest().Runtime.Optimize, "inherited")
+	assert.Equal(t, aws.Bool(true), r.Variants[1].manifest().Runtime.Optimize)
+	assert.False(t, *cfg.Runtime.Optimize, "the top level isn't changed by resolving")
 
 	cfg, err = parseAppConfig([]byte("application: {name: a}\n"))
 	require.NoError(t, err)
 	m := appManifest(cfg)
-	assert.Nil(t, m.Runtime.Lambda, "unset: the platform decides")
+	assert.Nil(t, m.Runtime.Optimize, "unset: the platform decides")
 	av, err := attributevalue.MarshalMap(m.Runtime)
 	require.NoError(t, err)
-	assert.NotContains(t, av, "lambda")
+	assert.NotContains(t, av, "optimize")
 }

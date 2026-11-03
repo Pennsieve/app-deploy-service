@@ -28,11 +28,11 @@ func TestDecide(t *testing.T) {
 	}{
 		{name: "a standard app with a Lambda image", rt: Runtime{ComputeTypes: []string{"standard"}}, img: lambdaImage()},
 		{name: "nothing declared", img: lambdaImage()},
-		{name: "lambda: true", rt: Runtime{Lambda: ptr(true)}, img: lambdaImage()},
+		{name: "optimize: true", rt: Runtime{Optimize: ptr(true)}, img: lambdaImage()},
 		{name: "at the limits", rt: Runtime{Memory: 10240, CPU: 6144, TimeoutSeconds: 840, ComputeTypes: []string{"standard", "gpu"}}, img: lambdaImage()},
 		{name: "an image of exactly 10 GB", img: func() ImageFacts { i := lambdaImage(); i.CompressedBytes = MaxImageBytes; return i }()},
-		{name: "opted out", rt: Runtime{Lambda: ptr(false)}, img: lambdaImage(),
-			want: []string{"the app opts out of Lambda (runtime.lambda: false)"}},
+		{name: "opted out", rt: Runtime{Optimize: ptr(false)}, img: lambdaImage(),
+			want: []string{"the app opts out of optimized runtimes (runtime.optimize: false)"}},
 		{name: "GPU only", rt: Runtime{ComputeTypes: []string{"gpu"}}, img: lambdaImage(),
 			want: []string{"it runs on GPU only"}},
 		{name: "interactive", rt: Runtime{Interactive: true, SessionType: "jupyter"}, img: lambdaImage(),
@@ -56,9 +56,9 @@ func TestDecide(t *testing.T) {
 			}},
 		{name: "a windows image", img: func() ImageFacts { i := lambdaImage(); i.OS = "windows"; return i }(),
 			want: []string{"the image is not linux/amd64"}},
-		{name: "everything at once", rt: Runtime{Lambda: ptr(false), ComputeTypes: []string{"gpu"}, Interactive: true}, img: ImageFacts{}, refs: true,
+		{name: "everything at once", rt: Runtime{Optimize: ptr(false), ComputeTypes: []string{"gpu"}, Interactive: true}, img: ImageFacts{}, refs: true,
 			want: []string{
-				"the app opts out of Lambda (runtime.lambda: false)",
+				"the app opts out of optimized runtimes (runtime.optimize: false)",
 				"it runs on GPU only",
 				"interactive sessions don't run on Lambda",
 				"it reads reference data, which a Lambda step can't",
@@ -100,8 +100,8 @@ func keys(m map[string]types.AttributeValue) []string {
 func TestManifest_HasReferenceInputs(t *testing.T) {
 	item := map[string]types.AttributeValue{
 		"runtime": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
-			"memory": &types.AttributeValueMemberN{Value: "2048"},
-			"lambda": &types.AttributeValueMemberBOOL{Value: false},
+			"memory":   &types.AttributeValueMemberN{Value: "2048"},
+			"optimize": &types.AttributeValueMemberBOOL{Value: false},
 		}},
 		"inputs": &types.AttributeValueMemberL{Value: []types.AttributeValue{
 			&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{"name": &types.AttributeValueMemberS{Value: "data"}}},
@@ -111,8 +111,8 @@ func TestManifest_HasReferenceInputs(t *testing.T) {
 	require.NoError(t, attributevalue.UnmarshalMap(item, &m))
 	assert.False(t, m.HasReferenceInputs())
 	assert.Equal(t, 2048, m.Runtime.Memory)
-	require.NotNil(t, m.Runtime.Lambda)
-	assert.False(t, *m.Runtime.Lambda)
+	require.NotNil(t, m.Runtime.Optimize)
+	assert.False(t, *m.Runtime.Optimize)
 
 	item["inputs"].(*types.AttributeValueMemberL).Value = append(item["inputs"].(*types.AttributeValueMemberL).Value,
 		&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{

@@ -379,9 +379,10 @@ type AppRuntime struct {
 	Interactive bool   `dynamodbav:"interactive,omitempty"`
 	SessionType string `dynamodbav:"sessionType,omitempty"`
 	Kernel      string `dynamodbav:"kernel,omitempty"`
-	// Lambda is app.yml's runtime.lambda: false opts the app out of Lambda
-	// steps; nil (unset) or true leaves it to the platform's eligibility.
-	Lambda *bool `dynamodbav:"lambda,omitempty" json:"lambda,omitempty"`
+	// Optimize is app.yml's runtime.optimize: false runs the app only as
+	// ComputeTypes declares it; nil (unset) or true lets Pennsieve run it on
+	// an optimized runtime it fits, such as Lambda (LambdaEligibility).
+	Optimize *bool `dynamodbav:"optimize,omitempty" json:"optimize,omitempty"`
 }
 
 // AppMaintainer is one of the people maintaining an app; Orcid is the bare
