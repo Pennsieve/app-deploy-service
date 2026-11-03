@@ -239,6 +239,30 @@ components:
           description: The version's variants in app.yml order (separately built flavours of the app, e.g. CPU and GPU). Absent when its app.yml declares none.
           items:
             $ref: '#/components/schemas/AppStoreVariant'
+        imageDigest:
+          type: string
+          description: The digest of the image built for this version (the default variant's, with variants). Absent until its build succeeds.
+        lambda:
+          $ref: '#/components/schemas/LambdaEligibility'
+    LambdaEligibility:
+      type: object
+      description: Whether the version (or variant) can run as a Lambda step, decided by the platform from its runtime and image after a successful build. Absent until then.
+      required: [eligible, checkedAt]
+      properties:
+        eligible:
+          type: boolean
+        reasons:
+          type: array
+          description: Why it can't, every reason that applies (e.g. "it runs on GPU only"). Absent when eligible.
+          items:
+            type: string
+        imageBytes:
+          type: integer
+          format: int64
+          description: The image's compressed size in bytes (the sum of its layers).
+        checkedAt:
+          type: string
+          format: date-time
     AppCitation:
       type: object
       description: >
@@ -347,6 +371,11 @@ components:
           description: Why the variant's build failed, when status is error.
         manifest:
           $ref: '#/components/schemas/AppManifest'
+        imageDigest:
+          type: string
+          description: The digest of the variant's image. Absent until its build succeeds.
+        lambda:
+          $ref: '#/components/schemas/LambdaEligibility'
     AppManifest:
       type: object
       description: The version's app.yml, parsed when it was registered. Absent for an app without an app.yml.
@@ -382,10 +411,16 @@ components:
               description: MiB.
             computeTypes:
               type: array
+              description: standard and/or gpu. Whether the app also runs on Lambda is decided by the platform (see lambda on the version); older manifests may still list lambda.
               items:
                 type: string
             timeoutSeconds:
               type: integer
+            llm:
+              type: boolean
+            lambda:
+              type: boolean
+              description: app.yml's runtime.lambda. false means the app opts out of Lambda steps; absent leaves it to the platform.
             interactive:
               type: boolean
               description: A human-in-the-loop app (e.g. a notebook kernel), run as a live session.

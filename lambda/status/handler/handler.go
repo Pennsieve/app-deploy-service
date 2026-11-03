@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/pennsieve/app-deploy-service/status/external"
+	"github.com/pennsieve/app-deploy-service/status/lambdaeligibility"
 	"github.com/pennsieve/app-deploy-service/status/logging"
 	"github.com/pennsieve/app-deploy-service/status/models"
 	"github.com/pennsieve/pennsieve-go-core/pkg/realtime"
@@ -30,6 +31,9 @@ type DeployTaskStateChangeHandler struct {
 	// ECRApi reads the digest of an App Store build's image; nil where
 	// unused (then no digest is recorded).
 	ECRApi external.ECRApi
+	// HTTPClient downloads an image's configuration from ECR; nil: a
+	// default client.
+	HTTPClient lambdaeligibility.HTTPDoer
 }
 
 // WithECR lets the handler record the digest of each App Store image it sees

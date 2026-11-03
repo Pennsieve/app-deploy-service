@@ -148,6 +148,7 @@ func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVer
 		Review:           AppReviewToModel(v.Review),
 		CommitSha:        v.CommitSha,
 		ImageDigest:      v.ImageDigest,
+		Lambda:           LambdaEligibilityToModel(v.Lambda),
 	}
 }
 
@@ -255,6 +256,7 @@ func appStoreVariantsToModels(v store_dynamodb.AppStoreVersion) []models.AppStor
 			FailureReason: sv.FailureReason,
 			Manifest:      AppManifestToModel(sv.Manifest),
 			ImageDigest:   sv.ImageDigest,
+			Lambda:        LambdaEligibilityToModel(sv.Lambda),
 		})
 	}
 	return out
@@ -287,6 +289,7 @@ func AppManifestToModel(m *store_dynamodb.AppManifest) *models.AppManifest {
 			Interactive:    m.Runtime.Interactive,
 			SessionType:    m.Runtime.SessionType,
 			Kernel:         m.Runtime.Kernel,
+			Lambda:         m.Runtime.Lambda,
 		},
 		Parameters: params,
 		Inputs:     appPortsToModels(m.Inputs),
@@ -354,4 +357,13 @@ func AppStoreVersionsToModels(versions []store_dynamodb.AppStoreVersion) []model
 		result = append(result, AppStoreVersionToModel(v))
 	}
 	return result
+}
+
+// LambdaEligibilityToModel is a version's or variant's Lambda eligibility;
+// nil until recorded.
+func LambdaEligibilityToModel(l *store_dynamodb.LambdaEligibility) *models.LambdaEligibility {
+	if l == nil {
+		return nil
+	}
+	return &models.LambdaEligibility{Eligible: l.Eligible, Reasons: l.Reasons, ImageBytes: l.ImageBytes, CheckedAt: l.CheckedAt}
 }

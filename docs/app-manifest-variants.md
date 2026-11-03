@@ -68,7 +68,7 @@ A list of 1 to 8 variants. The order is the display order.
 | `name` | A short label ("GPU (ONCET)"). Default: the id. |
 | `description` | When to pick this variant, in a sentence. It doesn't replace the app's description. |
 | `build` | See above. |
-| `runtime` | Any of `cpu`, `memory`, `computeTypes`, `timeoutSeconds` and `llm`. Each replaces the top-level value (no deep merge: `computeTypes: [gpu]` replaces the whole list). |
+| `runtime` | Any of `cpu`, `memory`, `computeTypes`, `timeoutSeconds`, `llm` and `lambda`. Each replaces the top-level value (no deep merge: `computeTypes: [gpu]` replaces the whole list). |
 | `parameters` | A map from the name of a top-level parameter to overrides of its `defaultValue`, `validValues`, `required`, `label` and `description`. |
 
 A variant can't change the inputs, outputs, the set of parameters (it can't add, remove or

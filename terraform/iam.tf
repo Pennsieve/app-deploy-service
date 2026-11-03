@@ -308,12 +308,18 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
     resources = ["*"]
   }
 
-  # The digest of each App Store image built, recorded on its version
-  # (lambda/status/handler/image_digest.go).
+  # The digest of each App Store image built, recorded on its version, and
+  # its manifest and configuration (layer sizes, platform, labels), from
+  # which its Lambda eligibility is decided (lambda/status/handler/
+  # image_digest.go, lambda/status/lambdaeligibility).
   statement {
-    sid       = "StatusLambdaImageDigests"
-    effect    = "Allow"
-    actions   = ["ecr:DescribeImages"]
+    sid    = "StatusLambdaImageDigests"
+    effect = "Allow"
+    actions = [
+      "ecr:DescribeImages",
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
     resources = ["arn:aws:ecr:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:repository/*"]
   }
 

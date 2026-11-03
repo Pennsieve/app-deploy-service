@@ -86,6 +86,7 @@ releasing, and permissions.
 | `lambda/service/cmd/check-app-access` | lambda the realtime events authorizer calls to decide whether a user may subscribe to an application's channel |
 | `lambda/service/cmd/backfill-manifests` | one-off tool: store app.yml for versions registered before versions kept theirs |
 | `lambda/status` | status lambda: turns ECS task and CodeBuild state changes into deployment and version status |
+| `lambda/status/cmd/backfill-lambda-eligibility` | one-off tool: decide and store the Lambda eligibility of versions built before it was recorded |
 | `fargate/app-provisioner` | provisioner task: starts builds (kaniko or CodeBuild) and deploys per-workspace apps |
 | `fargate/buildkit-builder` | the BuildKit spike prototype (not deployed) |
 | `terraform` | the service's infrastructure; `terraform/image-builder` holds CodeBuild's `build.sh` and buildspec |
