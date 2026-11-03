@@ -129,7 +129,9 @@ label on Lambda ("rebuild the app").
   ```
 
   buildctl then takes the Dockerfile from that local directory
-  (`--local dockerfile=`) while the build context stays the git URL. Done in
+  (`--local dockerfile=` with `--opt dockerfilekey=dockerfile`, which makes
+  the frontend read it there rather than from the remote context) while the
+  build context stays the git URL. Done in
   the Dockerfile rather than after the push so the tag is pushed once, as the
   final image: appstore-private's tags are immutable, and the SOCI index
   builder indexes what was pushed.

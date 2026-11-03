@@ -289,8 +289,10 @@ if [ -n "${BUILD_TARGET:-}" ]; then
   set -- "$@" --opt "target=$BUILD_TARGET"
 fi
 if [ -n "$dockerfile_dir" ]; then
-  # the Dockerfile with the runtime added; the context stays the git URL
-  set -- "$@" --local "dockerfile=$dockerfile_dir" --opt "filename=Dockerfile"
+  # the Dockerfile with the runtime added; the context stays the git URL.
+  # Naming the Dockerfile's local explicitly (dockerfilekey) is what makes
+  # the frontend read it there rather than from the remote context.
+  set -- "$@" --local "dockerfile=$dockerfile_dir" --opt dockerfilekey=dockerfile --opt "filename=Dockerfile"
 elif [ -n "${DOCKERFILE:-}" ]; then
   # read from the git context, like the default Dockerfile
   set -- "$@" --opt "filename=$DOCKERFILE"
