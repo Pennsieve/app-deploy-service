@@ -29,7 +29,7 @@ func TestDecide(t *testing.T) {
 		{name: "a standard app with a Lambda image", rt: Runtime{ComputeTypes: []string{"standard"}}, img: lambdaImage()},
 		{name: "nothing declared", img: lambdaImage()},
 		{name: "optimize: true", rt: Runtime{Optimize: ptr(true)}, img: lambdaImage()},
-		{name: "at the limits", rt: Runtime{Memory: 10240, CPU: 6144, TimeoutSeconds: 840, ComputeTypes: []string{"standard", "gpu"}}, img: lambdaImage()},
+		{name: "at the limits", rt: Runtime{Memory: 10240, CPU: 6144, TimeoutSeconds: 900, ComputeTypes: []string{"standard", "gpu"}}, img: lambdaImage()},
 		{name: "an image of exactly 10 GB", img: func() ImageFacts { i := lambdaImage(); i.CompressedBytes = MaxImageBytes; return i }()},
 		{name: "opted out", rt: Runtime{Optimize: ptr(false)}, img: lambdaImage(),
 			want: []string{"the app opts out of optimized runtimes (runtime.optimize: false)"}},
@@ -43,10 +43,11 @@ func TestDecide(t *testing.T) {
 			want: []string{
 				"it needs 16 GB of memory; a Lambda step has at most 10 GB",
 				"it needs 6.5 vCPU; a Lambda step has at most 6",
-				"it may run up to 2 hours; a Lambda step runs at most 14 minutes",
+				"it may run up to 2 hours; a Lambda step runs at most 15 minutes",
 			}},
-		{name: "a 15 minute timeout", rt: Runtime{TimeoutSeconds: 900}, img: lambdaImage(),
-			want: []string{"it may run up to 15 minutes; a Lambda step runs at most 14 minutes"}},
+		{name: "a 15 minute timeout fits", rt: Runtime{TimeoutSeconds: 900}, img: lambdaImage()},
+		{name: "a 16 minute timeout", rt: Runtime{TimeoutSeconds: 960}, img: lambdaImage(),
+			want: []string{"it may run up to 16 minutes; a Lambda step runs at most 15 minutes"}},
 		{name: "an image built before the runtime, too big, for arm64",
 			img: ImageFacts{OS: "linux", Architecture: "arm64", CompressedBytes: 12_340_000_000},
 			want: []string{
