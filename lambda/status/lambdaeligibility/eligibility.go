@@ -27,9 +27,12 @@ const (
 	// MaxCPUUnits is the most CPU a Lambda function gets: 6 vCPU, in the
 	// manifest's units (1024 = 1 vCPU).
 	MaxCPUUnits = 6144
-	// MaxTimeoutSeconds is a Lambda step's timeout (the provisioner's
-	// lambdaStepTimeoutSeconds, a minute under the step runner's 900 s).
-	MaxTimeoutSeconds = 840
+	// MaxTimeoutSeconds is the longest timeoutSeconds that fits Lambda:
+	// Lambda's own 15 minutes, which authors write for a Lambda-sized app.
+	// It is an upper bound, not a run time; the compute node still stops a
+	// Lambda step at 840 s (lambdaStepTimeoutSeconds, a minute under the
+	// step runner's 900 s), as before.
+	MaxTimeoutSeconds = 900
 )
 
 // Eligibility is the decision, as stored on a version and on each variant
@@ -115,7 +118,7 @@ func Decide(rt Runtime, img ImageFacts, hasReferenceInputs bool, now time.Time) 
 		reasons = append(reasons, fmt.Sprintf("it needs %s vCPU; a Lambda step has at most 6", units(rt.CPU, 1024)))
 	}
 	if rt.TimeoutSeconds > MaxTimeoutSeconds {
-		reasons = append(reasons, fmt.Sprintf("it may run up to %s; a Lambda step runs at most 14 minutes", duration(rt.TimeoutSeconds)))
+		reasons = append(reasons, fmt.Sprintf("it may run up to %s; a Lambda step runs at most 15 minutes", duration(rt.TimeoutSeconds)))
 	}
 	if img.CompressedBytes > MaxImageBytes {
 		reasons = append(reasons, fmt.Sprintf("the image is %.1f GB; Lambda takes images up to 10 GB", float64(img.CompressedBytes)/1e9))
