@@ -33,6 +33,10 @@ locals {
   docker_hub_credentials_arn = data.terraform_remote_state.platform_infrastructure.outputs.docker_hub_credentials_arn
 
   use_dockerhub_cache = local.use_codebuild && var.image_builder_dockerhub_cache
+
+  # The Lambda step runtime's layer image (variables.tf), "" for none.
+  lambda_step_runtime_image = var.lambda_step_runtime_version != "" ? "${var.lambda_step_runtime_registry}/pennsieve/lambda-step-runtime:${var.lambda_step_runtime_version}" : ""
+  lambda_step_runtime_arn   = "arn:aws:ecr:${split(".", var.lambda_step_runtime_registry)[3]}:${split(".", var.lambda_step_runtime_registry)[0]}:repository/pennsieve/lambda-step-runtime"
   # Mirror for docker.io in buildkitd (build.sh): <registry>/<prefix>
   dockerhub_mirror = local.use_dockerhub_cache ? "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current_region.name}.amazonaws.com/${var.image_builder_dockerhub_cache_prefix}" : ""
 }
@@ -210,6 +214,23 @@ data "aws_iam_policy_document" "image_builder" {
   }
 
   dynamic "statement" {
+    for_each = local.lambda_step_runtime_image != "" ? [1] : []
+    content {
+      # The runtime's layer image, pulled by the build's COPY --from (the
+      # repository's own policy admits any principal; the identity needs
+      # the actions too).
+      sid    = "LambdaStepRuntimePull"
+      effect = "Allow"
+      actions = [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer",
+      ]
+      resources = [local.lambda_step_runtime_arn]
+    }
+  }
+
+  dynamic "statement" {
     for_each = var.image_builder_dockerhub_auth ? [1] : []
     content {
       sid       = "DockerHubCredentials"
@@ -257,6 +278,15 @@ resource "aws_codebuild_project" "image_builder" {
     environment_variable {
       name  = "DOCKERHUB_MIRROR"
       value = local.dockerhub_mirror
+    }
+
+    environment_variable {
+      name  = "LAMBDA_STEP_RUNTIME_IMAGE"
+      value = local.lambda_step_runtime_image
+    }
+    environment_variable {
+      name  = "LAMBDA_STEP_RUNTIME_VERSION"
+      value = var.lambda_step_runtime_version
     }
 
     dynamic "environment_variable" {
