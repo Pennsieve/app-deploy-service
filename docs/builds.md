@@ -150,10 +150,13 @@ label on Lambda ("rebuild the app").
   release that runs Lambda steps through the runtime.
 - **Backfill:** versions built before the runtime are given the layer in
   place by `scripts/backfill-lambda-step-runtime.sh`, which appends the layer
-  and the label with `crane` and re-pushes the tag (deleting the old image
-  and its `-soci` index first, since tags are immutable; the SOCI index
-  builder re-indexes the push). Run it per environment before its nodes are
-  updated.
+  and the label with `crane`, pushes the result under a temporary `<tag>-rt`,
+  deletes the old tag and its `-soci` index (tags are immutable, and ECR
+  deletes an image with its last tag, so the new image is in the repository
+  before the old one goes), tags the new image `<tag>` and drops the
+  temporary tag; the SOCI index builder re-indexes the push. The list to
+  backfill is the versions whose `computeTypes` include `lambda`. Run it per
+  environment before its nodes are updated.
 
 ### Cache
 
