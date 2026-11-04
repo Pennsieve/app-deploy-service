@@ -1,9 +1,9 @@
 #!/bin/sh
-# Backfill: give App Store images built before the Lambda step runtime its
-# layer and label, in place (docs/builds.md, "The Lambda step runtime").
+# Backfill: give App Store images built before the Lambda step runtime, or
+# with an older one, the runtime's layer and label, in place (docs/builds.md, "The Lambda step runtime").
 #
 # For each image tag given (one per line on stdin, <registry>/<repo>:<tag>):
-#   1. skip it when it already carries the label;
+#   1. skip it when its label already names this runtime version;
 #   2. push the image with the runtime layer appended and the label set,
 #      under a temporary tag <tag>-rt (crane mutate; the layers are already
 #      in the repository, so only the new layer and the manifest go up);
@@ -69,12 +69,15 @@ while IFS= read -r image; do
   [ -n "$image" ] || continue
   registry=${image%%/*}
   case "$logged" in *" $registry "*) ;; *) login "$registry"; logged="$logged$registry " ;; esac
-  if crane config "$image" 2>/dev/null | grep -q "\"$label\""; then
-    log "$image: already has the runtime"
+  # The runtime version the image carries ("" when none); an image with
+  # an older one gets the new layer on top, which replaces its files.
+  have=$(crane config "$image" 2>/dev/null | python3 -c 'import json,sys; print((json.load(sys.stdin).get("config") or {}).get("Labels", {}).get(sys.argv[1], ""))' "$label" || true)
+  if [ "$have" = "$version" ]; then
+    log "$image: already has runtime $version"
     continue
   fi
   if [ -n "$dry" ]; then
-    log "$image: would append the runtime"
+    log "$image: would append runtime $version${have:+ (has $have)}"
     continue
   fi
   repo_and_tag=${image#*/}
@@ -86,7 +89,7 @@ while IFS= read -r image; do
   delete_tags "$registry" "$repo" "$tag" "$tag-soci"
   crane tag "$temp" "$tag" >/dev/null
   delete_tags "$registry" "$repo" "$tag-rt"
-  log "$image: runtime $version appended"
+  log "$image: runtime $version appended${have:+ (replacing $have)}"
 done
 rm -f "$layer"
 
