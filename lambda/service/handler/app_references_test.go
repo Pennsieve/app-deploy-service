@@ -72,7 +72,6 @@ func TestReferenceProblems(t *testing.T) {
 	}{
 		"not in its own folder": {"description: Salmon index of the genome the reads come from.\n    placement: subfolder", "description: Salmon index of the genome the reads come from.\n    placement: root", "placement: subfolder"},
 		"default not offered":   {"organisms: [9606, 10090]", "organisms: [10090]", "not one of the reference's organisms"},
-		"lambda only":           {"computeTypes: [standard]", "computeTypes: [lambda]", "only on lambda"},
 		"taxonomy on user":      {"      organisms:", "      taxonomyId: 9606\n      organisms:", "lists the organisms"},
 	}
 	for name, c := range cases {
@@ -93,8 +92,14 @@ func TestReferenceProblems(t *testing.T) {
 	if ps := referenceProblems(cfg); len(ps) != 1 || !strings.Contains(ps[0], "only inputs") {
 		t.Errorf("output reference: %v", ps)
 	}
+	// Lambda takes references too (the Lambda step runtime unpacks them):
+	// an app, or a variant, that runs only on Lambda is fine.
+	cfg, _ = parseAppConfig([]byte(strings.Replace(rnaseqQuant, "computeTypes: [standard]", "computeTypes: [lambda]", 1)))
+	if ps := referenceProblems(cfg); ps != nil {
+		t.Errorf("lambda only: %v", ps)
+	}
 	cfg, _ = parseAppConfig([]byte(rnaseqQuant + "variants:\n  - id: small\n    name: Small\n    runtime:\n      computeTypes: [lambda]\n"))
-	if ps := referenceProblems(cfg); len(ps) != 1 || !strings.Contains(ps[0], "/variants/0/runtime/computeTypes") {
+	if ps := referenceProblems(cfg); ps != nil {
 		t.Errorf("lambda variant: %v", ps)
 	}
 	cfg, _ = parseAppConfig([]byte(strings.Replace(rnaseqQuant, "computeTypes: [standard]", "computeTypes: [lambda]", 1)[:strings.Index(rnaseqQuant, "  - name: index")]))

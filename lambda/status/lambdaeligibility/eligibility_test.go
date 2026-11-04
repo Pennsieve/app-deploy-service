@@ -23,7 +23,6 @@ func TestDecide(t *testing.T) {
 		name string
 		rt   Runtime
 		img  ImageFacts
-		refs bool
 		want []string
 		// overridable: only declared resource limits stand in the way.
 		overridable bool
@@ -39,8 +38,7 @@ func TestDecide(t *testing.T) {
 			want: []string{"it runs on GPU only"}},
 		{name: "interactive", rt: Runtime{Interactive: true, SessionType: "jupyter"}, img: lambdaImage(),
 			want: []string{"interactive sessions don't run on Lambda"}},
-		{name: "reference inputs", img: lambdaImage(), refs: true,
-			want: []string{"it reads reference data, which a Lambda step can't"}},
+		{name: "reference inputs don't matter", img: lambdaImage()},
 		{name: "too big to run", rt: Runtime{Memory: 16384, CPU: 6656, TimeoutSeconds: 7200}, img: lambdaImage(),
 			want: []string{
 				"it needs 16 GB of memory; a Lambda step has at most 10 GB",
@@ -72,19 +70,18 @@ func TestDecide(t *testing.T) {
 			}},
 		{name: "a windows image", img: func() ImageFacts { i := lambdaImage(); i.OS = "windows"; return i }(),
 			want: []string{"the image is not linux/amd64"}},
-		{name: "everything at once", rt: Runtime{Optimize: ptr(false), ComputeTypes: []string{"gpu"}, Interactive: true}, img: ImageFacts{}, refs: true,
+		{name: "everything at once", rt: Runtime{Optimize: ptr(false), ComputeTypes: []string{"gpu"}, Interactive: true}, img: ImageFacts{},
 			want: []string{
 				"the app opts out of optimized runtimes (runtime.optimize: false)",
 				"it runs on GPU only",
 				"interactive sessions don't run on Lambda",
-				"it reads reference data, which a Lambda step can't",
 				"the image has no Lambda step runtime: rebuild the app",
 				"the image is not linux/amd64",
 			}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got := Decide(c.rt, c.img, c.refs, checked)
+			got := Decide(c.rt, c.img, checked)
 			assert.Equal(t, c.want, got.Reasons)
 			assert.Equal(t, len(c.want) == 0, got.Eligible)
 			assert.Equal(t, c.overridable, got.Overridable)
@@ -118,32 +115,22 @@ func keys(m map[string]types.AttributeValue) []string {
 	return out
 }
 
-func TestManifest_HasReferenceInputs(t *testing.T) {
+func TestManifest_ReadsTheRuntime(t *testing.T) {
 	item := map[string]types.AttributeValue{
 		"runtime": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
 			"memory":   &types.AttributeValueMemberN{Value: "2048"},
 			"optimize": &types.AttributeValueMemberBOOL{Value: false},
 		}},
 		"inputs": &types.AttributeValueMemberL{Value: []types.AttributeValue{
-			&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{"name": &types.AttributeValueMemberS{Value: "data"}}},
+			&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+				"name":      &types.AttributeValueMemberS{Value: "genome"},
+				"reference": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{"kind": &types.AttributeValueMemberS{Value: "genome"}}},
+			}},
 		}},
 	}
 	var m Manifest
 	require.NoError(t, attributevalue.UnmarshalMap(item, &m))
-	assert.False(t, m.HasReferenceInputs())
 	assert.Equal(t, 2048, m.Runtime.Memory)
 	require.NotNil(t, m.Runtime.Optimize)
 	assert.False(t, *m.Runtime.Optimize)
-
-	item["inputs"].(*types.AttributeValueMemberL).Value = append(item["inputs"].(*types.AttributeValueMemberL).Value,
-		&types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
-			"name":      &types.AttributeValueMemberS{Value: "genome"},
-			"reference": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{"kind": &types.AttributeValueMemberS{Value: "genome"}}},
-		}})
-	m = Manifest{}
-	require.NoError(t, attributevalue.UnmarshalMap(item, &m))
-	assert.True(t, m.HasReferenceInputs())
-
-	var none *Manifest
-	assert.False(t, none.HasReferenceInputs())
 }

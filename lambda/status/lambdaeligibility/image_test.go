@@ -98,7 +98,7 @@ func TestReadImage_IndexWithoutAmd64(t *testing.T) {
 	facts, err := ReadImage(context.Background(), r, r.server.Client(), testImage)
 	require.NoError(t, err)
 	assert.Equal(t, "arm64", facts.Architecture)
-	assert.Contains(t, Decide(Runtime{}, facts, false, checked).Reasons, "the image is not linux/amd64")
+	assert.Contains(t, Decide(Runtime{}, facts, checked).Reasons, "the image is not linux/amd64")
 }
 
 func TestReadImage_Errors(t *testing.T) {

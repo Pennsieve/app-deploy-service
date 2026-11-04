@@ -89,18 +89,15 @@ func validReference(r portReference) bool {
 
 // referenceProblems are the checks on inputs' references that JSON Schema
 // can't express: only inputs take them, each in its own folder (placement:
-// subfolder), a choice: user default is one of its organisms, and the app
-// (and each variant) runs somewhere references are delivered, not only on
-// Lambda.
+// subfolder), and a choice: user default is one of its organisms. Every
+// compute type takes references: the Lambda step runtime unpacks them too.
 func referenceProblems(c appConfig) []string {
 	var out []string
-	has := false
 	for i, p := range c.Inputs {
 		r := p.Reference
 		if r == nil {
 			continue
 		}
-		has = true
 		path := fmt.Sprintf("/inputs/%d", i)
 		if p.Placement != "subfolder" {
 			out = append(out, fmt.Sprintf("%s/placement: an input filled from the reference catalog needs placement: subfolder (the reference is unpacked into its folder)", path))
@@ -128,31 +125,7 @@ func referenceProblems(c appConfig) []string {
 			out = append(out, fmt.Sprintf("/outputs/%d/reference: only inputs are filled from the reference catalog", i))
 		}
 	}
-	if !has {
-		return out
-	}
-	// References are delivered to ECS steps (standard, gpu), not Lambda ones.
-	if lambdaOnly(defaultComputeTypes(c.Runtime.ComputeTypes)) {
-		out = append(out, "/runtime/computeTypes: an app with reference inputs can't run only on lambda; references are delivered to standard and gpu steps")
-	}
-	for i, v := range c.Variants {
-		if v.Runtime.ComputeTypes != nil && lambdaOnly(v.Runtime.ComputeTypes) {
-			out = append(out, fmt.Sprintf("/variants/%d/runtime/computeTypes: an app with reference inputs can't run only on lambda; references are delivered to standard and gpu steps", i))
-		}
-	}
 	return out
-}
-
-func lambdaOnly(ct []string) bool {
-	if len(ct) == 0 {
-		return false
-	}
-	for _, t := range ct {
-		if !strings.EqualFold(strings.TrimSpace(t), "lambda") {
-			return false
-		}
-	}
-	return true
 }
 
 func containsInt(xs []int, x int) bool {
