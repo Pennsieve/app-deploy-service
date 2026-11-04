@@ -64,31 +64,11 @@ type Runtime struct {
 	Optimize *bool `dynamodbav:"optimize,omitempty"`
 }
 
-// Manifest is what eligibility reads of a stored manifest: its runtime and
-// whether any input is filled from the reference catalog.
+// Manifest is what eligibility reads of a stored manifest: its runtime.
+// (Reference inputs don't matter: the Lambda step runtime delivers them, as
+// fetch-inputs does for an ECS step.)
 type Manifest struct {
 	Runtime Runtime `dynamodbav:"runtime"`
-	Inputs  []Port  `dynamodbav:"inputs,omitempty"`
-}
-
-// Port is a stored input; Reference is non-nil when it is filled from the
-// reference catalog.
-type Port struct {
-	Reference *struct{} `dynamodbav:"reference,omitempty"`
-}
-
-// HasReferenceInputs: an input is filled from the reference catalog, which
-// is delivered to ECS steps (standard, gpu) only.
-func (m *Manifest) HasReferenceInputs() bool {
-	if m == nil {
-		return false
-	}
-	for _, p := range m.Inputs {
-		if p.Reference != nil {
-			return true
-		}
-	}
-	return false
 }
 
 // ImageFacts is what eligibility reads of an image: its platform, its
@@ -101,7 +81,7 @@ type ImageFacts struct {
 }
 
 // Decide is the eligibility of a runtime and image, checked at now.
-func Decide(rt Runtime, img ImageFacts, hasReferenceInputs bool, now time.Time) Eligibility {
+func Decide(rt Runtime, img ImageFacts, now time.Time) Eligibility {
 	// hard reasons rule Lambda out; soft ones are declared resource limits
 	// (memory, cpu, timeoutSeconds) a user may override for a run.
 	var reasons []string
@@ -116,9 +96,6 @@ func Decide(rt Runtime, img ImageFacts, hasReferenceInputs bool, now time.Time) 
 	}
 	if rt.Interactive || rt.SessionType != "" {
 		addHard("interactive sessions don't run on Lambda")
-	}
-	if hasReferenceInputs {
-		addHard("it reads reference data, which a Lambda step can't")
 	}
 	if rt.Memory > MaxMemoryMiB {
 		addSoft(fmt.Sprintf("it needs %s GB of memory; a Lambda step has at most 10 GB", units(rt.Memory, 1024)))

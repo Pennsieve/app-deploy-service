@@ -188,7 +188,6 @@ Lambda for a run anyway; any other reason makes it false. A version is
 | `runtime.optimize: false` | the app opts out of optimized runtimes (runtime.optimize: false) |
 | `computeTypes` is `[gpu]` | it runs on GPU only |
 | interactive | interactive sessions don't run on Lambda |
-| an input has a `reference` | it reads reference data, which a Lambda step can't |
 | `memory` > 10240 MiB | it needs N GB of memory; a Lambda step has at most 10 GB |
 | `cpu` > 6144 units | it needs N vCPU; a Lambda step has at most 6 |
 | `timeoutSeconds` > 900 (unset is fine; 900, Lambda's own limit, fits, and the compute node still stops a step at 840 s) | it may run up to …; a Lambda step runs at most 15 minutes |

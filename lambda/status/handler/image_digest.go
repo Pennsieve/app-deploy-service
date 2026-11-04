@@ -95,7 +95,7 @@ func decideEligibility(m *lambdaeligibility.Manifest, facts lambdaeligibility.Im
 	if m != nil {
 		rt = m.Runtime
 	}
-	return lambdaeligibility.Decide(rt, facts, m.HasReferenceInputs(), now)
+	return lambdaeligibility.Decide(rt, facts, now)
 }
 
 // imageByDigest is the image by its digest: exactly what was pushed, even if
