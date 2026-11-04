@@ -365,5 +365,5 @@ func LambdaEligibilityToModel(l *store_dynamodb.LambdaEligibility) *models.Lambd
 	if l == nil {
 		return nil
 	}
-	return &models.LambdaEligibility{Eligible: l.Eligible, Reasons: l.Reasons, ImageBytes: l.ImageBytes, CheckedAt: l.CheckedAt}
+	return &models.LambdaEligibility{Eligible: l.Eligible, Overridable: l.Overridable, Reasons: l.Reasons, ImageBytes: l.ImageBytes, CheckedAt: l.CheckedAt}
 }

@@ -197,12 +197,15 @@ type AppStoreVersion struct {
 // LambdaEligibility is the platform's decision whether a version (or a
 // variant) runs as a Lambda step. Reasons: why not, all that apply.
 // ImageBytes: the image's compressed size (the sum of its layers).
-// CheckedAt: when it was decided, RFC 3339.
+// CheckedAt: when it was decided, RFC 3339. Overridable: not eligible only
+// because of declared resource limits (memory, cpu, timeoutSeconds), so a
+// user may choose Lambda for a run anyway.
 type LambdaEligibility struct {
-	Eligible   bool     `json:"eligible"`
-	Reasons    []string `json:"reasons,omitempty"`
-	ImageBytes int64    `json:"imageBytes,omitempty"`
-	CheckedAt  string   `json:"checkedAt"`
+	Eligible    bool     `json:"eligible"`
+	Overridable bool     `json:"overridable,omitempty"`
+	Reasons     []string `json:"reasons,omitempty"`
+	ImageBytes  int64    `json:"imageBytes,omitempty"`
+	CheckedAt   string   `json:"checkedAt"`
 }
 
 // AppReview is a version's app.yml review block: per input port where a

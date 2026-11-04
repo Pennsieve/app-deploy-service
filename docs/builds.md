@@ -177,7 +177,10 @@ config blob through `GetDownloadUrlForLayer`), and records `lambda` next to
 {"eligible": false, "reasons": ["it runs on GPU only"], "imageBytes": 2147483648, "checkedAt": "2026-11-03T12:00:00Z"}
 ```
 
-`imageBytes` is the compressed size (the sum of the layers). A version is
+`imageBytes` is the compressed size (the sum of the layers). `overridable`
+is true (and otherwise omitted) when the version isn't eligible only because
+of its declared `memory`, `cpu` or `timeoutSeconds`, so a user may choose
+Lambda for a run anyway; any other reason makes it false. A version is
 **not** eligible, with a reason for each that applies, when:
 
 | Rule | Reason |
@@ -199,7 +202,8 @@ are `lambda/status/lambdaeligibility`. A failure to read the image is logged
 and leaves `lambda` unset; the digest and the build's status are recorded as
 usual. Versions built before this are decided by
 `lambda/status/cmd/backfill-lambda-eligibility` (`APPSTORE_VERSIONS_TABLE=...
-go run ./cmd/backfill-lambda-eligibility [-dry-run]`), which reads each
+go run ./cmd/backfill-lambda-eligibility [-dry-run] [-versions uuid,...]`;
+`-versions` limits it to those versions and their variants), which reads each
 version's and variant's image by its recorded digest (else its tag); it can
 be rerun, and should be after `runtime.optimize` changes for a stored manifest
 (for example after `backfill-manifests`).

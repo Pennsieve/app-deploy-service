@@ -48,9 +48,16 @@ type backfillVersion struct {
 // the image in ECR (by its recorded digest, else its tag). A version or
 // variant whose image can't be read (never built, deleted) is logged and
 // left as it is. With dryRun nothing is written; each decision is logged.
+// With versions (version uuids, the table's key) only those versions and
+// their variants are decided; one not in the table is logged. Empty means
+// every version.
 func BackfillLambdaEligibility(ctx context.Context, db VersionsTableApi, images lambdaeligibility.ImageReader, httpc lambdaeligibility.HTTPDoer,
-	tableName string, dryRun bool, now func() time.Time, logf func(string, ...any)) (LambdaBackfillResult, error) {
+	tableName string, dryRun bool, versions []string, now func() time.Time, logf func(string, ...any)) (LambdaBackfillResult, error) {
 	var res LambdaBackfillResult
+	only := map[string]bool{}
+	for _, id := range versions {
+		only[id] = false
+	}
 	facts := map[string]lambdaeligibility.ImageFacts{}
 	failed := map[string]bool{}
 	read := func(image string) (lambdaeligibility.ImageFacts, bool) {
@@ -112,6 +119,12 @@ func BackfillLambdaEligibility(ctx context.Context, db VersionsTableApi, images 
 				logf("%v: unable to read the version: %v", item[models.ApplicationKeyField], err)
 				continue
 			}
+			if len(only) > 0 {
+				if _, ok := only[v.Uuid]; !ok {
+					continue
+				}
+				only[v.Uuid] = true
+			}
 			if v.DestinationUrl == "" {
 				continue
 			}
@@ -141,6 +154,16 @@ func BackfillLambdaEligibility(ctx context.Context, db VersionsTableApi, images 
 			}
 		}
 		if len(out.LastEvaluatedKey) == 0 {
+			missing := make([]string, 0, len(only))
+			for id, found := range only {
+				if !found {
+					missing = append(missing, id)
+				}
+			}
+			sort.Strings(missing)
+			for _, id := range missing {
+				logf("%s: no such version", id)
+			}
 			return res, nil
 		}
 		start = out.LastEvaluatedKey
