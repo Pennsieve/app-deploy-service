@@ -38,12 +38,16 @@ const (
 // Eligibility is the decision, as stored on a version and on each variant
 // (attribute `lambda`). Reasons are why it isn't eligible, all that apply;
 // ImageBytes is the image's compressed size (the sum of its layers);
-// CheckedAt is when it was decided, RFC 3339.
+// CheckedAt is when it was decided, RFC 3339. Overridable is true when it
+// isn't eligible only because of declared resource limits (memory, cpu,
+// timeoutSeconds), so a user may choose Lambda for a run anyway; any other
+// reason makes it false, and it is always false when Eligible.
 type Eligibility struct {
-	Eligible   bool     `dynamodbav:"eligible" json:"eligible"`
-	Reasons    []string `dynamodbav:"reasons,omitempty" json:"reasons,omitempty"`
-	ImageBytes int64    `dynamodbav:"imageBytes,omitempty" json:"imageBytes,omitempty"`
-	CheckedAt  string   `dynamodbav:"checkedAt" json:"checkedAt"`
+	Eligible    bool     `dynamodbav:"eligible" json:"eligible"`
+	Overridable bool     `dynamodbav:"overridable,omitempty" json:"overridable,omitempty"`
+	Reasons     []string `dynamodbav:"reasons,omitempty" json:"reasons,omitempty"`
+	ImageBytes  int64    `dynamodbav:"imageBytes,omitempty" json:"imageBytes,omitempty"`
+	CheckedAt   string   `dynamodbav:"checkedAt" json:"checkedAt"`
 }
 
 // Runtime is what eligibility reads of a stored manifest's runtime
@@ -98,42 +102,48 @@ type ImageFacts struct {
 
 // Decide is the eligibility of a runtime and image, checked at now.
 func Decide(rt Runtime, img ImageFacts, hasReferenceInputs bool, now time.Time) Eligibility {
+	// hard reasons rule Lambda out; soft ones are declared resource limits
+	// (memory, cpu, timeoutSeconds) a user may override for a run.
 	var reasons []string
+	hard := false
+	addHard := func(r string) { reasons = append(reasons, r); hard = true }
+	addSoft := func(r string) { reasons = append(reasons, r) }
 	if rt.Optimize != nil && !*rt.Optimize {
-		reasons = append(reasons, "the app opts out of optimized runtimes (runtime.optimize: false)")
+		addHard("the app opts out of optimized runtimes (runtime.optimize: false)")
 	}
 	if gpuOnly(rt.ComputeTypes) {
-		reasons = append(reasons, "it runs on GPU only")
+		addHard("it runs on GPU only")
 	}
 	if rt.Interactive || rt.SessionType != "" {
-		reasons = append(reasons, "interactive sessions don't run on Lambda")
+		addHard("interactive sessions don't run on Lambda")
 	}
 	if hasReferenceInputs {
-		reasons = append(reasons, "it reads reference data, which a Lambda step can't")
+		addHard("it reads reference data, which a Lambda step can't")
 	}
 	if rt.Memory > MaxMemoryMiB {
-		reasons = append(reasons, fmt.Sprintf("it needs %s GB of memory; a Lambda step has at most 10 GB", units(rt.Memory, 1024)))
+		addSoft(fmt.Sprintf("it needs %s GB of memory; a Lambda step has at most 10 GB", units(rt.Memory, 1024)))
 	}
 	if rt.CPU > MaxCPUUnits {
-		reasons = append(reasons, fmt.Sprintf("it needs %s vCPU; a Lambda step has at most 6", units(rt.CPU, 1024)))
+		addSoft(fmt.Sprintf("it needs %s vCPU; a Lambda step has at most 6", units(rt.CPU, 1024)))
 	}
 	if rt.TimeoutSeconds > MaxTimeoutSeconds {
-		reasons = append(reasons, fmt.Sprintf("it may run up to %s; a Lambda step runs at most 15 minutes", duration(rt.TimeoutSeconds)))
+		addSoft(fmt.Sprintf("it may run up to %s; a Lambda step runs at most 15 minutes", duration(rt.TimeoutSeconds)))
 	}
 	if img.CompressedBytes > MaxImageBytes {
-		reasons = append(reasons, fmt.Sprintf("the image is %.1f GB; Lambda takes images up to 10 GB", float64(img.CompressedBytes)/1e9))
+		addHard(fmt.Sprintf("the image is %.1f GB; Lambda takes images up to 10 GB", float64(img.CompressedBytes)/1e9))
 	}
 	if img.Labels[ImageLabel] == "" {
-		reasons = append(reasons, "the image has no Lambda step runtime: rebuild the app")
+		addHard("the image has no Lambda step runtime: rebuild the app")
 	}
 	if (img.OS != "" && img.OS != "linux") || img.Architecture != "amd64" {
-		reasons = append(reasons, "the image is not linux/amd64")
+		addHard("the image is not linux/amd64")
 	}
 	return Eligibility{
-		Eligible:   len(reasons) == 0,
-		Reasons:    reasons,
-		ImageBytes: img.CompressedBytes,
-		CheckedAt:  now.UTC().Format(time.RFC3339),
+		Eligible:    len(reasons) == 0,
+		Overridable: len(reasons) > 0 && !hard,
+		Reasons:     reasons,
+		ImageBytes:  img.CompressedBytes,
+		CheckedAt:   now.UTC().Format(time.RFC3339),
 	}
 }
 

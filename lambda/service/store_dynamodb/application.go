@@ -170,13 +170,16 @@ type AppStoreVersion struct {
 // variant) runs as a Lambda step, from its runtime and its image. Reasons
 // are why it doesn't, all that apply; ImageBytes is the image's compressed
 // size (the sum of its layers); CheckedAt is when it was decided (RFC 3339).
+// Overridable: not eligible only because of declared resource limits
+// (memory, cpu, timeoutSeconds), so a user may choose Lambda for a run.
 // The status lambda writes it (lambda/status/lambdaeligibility); this
 // service only reads it.
 type LambdaEligibility struct {
-	Eligible   bool     `dynamodbav:"eligible" json:"eligible"`
-	Reasons    []string `dynamodbav:"reasons,omitempty" json:"reasons,omitempty"`
-	ImageBytes int64    `dynamodbav:"imageBytes,omitempty" json:"imageBytes,omitempty"`
-	CheckedAt  string   `dynamodbav:"checkedAt" json:"checkedAt"`
+	Eligible    bool     `dynamodbav:"eligible" json:"eligible"`
+	Overridable bool     `dynamodbav:"overridable,omitempty" json:"overridable,omitempty"`
+	Reasons     []string `dynamodbav:"reasons,omitempty" json:"reasons,omitempty"`
+	ImageBytes  int64    `dynamodbav:"imageBytes,omitempty" json:"imageBytes,omitempty"`
+	CheckedAt   string   `dynamodbav:"checkedAt" json:"checkedAt"`
 }
 
 // AppReview is a version's app.yml review block as stored. Parameters are

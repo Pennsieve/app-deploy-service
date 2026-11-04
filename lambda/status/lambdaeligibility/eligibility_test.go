@@ -25,6 +25,8 @@ func TestDecide(t *testing.T) {
 		img  ImageFacts
 		refs bool
 		want []string
+		// overridable: only declared resource limits stand in the way.
+		overridable bool
 	}{
 		{name: "a standard app with a Lambda image", rt: Runtime{ComputeTypes: []string{"standard"}}, img: lambdaImage()},
 		{name: "nothing declared", img: lambdaImage()},
@@ -44,10 +46,23 @@ func TestDecide(t *testing.T) {
 				"it needs 16 GB of memory; a Lambda step has at most 10 GB",
 				"it needs 6.5 vCPU; a Lambda step has at most 6",
 				"it may run up to 2 hours; a Lambda step runs at most 15 minutes",
+			}, overridable: true},
+		{name: "memory alone", rt: Runtime{Memory: 16384}, img: lambdaImage(),
+			want: []string{"it needs 16 GB of memory; a Lambda step has at most 10 GB"}, overridable: true},
+		{name: "too big to run and GPU only", rt: Runtime{Memory: 16384, ComputeTypes: []string{"gpu"}}, img: lambdaImage(),
+			want: []string{
+				"it runs on GPU only",
+				"it needs 16 GB of memory; a Lambda step has at most 10 GB",
+			}},
+		{name: "a long timeout and an image too big", rt: Runtime{TimeoutSeconds: 3600},
+			img: func() ImageFacts { i := lambdaImage(); i.CompressedBytes = 11_000_000_000; return i }(),
+			want: []string{
+				"it may run up to 1 hour; a Lambda step runs at most 15 minutes",
+				"the image is 11.0 GB; Lambda takes images up to 10 GB",
 			}},
 		{name: "a 15 minute timeout fits", rt: Runtime{TimeoutSeconds: 900}, img: lambdaImage()},
 		{name: "a 16 minute timeout", rt: Runtime{TimeoutSeconds: 960}, img: lambdaImage(),
-			want: []string{"it may run up to 16 minutes; a Lambda step runs at most 15 minutes"}},
+			want: []string{"it may run up to 16 minutes; a Lambda step runs at most 15 minutes"}, overridable: true},
 		{name: "an image built before the runtime, too big, for arm64",
 			img: ImageFacts{OS: "linux", Architecture: "arm64", CompressedBytes: 12_340_000_000},
 			want: []string{
@@ -72,6 +87,7 @@ func TestDecide(t *testing.T) {
 			got := Decide(c.rt, c.img, c.refs, checked)
 			assert.Equal(t, c.want, got.Reasons)
 			assert.Equal(t, len(c.want) == 0, got.Eligible)
+			assert.Equal(t, c.overridable, got.Overridable)
 			assert.Equal(t, c.img.CompressedBytes, got.ImageBytes)
 			assert.Equal(t, "2026-11-03T12:00:00Z", got.CheckedAt)
 		})
@@ -88,6 +104,10 @@ func TestEligibility_Stored(t *testing.T) {
 	av, err = attributevalue.Marshal(Eligibility{Eligible: true, CheckedAt: "2026-11-03T12:00:00Z"})
 	require.NoError(t, err)
 	assert.ElementsMatch(t, []string{"eligible", "checkedAt"}, keys(av.(*types.AttributeValueMemberM).Value))
+
+	av, err = attributevalue.Marshal(Eligibility{Eligible: false, Overridable: true, Reasons: []string{"too big"}, CheckedAt: "2026-11-03T12:00:00Z"})
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"eligible", "overridable", "reasons", "checkedAt"}, keys(av.(*types.AttributeValueMemberM).Value))
 }
 
 func keys(m map[string]types.AttributeValue) []string {

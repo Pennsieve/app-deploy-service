@@ -251,6 +251,9 @@ components:
       properties:
         eligible:
           type: boolean
+        overridable:
+          type: boolean
+          description: True when it isn't eligible only because of declared resource limits (memory, cpu, timeoutSeconds), so a user may choose Lambda for a run anyway. False (absent) when eligible or when any other reason applies.
         reasons:
           type: array
           description: Why it can't, every reason that applies (e.g. "it runs on GPU only"). Absent when eligible.

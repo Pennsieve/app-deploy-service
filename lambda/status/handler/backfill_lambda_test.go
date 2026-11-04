@@ -56,7 +56,7 @@ func TestBackfillLambdaEligibility(t *testing.T) {
 	table := backfillTable()
 	var logs []string
 	now := func() time.Time { return time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC) }
-	res, err := BackfillLambdaEligibility(context.Background(), table, fake, fake.blobs.Client(), testVersionsTable, false, now,
+	res, err := BackfillLambdaEligibility(context.Background(), table, fake, fake.blobs.Client(), testVersionsTable, false, nil, now,
 		func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
 	require.NoError(t, err)
 	assert.Equal(t, LambdaBackfillResult{Versions: 2, Variants: 1, Eligible: 1, Ineligible: 1, Unreadable: 1}, res)
@@ -73,8 +73,30 @@ func TestBackfillLambdaEligibility(t *testing.T) {
 
 	// a dry run writes nothing
 	table = backfillTable()
-	res, err = BackfillLambdaEligibility(context.Background(), table, fake, fake.blobs.Client(), testVersionsTable, true, now, func(string, ...any) {})
+	res, err = BackfillLambdaEligibility(context.Background(), table, fake, fake.blobs.Client(), testVersionsTable, true, nil, now, func(string, ...any) {})
 	require.NoError(t, err)
 	assert.Equal(t, 1, res.Eligible)
+	assert.Empty(t, table.updates)
+}
+
+// -versions limits a backfill to those versions and their variants.
+func TestBackfillLambdaEligibility_Versions(t *testing.T) {
+	fake := fakeLambdaImage(t)
+	now := func() time.Time { return time.Date(2026, 11, 3, 12, 0, 0, 0, time.UTC) }
+
+	table := backfillTable()
+	var logs []string
+	res, err := BackfillLambdaEligibility(context.Background(), table, fake, fake.blobs.Client(), testVersionsTable, false,
+		[]string{"version-1", "version-9"}, now, func(f string, a ...any) { logs = append(logs, fmt.Sprintf(f, a...)) })
+	require.NoError(t, err)
+	assert.Equal(t, LambdaBackfillResult{Versions: 1, Variants: 1, Eligible: 1, Ineligible: 1}, res, "version-2 is skipped, not unreadable")
+	require.Len(t, table.updates, 2, "version-1 and its variant")
+	assert.Contains(t, logs, "version-9: no such version")
+
+	table = backfillTable()
+	res, err = BackfillLambdaEligibility(context.Background(), table, fake, fake.blobs.Client(), testVersionsTable, false,
+		[]string{"version-2"}, now, func(string, ...any) {})
+	require.NoError(t, err)
+	assert.Equal(t, LambdaBackfillResult{Versions: 1, Unreadable: 1}, res)
 	assert.Empty(t, table.updates)
 }
