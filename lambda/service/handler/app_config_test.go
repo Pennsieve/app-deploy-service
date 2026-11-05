@@ -244,6 +244,13 @@ func TestAppManifest_FromFullAppYml(t *testing.T) {
 	assert.Len(t, m.Outputs, 1, "an output without a name is skipped")
 }
 
+func TestMediaTypes_Profile(t *testing.T) {
+	assert.Equal(t,
+		[]string{"application/edf", "application/x-hdf5; profile=nwb", "image/tiff; profile=ome-tiff"},
+		mediaTypes([]string{" application/edf ", "application/x-hdf5;profile=NWB", "Image/TIFF ;  profile=ome-tiff"}))
+	assert.Nil(t, mediaTypes(nil))
+}
+
 func TestAppManifest_Interactive(t *testing.T) {
 	c, err := parseAppConfig([]byte("runtime:\n  sessionType: jupyter\n"))
 	assert.NoError(t, err)

@@ -17,6 +17,32 @@ Each input and output is one of these, or a structure that holds files:
 
 A port with none of these takes any file, as before.
 
+### Formats that share a media type
+
+Some formats are a kind of another: NWB is HDF5, OME-TIFF is TIFF. They share
+the container's MIME type and are told apart by a `profile` parameter, as the
+platform's format registry (`GET /packages/formats`) lists them.
+
+This is a Pennsieve convention, not a standard: MIME parameters are defined
+per media type, and these types (`application/x-hdf5` is unregistered,
+`image/tiff` defines only `application`) define no `profile`. It follows
+RFC 6906's profile idea and is well-formed MIME, so a tool that doesn't know
+it reads the container type, which is still true. It names port types only;
+it isn't sent as a Content-Type.
+
+```yaml
+inputs:
+  - name: recording
+    mediaTypes: ["application/x-hdf5; profile=nwb"]  # NWB files only
+  - name: tables
+    mediaTypes: [application/x-hdf5]                 # any HDF5 file, NWB included
+  - name: signals
+    mediaTypes: [application/edf, "application/x-hdf5; profile=nwb"]  # either
+```
+
+`profile` is the only parameter app.yml takes. It's stored as
+`type/subtype; profile=<name>`, lower case, however it was spaced.
+
 Which one to pick:
 
 - **Each file is useful on its own** (a `.dcm` slice, an `.edf` recording):
@@ -184,6 +210,13 @@ An output can feed an input when:
 
   and, where both list `mediaTypes`, they overlap;
 - **without structures:** their media types overlap, as before.
+
+Media types overlap when one of the output's fits one of the input's: the
+same type and profile, an input of the bare type taking any of its profiles
+(an NWB output feeds an `application/x-hdf5` input), or `*/*` on either side.
+An output of the bare type and an input asking for a profile (HDF5 out, NWB
+in) may fit, as the HDF5 may be NWB: the builder lets them connect. Two
+different profiles of one type never do.
 
 A structure never feeds a plain-files input, and plain files never feed a
 structure.
