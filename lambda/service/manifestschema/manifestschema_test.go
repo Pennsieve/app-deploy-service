@@ -55,6 +55,7 @@ func TestProblems(t *testing.T) {
 		{"an unknown compute type", "application:\n  name: a\nruntime:\n  computeTypes: [ecs]\n", "/runtime/computeTypes/0"},
 		{"a bad ORCID", "application:\n  name: a\n  maintainers:\n    - name: b\n      orcid: 1234\n", "/application/maintainers/0/orcid"},
 		{"a bad media type", "application:\n  name: a\ninputs:\n  - name: x\n    mediaTypes: [parquet]\n", "/inputs/0/mediaTypes/0"},
+		{"a media type parameter other than profile", "application:\n  name: a\ninputs:\n  - name: x\n    mediaTypes: [\"text/csv; charset=utf-8\"]\n", "/inputs/0/mediaTypes/0"},
 		{"an unknown container", "application:\n  name: a\ninputs:\n  - name: x\n    container: folder\n", "/inputs/0/container"},
 		{"a subfolder named with spaces", "application:\n  name: a\ninputs:\n  - name: My recordings\n    placement: subfolder\n", "/inputs/0/name"},
 		{"folders of no format", "application:\n  name: a\ninputs:\n  - name: x\n    container: directory\n", "mediaTypes"},
@@ -109,6 +110,8 @@ parameters:
 inputs:
   - name: recording
     formats: [format_3590, http://edamontology.org/format_3549]
+  - name: signals
+    mediaTypes: [application/edf, "application/x-hdf5; profile=nwb", "image/tiff;profile=ome-tiff"]
 outputs:
   - name: spikes
     mediaTypes: [application/vnd.apache.parquet]

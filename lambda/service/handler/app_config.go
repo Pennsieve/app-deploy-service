@@ -409,7 +409,7 @@ func appPorts(ports []appPort) []store_dynamodb.AppPort {
 		if p.Name == "" {
 			continue
 		}
-		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: p.MediaTypes, Formats: edamFormats(p.Formats),
+		out = append(out, store_dynamodb.AppPort{Name: p.Name, Description: p.Description, MediaTypes: mediaTypes(p.MediaTypes), Formats: edamFormats(p.Formats),
 			Container: strings.TrimSpace(p.Container), ConformsTo: p.ConformsTo.trimmed(), Reference: storedReference(p.Reference),
 			Placement: strings.TrimSpace(p.Placement)})
 	}
@@ -478,6 +478,28 @@ func reviewDatasetRecord(d *appReviewDataset) *store_dynamodb.ReviewDataset {
 		return nil
 	}
 	return &store_dynamodb.ReviewDataset{DOI: d.DOI, URL: d.URL, Files: d.Files}
+}
+
+// mediaTypes writes each one as type/subtype, with its profile, if any, as
+// "; profile=<name>" ("application/x-hdf5;profile=NWB" ->
+// "application/x-hdf5; profile=nwb"), so ports compare as strings.
+func mediaTypes(ms []string) []string {
+	if len(ms) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(ms))
+	for _, m := range ms {
+		base, params, _ := strings.Cut(m, ";")
+		base = strings.ToLower(strings.TrimSpace(base))
+		if base == "" {
+			continue
+		}
+		if k, v, ok := strings.Cut(strings.TrimSpace(params), "="); ok && strings.EqualFold(strings.TrimSpace(k), "profile") && strings.TrimSpace(v) != "" {
+			base += "; profile=" + strings.ToLower(strings.TrimSpace(v))
+		}
+		out = append(out, base)
+	}
+	return out
 }
 
 // edamFormats keeps EDAM format ids short (format_3590), whether written so
