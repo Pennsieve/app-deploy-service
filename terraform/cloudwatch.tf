@@ -36,7 +36,12 @@ resource "aws_cloudwatch_event_rule" "status_cloudwatch_event_rule" {
   description = "Listens for app deploy task state changes"
   event_pattern = jsonencode({
     "detail" : {
-      "group" : ["family:${aws_ecs_task_definition.app_deployer_ecs_task_definition.family}"],
+      // The provisioner task too: only its failures are recorded (an App
+      // Store build that never started); CodeBuild reports the rest.
+      "group" : [
+        "family:${aws_ecs_task_definition.app_deployer_ecs_task_definition.family}",
+        "family:${aws_ecs_task_definition.app_provisioner_ecs_task_definition.family}",
+      ],
     },
     "detail-type" : ["ECS Task State Change"],
     "source" : ["aws.ecs"]

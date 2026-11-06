@@ -47,7 +47,8 @@ func init() {
 			codebuild.NewFromConfig(awsConfig),
 			cloudwatchlogs.NewFromConfig(awsConfig),
 			ssm.NewFromConfig(awsConfig)).
-		WithECR(ecr.NewFromConfig(awsConfig))
+		WithECR(ecr.NewFromConfig(awsConfig)).
+		WithProvisionerGroup(os.Getenv(handler.ProvisionerTaskGroupEnvVar))
 
 	// live status updates: AppSync Events where configured, otherwise Pusher
 	if strings.TrimSpace(os.Getenv(realtime.EnvEventsEndpoint)) != "" {

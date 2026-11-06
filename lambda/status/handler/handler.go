@@ -34,6 +34,20 @@ type DeployTaskStateChangeHandler struct {
 	// HTTPClient downloads an image's configuration from ECR; nil: a
 	// default client.
 	HTTPClient lambdaeligibility.HTTPDoer
+
+	// ProvisionerGroup is the App Store provisioner task's ECS group
+	// ("family:..."); empty: its events aren't told apart.
+	ProvisionerGroup string
+}
+
+// WithProvisionerGroup names the App Store provisioner task's ECS group. That
+// task only starts the image build, whose CodeBuild events say deployed or
+// failed, so of its own events only a failure is recorded: then no build
+// started (a Docker Hub outage failing the task's start) and nothing else
+// would say so.
+func (h *DeployTaskStateChangeHandler) WithProvisionerGroup(group string) *DeployTaskStateChangeHandler {
+	h.ProvisionerGroup = group
+	return h
 }
 
 // WithECR lets the handler record the digest of each App Store image it sees
@@ -95,6 +109,13 @@ func (h *DeployTaskStateChangeHandler) Handle(ctx context.Context, event models.
 	taskArn := event.Detail.TaskArn
 	h.logger = h.logger.With(slog.String("taskArn", taskArn))
 	h.logger.Info("handling event", slog.Any("event", event))
+
+	if h.ProvisionerGroup != "" && event.Detail.Group == h.ProvisionerGroup {
+		if final := IsFinalState(event); final == nil || !final.Errored {
+			h.logger.Info("ignoring provisioner task event: the image build reports the status")
+			return nil
+		}
+	}
 
 	ids, err := h.GetIdsFromTags(ctx, taskArn, event.Detail.ClusterArn)
 	if err != nil {
