@@ -111,6 +111,7 @@ resource "aws_lambda_function" "status_lambda" {
       APPLICATIONS_TABLE          = aws_dynamodb_table.applications_table.name,
       APPSTORE_APPLICATIONS_TABLE = aws_dynamodb_table.appstore_applications_table.name,
       DEPLOYMENTS_TABLE           = aws_dynamodb_table.deployments_table.name
+      PROVISIONER_TASK_GROUP      = "family:${aws_ecs_task_definition.app_provisioner_ecs_task_definition.family}"
     }
   }
 }

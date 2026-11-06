@@ -31,6 +31,8 @@ type Detail struct {
 	TaskArn           string `json:"taskArn"`
 	TaskDefinitionArn string `json:"taskDefinitionArn"`
 	Version           int    `json:"version"`
+	// Group is "family:<task definition family>".
+	Group string `json:"group"`
 
 	ClusterArn string `json:"clusterArn"`
 
@@ -66,7 +68,7 @@ type Detail struct {
 }
 
 func (d Detail) Errored() bool {
-	if d.BuildFailed {
+	if d.BuildFailed || d.StopCode == StopCodeTaskFailedToStart {
 		return true
 	}
 	for _, c := range d.Containers {
