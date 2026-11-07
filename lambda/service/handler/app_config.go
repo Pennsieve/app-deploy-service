@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"log"
 	"os"
@@ -310,6 +311,12 @@ func buildStorageGiB(c appConfig) int32 {
 func readSyncedAppConfig(ctx context.Context, cfg aws.Config, sourceUrl string, tag string) (appConfig, bool) {
 	data, ok := readSyncedAppYml(ctx, cfg, sourceUrl, tag)
 	if !ok {
+		return appConfig{}, false
+	}
+	// An empty file is no app.yml: what a sync GitHub refused (a rate limit)
+	// left, not an app without inputs, outputs or a name.
+	if len(bytes.TrimSpace(data)) == 0 {
+		log.Printf("warning: the synced app.yml of %s %s is empty", sourceUrl, tag)
 		return appConfig{}, false
 	}
 	c, err := parseAppConfig(data)

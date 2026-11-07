@@ -325,7 +325,7 @@ func TestBackfillManifests_Variants(t *testing.T) {
 	pilot := storedManifestOf(readConfig(t, dynasdVariantsFile))
 	read := func(context.Context, string, string) (storedManifest, bool) { return pilot, true }
 
-	res, err := BackfillManifests(context.Background(), apps, versions, read, false, func(string, ...any) {})
+	res, err := BackfillManifests(context.Background(), apps, versions, read, BackfillOptions{}, func(string, ...any) {})
 	require.NoError(t, err)
 	assert.Equal(t, 1, res.Stored)
 	assert.Equal(t, "cpu", versions.manifests["d1"].Variant.ID, "the manifest is the default variant's")
