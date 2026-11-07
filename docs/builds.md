@@ -6,13 +6,15 @@ release's root `Dockerfile` from git at the release tag and pushes the image to
 then adds `<hash>-<tag>-soci`, and `image_resolver` hands out the SOCI-enabled
 digest.
 
-Two builders can do the build. The Terraform variable `image_builder` picks one
-per environment:
+BuildKit v0.34.1 in a CodeBuild project (`terraform/codebuild.tf`) does the
+build: the same engine as `docker build`, with a per-app registry cache.
+`image_builder` is `codebuild`, its only value.
 
-| `image_builder` | What builds | Notes |
-|---|---|---|
-| `kaniko` (default) | the kaniko Fargate task (`gcr.io/kaniko-project/executor`, v1.24.0 pinned by digest) | kaniko is archived. It ignores Dockerfile heredocs and `RUN --mount`, so releases using them are refused (below). There is no cache. |
-| `codebuild` | BuildKit v0.34.1 in a CodeBuild project (`terraform/codebuild.tf`) | The same engine as `docker build`, with a per-app registry cache. |
+**kaniko is retired.** It was the first builder (a Fargate task, archived
+upstream, which ignored Dockerfile heredocs and `RUN --mount`); every
+environment moved to CodeBuild, and the kaniko task, its guard against
+BuildKit-only Dockerfiles and the `image_builder = "kaniko"` option are gone.
+The comparisons with kaniko below are kept as the record of why.
 
 Background: the spike in [buildkit-spike.md](buildkit-spike.md). It explains why
 BuildKit cannot run on Fargate and why CodeBuild was chosen.
@@ -21,20 +23,17 @@ BuildKit cannot run on Fargate and why CodeBuild was chosen.
 
 ```
 release ─► service lambda (post_appstore_handler) ─► provisioner task (ADD_TO_APPSTORE)
-                │ kaniko only: refuse BuildKit-only Dockerfiles      │
-                │                                                    ├─ kaniko:    ecs.RunTask (deployer task)
-                │                                                    └─ codebuild: codebuild.StartBuild
+                │                                                    └─ codebuild.StartBuild
                 ▼
         version "registering" ─► "deploying" ─► status lambda ─► "deployed" | "error"
                                                    ▲
-              ECS Task State Change (kaniko) ──────┤
               CodeBuild Build State Change ────────┘
 ```
 
-Both paths have the same inputs: the source URL, the tag, the destination
+The build's inputs: the source URL, the tag, the destination
 `<appstore-private>:<hash>-<tag>`, a GitHub token for a private repo, and the
-storage a GPU build needs (`APP_STORAGE` from app.yml). Both have the same
-output, the image pushed to that tag. The deployment record and the version
+storage a GPU build needs (`APP_STORAGE` from app.yml). Its
+output is the image pushed to that tag. The deployment record and the version
 status go through the same steps.
 
 ### CodeBuild path
@@ -296,20 +295,6 @@ container, privileged.
   names a private ECR image in the Pennsieve account builds under kaniko but
   not under CodeBuild. Public base images are unaffected.
 
-### The kaniko guard
-
-While `image_builder = "kaniko"`, the service lambda reads the release's
-`Dockerfile` before it starts the build (`handler/dockerfile_check.go`). It
-refuses the release (HTTP 422, version status `error: ...`) when a
-`RUN`/`COPY`/`ADD` uses a heredoc (`<<EOF`, `<<-'EOF'`, ...) or a `RUN` uses
-`--mount`. The message names the lines. kaniko would silently build something
-other than what the author tested: it dropped the dynasd v0.2.0 heredoc body,
-so `/opt/dynasd` was never created. With `codebuild`, the check is skipped. A
-Dockerfile that can't be read doesn't block the release.
-
-It checks every Dockerfile the release builds: `Dockerfile`, or the ones app.yml's
-`build.dockerfile` (top level or a built variant's) names, each once.
-
 ## Variants
 
 An app.yml with `variants` ([app-manifest-variants.md](app-manifest-variants.md)) builds
@@ -396,7 +381,7 @@ statements and the environment variables into that module, with
 download BuildKit from GitHub or needs a mirror (S3 or clin ECR) is for clin
 to decide. The build already clones the app from GitHub.
 
-## Rollout
+## Rollout (done; kaniko since retired)
 
 1. **Merge.** Nothing changes: `image_builder` defaults to `kaniko`, which is
    now pinned to v1.24.0 by digest, and the heredoc/`--mount` guard is on. The
@@ -415,11 +400,8 @@ to decide. The build already clones the app from GitHub.
    - break a Dockerfile and check the deployment's `stoppedReason`.
 4. **prod**, then **clin** (after porting the module).
 
-**Rollback:** set `image_builder = "kaniko"` and apply. The provisioner and
-the service lambda pick the variable up from their environment, the guard
-comes back, and the CodeBuild resources are destroyed. The cache repository
-has `force_delete`, and its contents are only cache. Images already pushed are
-untouched.
+There is no rollback to kaniko any more: the kaniko task and its option were
+removed once every environment built with CodeBuild.
 
 ## Cost
 

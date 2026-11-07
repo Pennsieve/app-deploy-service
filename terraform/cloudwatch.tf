@@ -6,14 +6,6 @@ resource "aws_cloudwatch_log_group" "app_provisioner_fargate_cloudwatch_log_grou
   tags = local.common_tags
 }
 
-// CREATE FARGATE TASK CLOUDWATCH LOG GROUP - deployer
-resource "aws_cloudwatch_log_group" "app_deployer_fargate_cloudwatch_log_group" {
-  name              = "/aws/fargate/${var.environment_name}-${var.service_name}-${var.deployer_tier}-${data.terraform_remote_state.region.outputs.aws_region_shortname}"
-  retention_in_days = 7
-
-  tags = local.common_tags
-}
-
 // CREATE STATUS LAMBDA CLOUDWATCH LOG GROUP
 resource "aws_cloudwatch_log_group" "status_lambda_cloudwatch_log_group" {
   name              = "/aws/lambda/${aws_lambda_function.status_lambda.function_name}"
@@ -36,10 +28,9 @@ resource "aws_cloudwatch_event_rule" "status_cloudwatch_event_rule" {
   description = "Listens for app deploy task state changes"
   event_pattern = jsonencode({
     "detail" : {
-      // The provisioner task too: only its failures are recorded (an App
-      // Store build that never started); CodeBuild reports the rest.
+      // The provisioner task: only its failures are recorded (an App Store
+      // build that never started); CodeBuild reports the rest.
       "group" : [
-        "family:${aws_ecs_task_definition.app_deployer_ecs_task_definition.family}",
         "family:${aws_ecs_task_definition.app_provisioner_ecs_task_definition.family}",
       ],
     },

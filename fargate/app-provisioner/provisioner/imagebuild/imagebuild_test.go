@@ -39,13 +39,15 @@ func vars(in *codebuild.StartBuildInput) map[string]cbtypes.EnvironmentVariable 
 }
 
 func TestSelected(t *testing.T) {
-	for in, want := range map[string]string{"": BuilderKaniko, "kaniko": BuilderKaniko, " CodeBuild ": BuilderCodeBuild, "codebuild": BuilderCodeBuild} {
+	for _, in := range []string{"", " CodeBuild ", "codebuild"} {
 		got, err := Selected(in)
 		require.NoError(t, err, in)
-		assert.Equal(t, want, got, in)
+		assert.Equal(t, BuilderCodeBuild, got, in)
 	}
-	_, err := Selected("buildkit")
-	assert.Error(t, err)
+	for _, in := range []string{"kaniko", "buildkit"} {
+		_, err := Selected(in)
+		assert.Error(t, err, in)
+	}
 }
 
 func TestConfigFromEnv(t *testing.T) {
@@ -197,7 +199,6 @@ func TestStartBuildInput_NoVariantNoSettingsUnchanged(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{ContextVar, DestinationVar, CacheRefVar, DeploymentIdVar, ApplicationIdVar, ApplicationsTableVar}, names)
 	assert.Equal(t, CacheRef(testConfig.CacheRepoUrl, testRequest.SourceUrl), aws.ToString(v[CacheRefVar].Value))
-	assert.Empty(t, KanikoFlags(testRequest))
 }
 
 func TestStartBuildInput_DefaultVariant(t *testing.T) {
@@ -241,11 +242,6 @@ func TestVariantDestination(t *testing.T) {
 	assert.Equal(t, base, VariantDestination(base, "", false))
 	assert.Equal(t, base, VariantDestination(base, "cpu", true))
 	assert.Equal(t, base+"--gpu", VariantDestination(base, "gpu", false))
-}
-
-func TestKanikoFlags(t *testing.T) {
-	r := Request{BuildArgs: map[string]string{"B": "2", "A": "x y"}, Target: "gpu", Dockerfile: "docker/Dockerfile.gpu"}
-	assert.Equal(t, []string{"--build-arg", "A=x y", "--build-arg", "B=2", "--target", "gpu", "--dockerfile", "docker/Dockerfile.gpu"}, KanikoFlags(r))
 }
 
 func TestRequestValidate(t *testing.T) {

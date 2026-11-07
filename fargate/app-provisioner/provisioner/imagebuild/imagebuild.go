@@ -25,11 +25,9 @@ import (
 	ssmtypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
 )
 
-// Builders, as the image_builder Terraform variable names them.
-const (
-	BuilderKaniko    = "kaniko"
-	BuilderCodeBuild = "codebuild"
-)
+// BuilderCodeBuild is the one builder, as the image_builder Terraform
+// variable names it (kaniko is retired).
+const BuilderCodeBuild = "codebuild"
 
 // Environment variables the provisioner task reads (task_definition.json.tpl).
 const (
@@ -73,17 +71,15 @@ const VariantTagSeparator = "--"
 // BUILD_GENERAL1_XLARGE (256 GB) instead.
 const largeDiskGiB = 128
 
-// Selected returns the configured builder: kaniko unless IMAGE_BUILDER says
-// codebuild. An unknown value is an error, so a typo in Terraform fails the
-// release instead of silently picking a builder.
+// Selected checks IMAGE_BUILDER: empty or codebuild. Anything else (kaniko
+// included, now retired) is an error, so a stale Terraform value fails the
+// release instead of silently building another way.
 func Selected(value string) (string, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "", BuilderKaniko:
-		return BuilderKaniko, nil
-	case BuilderCodeBuild:
+	case "", BuilderCodeBuild:
 		return BuilderCodeBuild, nil
 	default:
-		return "", fmt.Errorf("unknown %s %q (want %q or %q)", BuilderEnv, value, BuilderKaniko, BuilderCodeBuild)
+		return "", fmt.Errorf("unknown %s %q (want %q)", BuilderEnv, value, BuilderCodeBuild)
 	}
 }
 
@@ -208,23 +204,6 @@ func BuildArgLines(args map[string]string) string {
 		lines = append(lines, k+"="+args[k])
 	}
 	return strings.Join(lines, "\n")
-}
-
-// KanikoFlags are the kaniko executor flags for the build settings:
-// --build-arg K=V per arg (sorted), --target and --dockerfile. None for a
-// build without settings, so its command is the one it always was.
-func KanikoFlags(r Request) []string {
-	var flags []string
-	for _, k := range sortedArgNames(r.BuildArgs) {
-		flags = append(flags, "--build-arg", k+"="+r.BuildArgs[k])
-	}
-	if r.Target != "" {
-		flags = append(flags, "--target", r.Target)
-	}
-	if r.Dockerfile != "" {
-		flags = append(flags, "--dockerfile", r.Dockerfile)
-	}
-	return flags
 }
 
 // GitContext is the BuildKit git context for a source URL at a tag. BuildKit

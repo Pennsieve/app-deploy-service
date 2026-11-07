@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/pennsieve/app-deploy-service/service/manifestschema"
 	"log"
@@ -41,13 +40,11 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	envValue := os.Getenv("ENV")
 
 	TaskDefinitionArn := os.Getenv("TASK_DEF_ARN")
-	DeployerTaskDefinitionArn := os.Getenv("DEPLOYER_TASK_DEF_ARN")
 	subIdStr := os.Getenv("SUBNET_IDS")
 	SubNetIds := strings.Split(subIdStr, ",")
 	cluster := os.Getenv("CLUSTER_ARN")
 	SecurityGroup := os.Getenv("SECURITY_GROUP")
 	TaskDefContainerName := os.Getenv("TASK_DEF_CONTAINER_NAME")
-	DeployerTaskDefContainerName := os.Getenv("DEPLOYER_TASK_DEF_CONTAINER_NAME")
 	deploymentsTable := os.Getenv(deploymentsTableNameKey)
 	applicationsTable := os.Getenv(appstoreApplicationsTableNameKey)
 	versionsTable := os.Getenv(appstoreVersionsTableNameKey)
@@ -245,23 +242,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		}
 	}
 
-	// While kaniko builds the images, a Dockerfile it can't build faithfully
-	// (heredocs, RUN --mount) is refused here with the reason, instead of
-	// silently pushing an image other than the one the author tested.
-	// Skipped when the environment builds with BuildKit (IMAGE_BUILDER).
-	var dockerfiles []string
-	if haveAppCfg {
-		dockerfiles = builtDockerfiles(resolved, buildAllVariants)
-	}
-	if reason := unsupportedDockerfileSyntax(application.Source.Url, application.Source.Tag, application.Source.AuthToken, dockerfiles); reason != "" {
-		log.Printf("refusing %s %s: %s", application.Source.Url, application.Source.Tag, reason)
-		refusal := withLiveUpdates(ctx, NewAppStoreStatusManager(handlerName, versionStore, versionUuid), cfg)
-		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusUnprocessableEntity,
-			Body:       refusal.SetErrorStatus(ctx, errors.New(reason)),
-		}, nil
-	}
-
 	// References Pennsieve's catalog doesn't have: noted on the version, never
 	// refusing the release. A reference input describes a folder's contents;
 	// the catalog is one way to fill it, and runs ask for files otherwise.
@@ -418,17 +398,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	sourceUrlKey := "SOURCE_URL"
 	sourceUrlValue := application.Source.Url
 
-	deployerTaskDefnKey := "DEPLOYER_TASK_DEF_ARN"
-	deployerTaskDefnValue := DeployerTaskDefinitionArn
-	subetsIdKey := "SUBNET_IDS"
-	subetsIdValue := subIdStr
-	clusterKey := "CLUSTER_ARN"
-	clusterValue := cluster
-	securityGroupKey := "SECURITY_GROUP"
-	securityGroupValue := SecurityGroup
-	deployertaskDefnContainerKey := "DEPLOYER_TASK_DEF_CONTAINER_NAME"
-	deployertaskDefnContainerValue := DeployerTaskDefContainerName
-
 	authTokenKey := "AUTH_TOKEN"
 	authTokenValue := application.Source.AuthToken
 
@@ -460,26 +429,6 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 		{
 			Name:  &sourceTagKey,
 			Value: &sourceTagValue,
-		},
-		{
-			Name:  &deployerTaskDefnKey,
-			Value: &deployerTaskDefnValue,
-		},
-		{
-			Name:  &subetsIdKey,
-			Value: &subetsIdValue,
-		},
-		{
-			Name:  &clusterKey,
-			Value: &clusterValue,
-		},
-		{
-			Name:  &securityGroupKey,
-			Value: &securityGroupValue,
-		},
-		{
-			Name:  &deployertaskDefnContainerKey,
-			Value: &deployertaskDefnContainerValue,
 		},
 		{
 			Name:  aws.String(deploymentsTableNameKey),

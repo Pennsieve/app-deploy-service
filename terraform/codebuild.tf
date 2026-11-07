@@ -2,11 +2,12 @@
 # App Store image builds with BuildKit on CodeBuild (docs/builds.md) #
 ####################################################################
 #
-# Exists only when var.image_builder = "codebuild". The provisioner starts one
-# build per release (StartBuild); the build runs image-builder/build.sh, which
-# builds the release's Dockerfile from git and pushes the image to
-# appstore-private with the tag the kaniko task used. CodeBuild's Build State
-# Change events go to the status lambda.
+# var.image_builder is always "codebuild" now (kaniko is retired); the count
+# on these resources stays so their addresses don't change. The provisioner
+# starts one build per release (StartBuild); the build runs
+# image-builder/build.sh, which builds the release's Dockerfile from git and
+# pushes the image to appstore-private. CodeBuild's Build State Change events
+# go to the status lambda.
 #
 # Environment-agnostic: names come from environment_name, service_name and
 # the region; the appstore-private repository from platform-infrastructure.
@@ -26,7 +27,6 @@ locals {
   image_build_parameter_prefix = "/${var.environment_name}/${var.service_name}/image-builds"
   image_build_parameter_arn    = "arn:aws:ssm:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:parameter${local.image_build_parameter_prefix}/*"
 
-  # empty with kaniko (task_definition.json.tpl)
   image_builder_project_name_or_empty = local.use_codebuild ? local.image_builder_project_name : ""
   build_cache_ecr_url_or_empty        = local.use_codebuild ? aws_ecr_repository.build_cache[0].repository_url : ""
 
@@ -59,7 +59,7 @@ resource "aws_ecr_repository" "build_cache" {
 
   name                 = "${var.environment_name}-appstore-buildcache-${local.region_shortname}"
   image_tag_mutability = "MUTABLE" # each release re-exports its app's cache tag
-  force_delete         = true      # only cache; safe to drop when switching back to kaniko
+  force_delete         = true      # only cache; safe to drop
 
   tags = merge(local.common_tags, {
     "Name"         = "${var.environment_name}-appstore-buildcache-ecr-${local.region_shortname}"
@@ -319,7 +319,7 @@ resource "aws_codebuild_project" "image_builder" {
 }
 
 # Build state changes (IN_PROGRESS, SUCCEEDED, FAILED, FAULT, STOPPED,
-# TIMED_OUT) to the status lambda, beside the kaniko task's ECS events.
+# TIMED_OUT) to the status lambda, beside the provisioner task's ECS events.
 resource "aws_cloudwatch_event_rule" "image_builder_status" {
   count = local.use_codebuild ? 1 : 0
 

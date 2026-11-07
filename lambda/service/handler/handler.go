@@ -31,15 +31,10 @@ func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTT
 		"requestContext.http.path", request.RequestContext.HTTP.Path)
 
 	router := NewLambdaRouter()
-	// register routes based on their supported methods - to be deprecated
-	router.POST("/v1", PostApplicationsHandler)
-	router.GET("/v1", GetApplicationsHandler)
-	router.GET("/{id}", GetApplicationHandler)
+	// Deployment history (App Store builds included). The routes that
+	// installed apps on compute nodes before the App Store are retired.
 	router.GET("/{id}/deployments", GetDeploymentsHandler)
 	router.GET("/{id}/deployments/{deploymentId}", GetDeploymentHandler)
-	router.DELETE("/{id}", DeleteApplicationHandler)
-	router.PUT("/{id}", PutApplicationsHandler)
-	router.POST("/deploy", PostApplicationDeployHandler)
 
 	// AppStore routes
 	router.POST("/store", PostAppStoreHandler)

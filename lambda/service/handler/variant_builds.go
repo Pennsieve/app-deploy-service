@@ -2,7 +2,6 @@ package handler
 
 import (
 	"os"
-	"path"
 	"strings"
 
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
@@ -74,39 +73,6 @@ func planVariantBuilds(vv *store_dynamodb.VersionVariants, r resolvedApp, defaul
 		}
 	}
 	return out
-}
-
-// builtDockerfiles are the distinct Dockerfiles a release builds, as paths
-// in the repository: "Dockerfile" unless app.yml's build (or a built
-// variant's) names another. The kaniko guard reads each one.
-func builtDockerfiles(r resolvedApp, buildAll bool) []string {
-	var files []string
-	seen := map[string]bool{}
-	add := func(p string) {
-		p = strings.TrimSpace(p)
-		if p == "" {
-			p = "Dockerfile"
-		}
-		p = strings.TrimPrefix(path.Clean(p), "/")
-		if !seen[p] {
-			seen[p] = true
-			files = append(files, p)
-		}
-	}
-	if len(r.Variants) == 0 {
-		if r.Build != nil {
-			add(r.Build.Dockerfile)
-		} else {
-			add("")
-		}
-		return files
-	}
-	for _, v := range r.Variants {
-		if v.ID == r.DefaultVariant || buildAll {
-			add(v.Build.Dockerfile)
-		}
-	}
-	return files
 }
 
 // defaultVariantBuilt is the variant the release's own deployment builds:
