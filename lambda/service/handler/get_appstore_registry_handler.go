@@ -114,8 +114,7 @@ func GetAppStoreRegistryHandler(ctx context.Context, request events.APIGatewayV2
 		}, nil
 	}
 
-	ver := versions[0]
-	destinationUrl, refusal := registryDestination(ver, variant)
+	destinationUrl, refusal := registryVersionDestination(versions, variant)
 	if refusal != nil {
 		log.Printf("%s: refused %s@%s variant %q: %s", handlerName, sourceUrl, version, variant, refusal.Message)
 		resp := models.RegistryImageResponse{

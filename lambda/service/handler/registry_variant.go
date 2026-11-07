@@ -3,6 +3,8 @@ package handler
 import (
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/pennsieve/app-deploy-service/service/store_dynamodb"
 )
@@ -73,4 +75,27 @@ func registryDestination(ver store_dynamodb.AppStoreVersion, variant string) (st
 		return "", &registryRefusal{http.StatusNotFound, fmt.Sprintf("variant %s of %s is not yet deployed", variant, ver.Version)}
 	}
 	return url, nil
+}
+
+// registryVersionDestination is registryDestination over every record of a
+// version: a release can be registered more than once (a build that failed,
+// then a retry), and its records come back in no useful order. The newest
+// record the registry would authorize wins; when none would, the newest one's
+// refusal is the answer.
+func registryVersionDestination(versions []store_dynamodb.AppStoreVersion, variant string) (string, *registryRefusal) {
+	newestFirst := slices.Clone(versions)
+	slices.SortStableFunc(newestFirst, func(a, b store_dynamodb.AppStoreVersion) int {
+		return strings.Compare(b.CreatedAt, a.CreatedAt)
+	})
+	var first *registryRefusal
+	for _, ver := range newestFirst {
+		url, refusal := registryDestination(ver, variant)
+		if refusal == nil {
+			return url, nil
+		}
+		if first == nil {
+			first = refusal
+		}
+	}
+	return "", first
 }
