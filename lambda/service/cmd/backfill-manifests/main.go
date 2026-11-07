@@ -4,7 +4,11 @@
 // after deploying, with AWS credentials for it:
 //
 //	APPSTORE_APPLICATIONS_TABLE=... APPSTORE_VERSIONS_TABLE=... CONTENT_SYNC_BUCKET=... \
-//	  go run ./cmd/backfill-manifests [-dry-run]
+//	  go run ./cmd/backfill-manifests [-dry-run] [-replace-empty]
+//
+// -replace-empty also re-reads the versions whose manifest is empty (no
+// name, inputs or outputs: registered from an empty synced app.yml); re-sync
+// their content first.
 package main
 
 import (
@@ -21,6 +25,7 @@ import (
 
 func main() {
 	dryRun := flag.Bool("dry-run", false, "report what would be stored, without writing")
+	replaceEmpty := flag.Bool("replace-empty", false, "also replace empty manifests (no name, inputs or outputs)")
 	flag.Parse()
 	for _, v := range []string{"APPSTORE_APPLICATIONS_TABLE", "APPSTORE_VERSIONS_TABLE", "CONTENT_SYNC_BUCKET"} {
 		if os.Getenv(v) == "" {
@@ -36,7 +41,7 @@ func main() {
 	res, err := handler.BackfillManifests(ctx,
 		store_dynamodb.NewAppStoreDatabaseStore(client, os.Getenv("APPSTORE_APPLICATIONS_TABLE")),
 		store_dynamodb.NewAppStoreVersionDatabaseStore(client, os.Getenv("APPSTORE_VERSIONS_TABLE")),
-		handler.SyncedManifestReader(cfg), *dryRun, log.Printf)
+		handler.SyncedManifestReader(cfg), handler.BackfillOptions{DryRun: *dryRun, ReplaceEmpty: *replaceEmpty}, log.Printf)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -103,7 +103,7 @@ func TestBackfillManifests(t *testing.T) {
 		return storedManifest{Manifest: &store_dynamodb.AppManifest{Name: tag, Parameters: []store_dynamodb.AppParameter{{Name: "new"}}}}, true
 	}
 
-	res, err := BackfillManifests(context.Background(), apps, versions, read, false, func(string, ...any) {})
+	res, err := BackfillManifests(context.Background(), apps, versions, read, BackfillOptions{}, func(string, ...any) {})
 	require.NoError(t, err)
 	assert.Equal(t, BackfillResult{Apps: 2, Versions: 3, Stored: 1, WithoutAppYml: 1, ParamsSet: 1}, res)
 	assert.Equal(t, "v2.0.0", versions.manifests["a2"].Name, "the version without one gets its manifest")
@@ -114,8 +114,45 @@ func TestBackfillManifests(t *testing.T) {
 
 	// A dry run writes nothing.
 	versions.manifests, apps.params = map[string]*store_dynamodb.AppManifest{}, map[string][]store_dynamodb.AppParameter{}
-	_, err = BackfillManifests(context.Background(), apps, versions, read, true, func(string, ...any) {})
+	_, err = BackfillManifests(context.Background(), apps, versions, read, BackfillOptions{DryRun: true}, func(string, ...any) {})
 	require.NoError(t, err)
 	assert.Empty(t, versions.manifests)
 	assert.Empty(t, apps.params)
+}
+
+// With ReplaceEmpty, an empty manifest (an empty synced app.yml registered
+// as one) is re-read as a missing one is; a real one is kept, and without
+// ReplaceEmpty an empty one is too.
+func TestBackfillReplacesEmptyManifests(t *testing.T) {
+	apps := &fakeApps{
+		apps:   []store_dynamodb.AppStoreApplication{{Uuid: "a", SourceUrl: "https://github.com/o/a"}},
+		params: map[string][]store_dynamodb.AppParameter{},
+	}
+	empty := &store_dynamodb.AppManifest{Runtime: store_dynamodb.AppRuntime{}}
+	named := &store_dynamodb.AppManifest{Name: "kept"}
+	newVersions := func() *fakeVersions {
+		return &fakeVersions{
+			versions: []store_dynamodb.AppStoreVersion{
+				{Uuid: "a1", ApplicationId: "a", Version: "v1.0.0", CreatedAt: "1", Manifest: named},
+				{Uuid: "a2", ApplicationId: "a", Version: "v2.0.0", CreatedAt: "2", Manifest: empty},
+			},
+			manifests: map[string]*store_dynamodb.AppManifest{},
+		}
+	}
+	read := func(_ context.Context, _, tag string) (storedManifest, bool) {
+		return storedManifest{Manifest: &store_dynamodb.AppManifest{Name: tag, Inputs: []store_dynamodb.AppPort{{Name: "in"}}}}, true
+	}
+
+	versions := newVersions()
+	res, err := BackfillManifests(context.Background(), apps, versions, read, BackfillOptions{ReplaceEmpty: true}, func(string, ...any) {})
+	require.NoError(t, err)
+	assert.Equal(t, 1, res.Stored)
+	assert.Equal(t, "v2.0.0", versions.manifests["a2"].Name)
+	assert.NotContains(t, versions.manifests, "a1")
+
+	versions = newVersions()
+	res, err = BackfillManifests(context.Background(), apps, versions, read, BackfillOptions{}, func(string, ...any) {})
+	require.NoError(t, err)
+	assert.Equal(t, 0, res.Stored)
+	assert.Empty(t, versions.manifests)
 }

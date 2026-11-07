@@ -36,6 +36,19 @@ func SyncedManifestReader(cfg aws.Config) manifestReader {
 	}
 }
 
+// BackfillOptions: DryRun writes nothing; ReplaceEmpty also re-reads the
+// versions whose stored manifest is empty (emptyManifest).
+type BackfillOptions struct {
+	DryRun, ReplaceEmpty bool
+}
+
+// emptyManifest is what registration stores when it read no app.yml (an
+// empty synced file, as a sync GitHub rate-limited left): no name, inputs or
+// outputs.
+func emptyManifest(m *store_dynamodb.AppManifest) bool {
+	return m != nil && m.Name == "" && len(m.Inputs) == 0 && len(m.Outputs) == 0
+}
+
 // BackfillResult counts what a backfill did.
 type BackfillResult struct {
 	Apps, Versions, Stored, WithoutAppYml, ParamsSet int
@@ -46,9 +59,11 @@ type BackfillResult struct {
 // does (with variants: the default's manifest, plus the variants), and sets
 // each app's top-level params from its newest version's (undoing any
 // rollback by a re-registered older tag). Versions without an app.yml are
-// left without a manifest. With dryRun nothing is written.
+// left as they are. With opts.ReplaceEmpty, an empty manifest is replaced as
+// a missing one is; with opts.DryRun nothing is written.
 func BackfillManifests(ctx context.Context, apps store_dynamodb.AppStoreDBStore, versions store_dynamodb.AppStoreVersionDBStore,
-	read manifestReader, dryRun bool, logf func(string, ...any)) (BackfillResult, error) {
+	read manifestReader, opts BackfillOptions, logf func(string, ...any)) (BackfillResult, error) {
+	dryRun := opts.DryRun
 	var res BackfillResult
 	all, err := apps.GetAll(ctx)
 	if err != nil {
@@ -66,10 +81,13 @@ func BackfillManifests(ctx context.Context, apps store_dynamodb.AppStoreDBStore,
 			res.Versions++
 			tagged = append(tagged, taggedVersion{Tag: v.Version, CreatedAt: v.CreatedAt})
 			m := v.Manifest
-			if m == nil && v.Version != "" {
+			if (m == nil || opts.ReplaceEmpty && emptyManifest(m)) && v.Version != "" {
 				stored, ok := read(ctx, app.SourceUrl, v.Version)
 				if !ok {
 					res.WithoutAppYml++
+					if m != nil {
+						manifests[v.Version] = m
+					}
 					continue
 				}
 				m = stored.Manifest
