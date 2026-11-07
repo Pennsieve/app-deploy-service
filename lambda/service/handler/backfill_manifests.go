@@ -43,10 +43,11 @@ type BackfillOptions struct {
 }
 
 // emptyManifest is what registration stores when it read no app.yml (an
-// empty synced file, as a sync GitHub rate-limited left): no name, inputs or
-// outputs.
+// empty synced file, as a sync GitHub rate-limited left): the runtime alone,
+// no name, parameters, inputs or outputs. (An older app.yml without a name or
+// ports still declares parameters.)
 func emptyManifest(m *store_dynamodb.AppManifest) bool {
-	return m != nil && m.Name == "" && len(m.Inputs) == 0 && len(m.Outputs) == 0
+	return m != nil && m.Name == "" && len(m.Parameters) == 0 && len(m.Inputs) == 0 && len(m.Outputs) == 0
 }
 
 // BackfillResult counts what a backfill did.

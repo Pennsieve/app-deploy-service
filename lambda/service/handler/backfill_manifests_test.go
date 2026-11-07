@@ -130,11 +130,13 @@ func TestBackfillReplacesEmptyManifests(t *testing.T) {
 	}
 	empty := &store_dynamodb.AppManifest{Runtime: store_dynamodb.AppRuntime{}}
 	named := &store_dynamodb.AppManifest{Name: "kept"}
+	parameters := &store_dynamodb.AppManifest{Parameters: []store_dynamodb.AppParameter{{Name: "p"}}}
 	newVersions := func() *fakeVersions {
 		return &fakeVersions{
 			versions: []store_dynamodb.AppStoreVersion{
 				{Uuid: "a1", ApplicationId: "a", Version: "v1.0.0", CreatedAt: "1", Manifest: named},
 				{Uuid: "a2", ApplicationId: "a", Version: "v2.0.0", CreatedAt: "2", Manifest: empty},
+				{Uuid: "a0", ApplicationId: "a", Version: "v0.9.0", CreatedAt: "0", Manifest: parameters},
 			},
 			manifests: map[string]*store_dynamodb.AppManifest{},
 		}
@@ -149,6 +151,7 @@ func TestBackfillReplacesEmptyManifests(t *testing.T) {
 	assert.Equal(t, 1, res.Stored)
 	assert.Equal(t, "v2.0.0", versions.manifests["a2"].Name)
 	assert.NotContains(t, versions.manifests, "a1")
+	assert.NotContains(t, versions.manifests, "a0", "an older app.yml's (parameters, no name or ports) is kept")
 
 	versions = newVersions()
 	res, err = BackfillManifests(context.Background(), apps, versions, read, BackfillOptions{}, func(string, ...any) {})
