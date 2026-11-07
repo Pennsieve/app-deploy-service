@@ -77,29 +77,6 @@ func TestPlanVariantBuilds_NoVariants(t *testing.T) {
 	}
 }
 
-func TestBuiltDockerfiles(t *testing.T) {
-	parse := func(yml string) resolvedApp {
-		c, err := parseAppConfig([]byte(yml))
-		require.NoError(t, err)
-		return resolveVariants(c)
-	}
-
-	assert.Equal(t, []string{"Dockerfile"}, builtDockerfiles(parse("runtime: {cpu: 1024}\n"), true))
-	assert.Equal(t, []string{"docker/Dockerfile.cpu"}, builtDockerfiles(parse("build: {dockerfile: ./docker/Dockerfile.cpu}\n"), true))
-
-	variants := parse(`
-build: {dockerfile: Dockerfile}
-variants:
-  - id: cpu
-  - id: gpu
-    build: {dockerfile: docker/Dockerfile.gpu}
-  - id: gpu-large
-    build: {dockerfile: docker/Dockerfile.gpu, target: large}
-`)
-	assert.Equal(t, []string{"Dockerfile", "docker/Dockerfile.gpu"}, builtDockerfiles(variants, true), "each distinct Dockerfile once")
-	assert.Equal(t, []string{"Dockerfile"}, builtDockerfiles(variants, false), "only the default's when only it is built")
-}
-
 func TestVariantBuildsEnabled(t *testing.T) {
 	for value, want := range map[string]bool{"": true, "true": true, "false": false, " FALSE ": false, "0": true} {
 		t.Setenv(appVariantsEnabledEnv, value)

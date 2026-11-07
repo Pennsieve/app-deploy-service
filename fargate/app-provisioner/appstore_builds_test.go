@@ -5,8 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/ecs/types"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/imagebuild"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/status"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/store_dynamodb"
@@ -217,35 +215,4 @@ func TestPlanAppStoreBuilds(t *testing.T) {
 	// a default that isn't recorded: the one image, as without variants
 	builds = planAppStoreBuilds(store_dynamodb.VersionBuilds{DefaultVariant: "cpu"}, "release-dep", 0)
 	assert.Equal(t, []appStoreBuild{{Default: true, DeploymentId: "release-dep"}}, builds)
-}
-
-func tags(in []types.Tag) map[string]string {
-	m := map[string]string{}
-	for _, t := range in {
-		m[aws.ToString(t.Key)] = aws.ToString(t.Value)
-	}
-	return m
-}
-
-func TestKanikoRunTaskInput(t *testing.T) {
-	env := map[string]string{"DEPLOYER_TASK_DEF_ARN": "td", "CLUSTER_ARN": "c", "SUBNET_IDS": "a,b", "SECURITY_GROUP": "sg", "DEPLOYER_TASK_DEF_CONTAINER_NAME": "deployer"}
-	getenv := func(k string) string { return env[k] }
-	base := imagebuild.Request{DeploymentId: "d", ApplicationId: "v", ApplicationsTable: "versions", Destination: testEcrRepo + ":1-v1"}
-
-	// without variants or settings: today's command and tags
-	in := kanikoRunTaskInput(base, "git://github.com/org/app.git#refs/tags/v1", nil, getenv)
-	assert.Equal(t, []string{"--context", "git://github.com/org/app.git#refs/tags/v1", "--destination", testEcrRepo + ":1-v1", "--force"}, in.Overrides.ContainerOverrides[0].Command)
-	assert.Equal(t, map[string]string{"DeploymentId": "d", "ApplicationId": "v", "ApplicationsTable": "versions"}, tags(in.Tags))
-	assert.Nil(t, in.Overrides.EphemeralStorage)
-	assert.Equal(t, []string{"a", "b"}, in.NetworkConfiguration.AwsvpcConfiguration.Subnets)
-
-	gpu := base
-	gpu.Variant, gpu.Destination, gpu.StorageGiB = "gpu", base.Destination+"--gpu", 100
-	gpu.BuildArgs, gpu.Target, gpu.Dockerfile = map[string]string{"TORCH_FLAVOUR": "cuda"}, "gpu", "docker/Dockerfile"
-	in = kanikoRunTaskInput(gpu, "ctx", nil, getenv)
-	assert.Equal(t, []string{"--context", "ctx", "--destination", testEcrRepo + ":1-v1--gpu", "--force",
-		"--build-arg", "TORCH_FLAVOUR=cuda", "--target", "gpu", "--dockerfile", "docker/Dockerfile"}, in.Overrides.ContainerOverrides[0].Command)
-	assert.Equal(t, "gpu", tags(in.Tags)["Variant"])
-	assert.Equal(t, "false", tags(in.Tags)["VariantDefault"])
-	assert.Equal(t, int32(100), in.Overrides.EphemeralStorage.SizeInGiB)
 }

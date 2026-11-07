@@ -33,25 +33,23 @@ resource "aws_lambda_function" "service_lambda" {
     variables = {
       # Deployed build: readable by the running code (os.Getenv("IMAGE_TAG")) and via
       # `aws lambda get-function-configuration ... Environment.Variables.IMAGE_TAG`.
-      IMAGE_TAG                        = var.image_tag
-      ENV                              = var.environment_name
-      PENNSIEVE_DOMAIN                 = data.terraform_remote_state.account.outputs.domain_name,
-      REGION                           = var.aws_region
-      TASK_DEF_ARN                     = aws_ecs_task_definition.app_provisioner_ecs_task_definition.arn,
-      DEPLOYER_TASK_DEF_ARN            = aws_ecs_task_definition.app_deployer_ecs_task_definition.arn,
-      CLUSTER_ARN                      = data.terraform_remote_state.fargate.outputs.ecs_cluster_arn,
-      SUBNET_IDS                       = join(",", data.terraform_remote_state.vpc.outputs.private_subnet_ids),
-      SECURITY_GROUP                   = data.terraform_remote_state.platform_infrastructure.outputs.rehydration_fargate_security_group_id,
-      LOG_LEVEL                        = "info",
-      TASK_DEF_CONTAINER_NAME          = var.tier,
-      DEPLOYER_TASK_DEF_CONTAINER_NAME = var.deployer_tier,
-      APPLICATIONS_TABLE               = aws_dynamodb_table.applications_table.name,
-      APPSTORE_APPLICATIONS_TABLE      = aws_dynamodb_table.appstore_applications_table.name,
-      APPSTORE_VERSIONS_TABLE          = aws_dynamodb_table.appstore_versions_table.name,
-      DEPLOYMENTS_TABLE                = aws_dynamodb_table.deployments_table.name,
-      APP_ACCESS_TABLE                 = aws_dynamodb_table.app_access_table.name,
-      ACCOUNTS_TABLE                   = data.terraform_remote_state.account_service.outputs.accounts_table_name
-      CONTENT_SYNC_BUCKET              = aws_s3_bucket.content_sync_bucket.id
+      IMAGE_TAG                   = var.image_tag
+      ENV                         = var.environment_name
+      PENNSIEVE_DOMAIN            = data.terraform_remote_state.account.outputs.domain_name,
+      REGION                      = var.aws_region
+      TASK_DEF_ARN                = aws_ecs_task_definition.app_provisioner_ecs_task_definition.arn,
+      CLUSTER_ARN                 = data.terraform_remote_state.fargate.outputs.ecs_cluster_arn,
+      SUBNET_IDS                  = join(",", data.terraform_remote_state.vpc.outputs.private_subnet_ids),
+      SECURITY_GROUP              = data.terraform_remote_state.platform_infrastructure.outputs.rehydration_fargate_security_group_id,
+      LOG_LEVEL                   = "info",
+      TASK_DEF_CONTAINER_NAME     = var.tier,
+      APPLICATIONS_TABLE          = aws_dynamodb_table.applications_table.name,
+      APPSTORE_APPLICATIONS_TABLE = aws_dynamodb_table.appstore_applications_table.name,
+      APPSTORE_VERSIONS_TABLE     = aws_dynamodb_table.appstore_versions_table.name,
+      DEPLOYMENTS_TABLE           = aws_dynamodb_table.deployments_table.name,
+      APP_ACCESS_TABLE            = aws_dynamodb_table.app_access_table.name,
+      ACCOUNTS_TABLE              = data.terraform_remote_state.account_service.outputs.accounts_table_name
+      CONTENT_SYNC_BUCKET         = aws_s3_bucket.content_sync_bucket.id
       // token_auth routes verify the request's organization_id through the
       // platform's direct authorizer (handler/workspace_access.go). Not
       // wrapped in try(): a missing output must fail the plan, not every
@@ -63,9 +61,6 @@ resource "aws_lambda_function" "service_lambda" {
       // Live updates: the Event API's publish host where realtime is on
       // (realtime.tf); empty keeps Pusher.
       REALTIME_EVENTS_ENDPOINT = local.realtime_events_endpoint
-      // Which builder builds App Store images (docs/builds.md); with kaniko,
-      // releases whose Dockerfile uses BuildKit-only syntax are refused.
-      IMAGE_BUILDER = var.image_builder
       // Build every variant of a release (true), or only the default.
       APP_VARIANTS_ENABLED = tostring(var.app_variants_enabled)
     }

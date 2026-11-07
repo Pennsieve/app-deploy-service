@@ -8,8 +8,8 @@ version. For each release it:
 - records the version's status;
 - tells compute nodes which image to run for an app, tag and variant.
 
-It also keeps the older per-workspace applications (`/v1`, `/deploy`), which
-deploy an app straight to a compute node.
+Apps used to be installed straight onto a compute node (`/v1`, `/deploy`);
+that path is retired, and apps run from the App Store.
 
 ## How a release becomes a version
 
@@ -19,12 +19,11 @@ GitHub release ─► POST /store (service lambda)
                     │  record the version: "registering"
                     ▼
                 provisioner task (fargate/app-provisioner, ADD_TO_APPSTORE)
-                    ├─ kaniko:    ECS RunTask (kaniko executor)
-                    └─ codebuild: CodeBuild StartBuild (BuildKit)
+                    └─ CodeBuild StartBuild (BuildKit)
                     ▼
                 image pushed to <env>-appstore-private-<region>:<hash>-<tag>
                     ▼
-                status lambda (ECS / CodeBuild state changes) ─► "deployed" | "error"
+                status lambda (CodeBuild state changes) ─► "deployed" | "error"
                     ▼
                 SOCI index builder adds <hash>-<tag>-soci
 ```
@@ -49,12 +48,11 @@ Problems in app.yml or CITATION.cff are recorded on the version
 
 ## Image builds
 
-`image_builder` picks the builder per environment; see [builds.md](docs/builds.md).
-
-| `image_builder` | Builder | Notes |
-|---|---|---|
-| `kaniko` (default) | kaniko Fargate task, v1.24.0 pinned | kaniko is archived. It ignores Dockerfile heredocs and `RUN --mount`, so those releases are refused. No cache. |
-| `codebuild` | BuildKit v0.34.1 in a CodeBuild project | Same engine as `docker build`, with a per-app registry cache. Docker Hub is pulled with the platform's account; an ECR pull-through cache can be put in front (`image_builder_dockerhub_cache`). |
+Images are built with BuildKit v0.34.1 in a CodeBuild project; see
+[builds.md](docs/builds.md). Same engine as `docker build`, with a per-app
+registry cache. Docker Hub is pulled with the platform's account; an ECR
+pull-through cache can be put in front (`image_builder_dockerhub_cache`).
+The kaniko builder is retired.
 
 Why CodeBuild and not BuildKit on Fargate: [buildkit-spike.md](docs/buildkit-spike.md).
 
@@ -72,7 +70,7 @@ which is both the OpenAPI spec and the API Gateway definition.
 | `POST /store/sync` | sync an application's details |
 | `GET /store/{id}/asset` | a file from an application's synced repository content, per tag |
 | `GET`/`PUT /store/{id}/permissions` | who can see and run an application |
-| `POST /v1`, `GET /{id}`, `POST /deploy`, `GET /{id}/deployments[/{deploymentId}]` | per-workspace applications deployed to a compute node |
+| `GET /{id}/deployments[/{deploymentId}]` | an application's deployment (build) history |
 
 [github-integration-and-app-store.md](docs/github-integration-and-app-store.md)
 walks through publishing from GitHub: linking GitHub, choosing repositories,
@@ -87,7 +85,7 @@ releasing, and permissions.
 | `lambda/service/cmd/backfill-manifests` | one-off tool: store app.yml for versions registered before versions kept theirs |
 | `lambda/status` | status lambda: turns ECS task and CodeBuild state changes into deployment and version status |
 | `lambda/status/cmd/backfill-lambda-eligibility` | one-off tool: decide and store the Lambda eligibility of versions built before it was recorded |
-| `fargate/app-provisioner` | provisioner task: starts builds (kaniko or CodeBuild) and deploys per-workspace apps |
+| `fargate/app-provisioner` | provisioner task: starts an App Store release's CodeBuild builds |
 | `fargate/buildkit-builder` | the BuildKit spike prototype (not deployed) |
 | `terraform` | the service's infrastructure; `terraform/image-builder` holds CodeBuild's `build.sh` and buildspec |
 | `docs` | design and how-to docs (linked above) |
@@ -102,7 +100,7 @@ The infrastructure repo calls the module once per environment, from
 
 | Variable | Default | What |
 |---|---|---|
-| `image_builder` | `kaniko` | `kaniko` or `codebuild` |
+| `image_builder` | `codebuild` | `codebuild` only (kaniko is retired; kept so environments that set it keep working) |
 | `image_builder_dockerhub_auth` | `true` | CodeBuild: pull from Docker Hub with the platform's account |
 | `image_builder_dockerhub_cache` | `false` | CodeBuild: use the ECR pull-through cache for Docker Hub; the rule is created outside this module (see builds.md) |
 | `image_builder_compute_type`, `image_builder_timeout_minutes` | | CodeBuild size and timeout |

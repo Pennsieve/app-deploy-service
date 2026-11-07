@@ -6,30 +6,23 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
-	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner"
 	"github.com/pennsieve/app-deploy-service/app-provisioner/provisioner/imagebuild"
 )
 
-// buildStarter starts an App Store image build: the kaniko Fargate task or a
-// CodeBuild build, as the environment's image_builder selects (docs/builds.md).
-// Either way the image is pushed to the same <appstore-private>:<hash>-<tag>
-// and the status lambda records how the build ended.
+// buildStarter starts an App Store image build: a CodeBuild build
+// (docs/builds.md), which pushes the image to <appstore-private>:<hash>-<tag>;
+// the status lambda records how the build ended.
 type buildStarter interface {
 	Name() string
 	Start(ctx context.Context, r imagebuild.Request, gitToken string) error
 }
 
-// newBuildStarter picks the builder from IMAGE_BUILDER: kaniko unless it says
-// codebuild. Selecting codebuild without its configuration is an error.
-func newBuildStarter(builder string, getenv func(string) string, cfg aws.Config, appProvisioner provisioner.Provisioner) (buildStarter, error) {
-	selected, err := imagebuild.Selected(builder)
-	if err != nil {
+// newBuildStarter is the CodeBuild builder. IMAGE_BUILDER, when set, must
+// say codebuild, and its configuration must be there.
+func newBuildStarter(builder string, getenv func(string) string, cfg aws.Config) (buildStarter, error) {
+	if _, err := imagebuild.Selected(builder); err != nil {
 		return nil, err
-	}
-	if selected == imagebuild.BuilderKaniko {
-		return kanikoStarter{appProvisioner: appProvisioner, ecsClient: ecs.NewFromConfig(cfg)}, nil
 	}
 	cbCfg, err := imagebuild.ConfigFromEnv(getenv)
 	if err != nil {
@@ -40,20 +33,6 @@ func newBuildStarter(builder string, getenv func(string) string, cfg aws.Config,
 		codeBuild: codebuild.NewFromConfig(cfg),
 		params:    ssm.NewFromConfig(cfg),
 	}, nil
-}
-
-type kanikoStarter struct {
-	appProvisioner provisioner.Provisioner
-	ecsClient      *ecs.Client
-}
-
-func (kanikoStarter) Name() string { return imagebuild.BuilderKaniko }
-
-func (k kanikoStarter) Start(ctx context.Context, r imagebuild.Request, gitToken string) error {
-	if err := r.Validate(); err != nil {
-		return err
-	}
-	return PrivateDeploy(ctx, r, gitToken, k.appProvisioner, k.ecsClient)
 }
 
 type codeBuildStarter struct {
