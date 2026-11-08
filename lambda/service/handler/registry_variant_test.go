@@ -119,3 +119,43 @@ func TestRegistryDestination_OtherVariant(t *testing.T) {
 	require.Nil(t, refusal)
 	assert.Equal(t, dynasdImage+"--gpu", url)
 }
+
+func TestRegistryVersionDestination_Retried(t *testing.T) {
+	// processor-cycombine v0.1.1 on prod: two failed builds, then a deployed retry
+	failed1 := store_dynamodb.AppStoreVersion{Version: "v0.1.1", Status: "error", CreatedAt: "2026-11-07 04:46:05.059161212 +0000 UTC"}
+	failed2 := store_dynamodb.AppStoreVersion{Version: "v0.1.1", Status: "error", CreatedAt: "2026-11-07 04:49:58.290587941 +0000 UTC"}
+	deployed := store_dynamodb.AppStoreVersion{Version: "v0.1.1", Status: "deployed", DestinationUrl: "repo:3-v0.1.1", CreatedAt: "2026-11-07 05:10:08.169359529 +0000 UTC"}
+
+	for _, order := range [][]store_dynamodb.AppStoreVersion{
+		{failed1, failed2, deployed},
+		{deployed, failed1, failed2},
+		{failed2, deployed, failed1},
+	} {
+		url, refusal := registryVersionDestination(order, "")
+		require.Nil(t, refusal)
+		assert.Equal(t, "repo:3-v0.1.1", url)
+	}
+}
+
+func TestRegistryVersionDestination_NewestDeployedWins(t *testing.T) {
+	older := store_dynamodb.AppStoreVersion{Version: "v1.0.0", Status: "deployed", DestinationUrl: "repo:1-v1.0.0", CreatedAt: "2026-11-01 10:00:00 +0000 UTC"}
+	newer := store_dynamodb.AppStoreVersion{Version: "v1.0.0", Status: "deployed", DestinationUrl: "repo:2-v1.0.0", CreatedAt: "2026-11-02 10:00:00 +0000 UTC"}
+	url, refusal := registryVersionDestination([]store_dynamodb.AppStoreVersion{older, newer}, "")
+	require.Nil(t, refusal)
+	assert.Equal(t, "repo:2-v1.0.0", url)
+}
+
+func TestRegistryVersionDestination_NoneDeployed(t *testing.T) {
+	// the newest record's refusal: a retry still building, after a failed build
+	failed := store_dynamodb.AppStoreVersion{Version: "v1.0.0", Status: "error", CreatedAt: "2026-11-01 10:00:00 +0000 UTC"}
+	building := store_dynamodb.AppStoreVersion{Version: "v1.0.0", Status: "registering", CreatedAt: "2026-11-02 10:00:00 +0000 UTC"}
+	_, refusal := registryVersionDestination([]store_dynamodb.AppStoreVersion{failed, building}, "")
+	require.NotNil(t, refusal)
+	assert.Equal(t, registryRefusal{http.StatusNotFound, "version is not yet deployed"}, *refusal)
+
+	// variants: the same rule
+	withGpu := dynasdVersion(store_dynamodb.AppVariant{}, store_dynamodb.AppVariant{Status: "error"})
+	_, refusal = registryVersionDestination([]store_dynamodb.AppStoreVersion{withGpu}, "gpu")
+	require.NotNil(t, refusal)
+	assert.Equal(t, registryRefusal{http.StatusNotFound, "variant gpu of v0.3.0 failed to build"}, *refusal)
+}
