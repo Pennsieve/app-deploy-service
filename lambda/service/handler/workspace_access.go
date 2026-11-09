@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -82,6 +83,33 @@ func workspaceFromRequest(ctx context.Context, request events.APIGatewayV2HTTPRe
 	if orgNodeId == "" {
 		return nil, nil
 	}
+	return verifyWorkspace(ctx, orgNodeId, claims, handlerName)
+}
+
+// isCallbackRequest reports whether the request was authorized with a run's
+// callback token. The platform authorizer takes any "Callback " header down
+// the callback path, so the claims then come from the validated run.
+func isCallbackRequest(request events.APIGatewayV2HTTPRequest) bool {
+	return strings.HasPrefix(request.Headers["authorization"], "Callback ")
+}
+
+// workspaceForRun is workspaceFromRequest for routes a workflow run calls
+// (the registry): a callback-authorized request without organization_id acts
+// in the run's workspace. Unlike a user token's (active) organization, a
+// callback's organization claim is the run's own, resolved by the authorizer
+// from the validated run, so apps shared with that workspace or a team in it
+// count. Verified like a named workspace, which also brings the teams.
+func workspaceForRun(ctx context.Context, request events.APIGatewayV2HTTPRequest, claims *authorizer.Claims, handlerName string) (*requestWorkspace, *events.APIGatewayV2HTTPResponse) {
+	if request.QueryStringParameters["organization_id"] == "" && isCallbackRequest(request) &&
+		claims != nil && claims.OrgClaim != nil && claims.OrgClaim.NodeId != "" {
+		return verifyWorkspace(ctx, claims.OrgClaim.NodeId, claims, handlerName)
+	}
+	return workspaceFromRequest(ctx, request, claims, handlerName)
+}
+
+// verifyWorkspace returns orgNodeId as the request's workspace once the
+// caller's membership there is verified (see workspaceFromRequest).
+func verifyWorkspace(ctx context.Context, orgNodeId string, claims *authorizer.Claims, handlerName string) (*requestWorkspace, *events.APIGatewayV2HTTPResponse) {
 	if claims == nil || claims.UserClaim == nil {
 		return nil, &events.APIGatewayV2HTTPResponse{StatusCode: http.StatusUnauthorized, Body: handlerError(handlerName, ErrNotPermitted)}
 	}

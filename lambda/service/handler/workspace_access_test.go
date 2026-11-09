@@ -130,3 +130,70 @@ func TestCanAccessAppIn(t *testing.T) {
 	assert.False(t, CanAccessAppIn(ctx, me, nil, private, grantFor("workspace#N:org:active", "workspace")), "no workspace: personal only")
 	assert.True(t, CanAccessAppIn(ctx, me, nil, private, grantFor("user#N:user:me", "user")), "no workspace: shared with me")
 }
+
+func callbackRequest(org string) events.APIGatewayV2HTTPRequest {
+	req := requestFor(org)
+	req.Headers = map[string]string{"authorization": "Callback workflow-service:run-1:token"}
+	return req
+}
+
+func TestWorkspaceForRun_CallbackUsesRunWorkspace(t *testing.T) {
+	calls := stubDirectAuthorize(t, func(req directAuthorizeRequest) (directAuthorizeResponse, error) {
+		return memberResponse(req.OrganizationNodeID, 8, "N:team:t1"), nil
+	})
+	ws, errResp := workspaceForRun(context.Background(), callbackRequest(""), newTestClaims("N:user:me", "N:org:run", nil), "test")
+	assert.Nil(t, errResp)
+	if assert.NotNil(t, ws) {
+		assert.Equal(t, "N:org:run", ws.OrgNodeId)
+		assert.Equal(t, []string{"N:team:t1"}, ws.TeamNodeIds)
+	}
+	if assert.Len(t, *calls, 1) {
+		assert.Equal(t, "N:org:run", (*calls)[0].OrganizationNodeID, "the run's workspace is verified like a named one")
+	}
+}
+
+func TestWorkspaceForRun_CallbackNamedWorkspaceWins(t *testing.T) {
+	stubDirectAuthorize(t, func(req directAuthorizeRequest) (directAuthorizeResponse, error) {
+		return memberResponse(req.OrganizationNodeID, 8), nil
+	})
+	ws, errResp := workspaceForRun(context.Background(), callbackRequest("N:org:named"), newTestClaims("N:user:me", "N:org:run", nil), "test")
+	assert.Nil(t, errResp)
+	if assert.NotNil(t, ws) {
+		assert.Equal(t, "N:org:named", ws.OrgNodeId)
+	}
+}
+
+func TestWorkspaceForRun_CallbackWithoutWorkspace(t *testing.T) {
+	stubDirectAuthorize(t, func(directAuthorizeRequest) (directAuthorizeResponse, error) {
+		t.Fatal("direct authorizer called for a run without a workspace")
+		return directAuthorizeResponse{}, nil
+	})
+	claims := newTestClaims("N:user:me", "", nil)
+	claims.OrgClaim = nil
+	ws, errResp := workspaceForRun(context.Background(), callbackRequest(""), claims, "test")
+	assert.Nil(t, ws, "a run on the user's own node: personal scope")
+	assert.Nil(t, errResp)
+}
+
+func TestWorkspaceForRun_UserTokenIgnoresActiveOrganization(t *testing.T) {
+	stubDirectAuthorize(t, func(directAuthorizeRequest) (directAuthorizeResponse, error) {
+		t.Fatal("a user token's (active) organization must not be used")
+		return directAuthorizeResponse{}, nil
+	})
+	req := requestFor("")
+	req.Headers = map[string]string{"authorization": "Bearer eyJ"}
+	ws, errResp := workspaceForRun(context.Background(), req, newTestClaims("N:user:me", "N:org:active", nil), "test")
+	assert.Nil(t, ws)
+	assert.Nil(t, errResp)
+}
+
+func TestWorkspaceForRun_CallbackNotAMember(t *testing.T) {
+	stubDirectAuthorize(t, func(req directAuthorizeRequest) (directAuthorizeResponse, error) {
+		return memberResponse(req.OrganizationNodeID, 0), nil
+	})
+	ws, errResp := workspaceForRun(context.Background(), callbackRequest(""), newTestClaims("N:user:me", "N:org:run", nil), "test")
+	assert.Nil(t, ws)
+	if assert.NotNil(t, errResp) {
+		assert.Equal(t, http.StatusForbidden, errResp.StatusCode)
+	}
+}
