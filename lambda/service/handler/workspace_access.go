@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -82,6 +83,45 @@ func workspaceFromRequest(ctx context.Context, request events.APIGatewayV2HTTPRe
 	if orgNodeId == "" {
 		return nil, nil
 	}
+	return verifyWorkspace(ctx, orgNodeId, claims, handlerName)
+}
+
+// isCallbackRequest reports whether the request was authorized with a run's
+// callback token. The platform authorizer takes any "Callback " header down
+// the callback path, so the claims then come from the validated run.
+func isCallbackRequest(request events.APIGatewayV2HTTPRequest) bool {
+	return strings.HasPrefix(request.Headers["authorization"], "Callback ")
+}
+
+// workspaceForRun is workspaceFromRequest for routes a workflow run calls
+// (the registry). A callback-authorized request acts in the run's workspace
+// and no other: unlike a user token's (active) organization, a callback's
+// organization claim is the run's own, resolved by the authorizer from the
+// validated run. Apps shared with that workspace or a team in it count; it is
+// verified like a named workspace, which also brings the teams. An
+// organization_id naming another workspace is refused, and a run outside any
+// workspace has the personal scope.
+func workspaceForRun(ctx context.Context, request events.APIGatewayV2HTTPRequest, claims *authorizer.Claims, handlerName string) (*requestWorkspace, *events.APIGatewayV2HTTPResponse) {
+	if !isCallbackRequest(request) {
+		return workspaceFromRequest(ctx, request, claims, handlerName)
+	}
+	runOrgNodeId := ""
+	if claims != nil && claims.OrgClaim != nil {
+		runOrgNodeId = claims.OrgClaim.NodeId
+	}
+	if named := request.QueryStringParameters["organization_id"]; named != "" && named != runOrgNodeId {
+		log.Printf("%s: run in workspace %q named workspace %s", handlerName, runOrgNodeId, named)
+		return nil, &events.APIGatewayV2HTTPResponse{StatusCode: http.StatusForbidden, Body: handlerError(handlerName, ErrNotPermitted)}
+	}
+	if runOrgNodeId == "" {
+		return nil, nil
+	}
+	return verifyWorkspace(ctx, runOrgNodeId, claims, handlerName)
+}
+
+// verifyWorkspace returns orgNodeId as the request's workspace once the
+// caller's membership there is verified (see workspaceFromRequest).
+func verifyWorkspace(ctx context.Context, orgNodeId string, claims *authorizer.Claims, handlerName string) (*requestWorkspace, *events.APIGatewayV2HTTPResponse) {
 	if claims == nil || claims.UserClaim == nil {
 		return nil, &events.APIGatewayV2HTTPResponse{StatusCode: http.StatusUnauthorized, Body: handlerError(handlerName, ErrNotPermitted)}
 	}

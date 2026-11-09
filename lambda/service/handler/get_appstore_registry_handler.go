@@ -132,9 +132,10 @@ func GetAppStoreRegistryHandler(ctx context.Context, request events.APIGatewayV2
 	appAccessTable := os.Getenv(appAccessTableNameKey)
 	appAccessStore := store_dynamodb.NewAppAccessDatabaseStore(dynamoDBClient, appAccessTable)
 
-	// token_auth: the workspace comes from the request, verified here; none
-	// means the personal scope. Never claims.OrgClaim (see workspace_access.go).
-	ws, errResp := workspaceFromRequest(ctx, request, claims, handlerName)
+	// token_auth: the workspace comes from the request, verified here; for a
+	// workflow run's callback, the run's workspace; otherwise none, the personal
+	// scope. Never a user token's claims.OrgClaim (see workspace_access.go).
+	ws, errResp := workspaceForRun(ctx, request, claims, handlerName)
 	if errResp != nil {
 		return *errResp, nil
 	}
