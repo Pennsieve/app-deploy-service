@@ -152,14 +152,34 @@ func TestWorkspaceForRun_CallbackUsesRunWorkspace(t *testing.T) {
 	}
 }
 
-func TestWorkspaceForRun_CallbackNamedWorkspaceWins(t *testing.T) {
+func TestWorkspaceForRun_CallbackNamingRunWorkspace(t *testing.T) {
 	stubDirectAuthorize(t, func(req directAuthorizeRequest) (directAuthorizeResponse, error) {
 		return memberResponse(req.OrganizationNodeID, 8), nil
 	})
-	ws, errResp := workspaceForRun(context.Background(), callbackRequest("N:org:named"), newTestClaims("N:user:me", "N:org:run", nil), "test")
+	ws, errResp := workspaceForRun(context.Background(), callbackRequest("N:org:run"), newTestClaims("N:user:me", "N:org:run", nil), "test")
 	assert.Nil(t, errResp)
 	if assert.NotNil(t, ws) {
-		assert.Equal(t, "N:org:named", ws.OrgNodeId)
+		assert.Equal(t, "N:org:run", ws.OrgNodeId)
+	}
+}
+
+func TestWorkspaceForRun_CallbackNamingOtherWorkspace(t *testing.T) {
+	stubDirectAuthorize(t, func(directAuthorizeRequest) (directAuthorizeResponse, error) {
+		t.Fatal("another workspace must be refused before any check")
+		return directAuthorizeResponse{}, nil
+	})
+	ws, errResp := workspaceForRun(context.Background(), callbackRequest("N:org:other"), newTestClaims("N:user:me", "N:org:run", nil), "test")
+	assert.Nil(t, ws)
+	if assert.NotNil(t, errResp) {
+		assert.Equal(t, http.StatusForbidden, errResp.StatusCode, "a run acts in its own workspace only")
+	}
+
+	// A run outside any workspace can't name one either.
+	claims := newTestClaims("N:user:me", "", nil)
+	claims.OrgClaim = nil
+	_, errResp = workspaceForRun(context.Background(), callbackRequest("N:org:other"), claims, "test")
+	if assert.NotNil(t, errResp) {
+		assert.Equal(t, http.StatusForbidden, errResp.StatusCode)
 	}
 }
 

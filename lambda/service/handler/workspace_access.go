@@ -94,17 +94,29 @@ func isCallbackRequest(request events.APIGatewayV2HTTPRequest) bool {
 }
 
 // workspaceForRun is workspaceFromRequest for routes a workflow run calls
-// (the registry): a callback-authorized request without organization_id acts
-// in the run's workspace. Unlike a user token's (active) organization, a
-// callback's organization claim is the run's own, resolved by the authorizer
-// from the validated run, so apps shared with that workspace or a team in it
-// count. Verified like a named workspace, which also brings the teams.
+// (the registry). A callback-authorized request acts in the run's workspace
+// and no other: unlike a user token's (active) organization, a callback's
+// organization claim is the run's own, resolved by the authorizer from the
+// validated run. Apps shared with that workspace or a team in it count; it is
+// verified like a named workspace, which also brings the teams. An
+// organization_id naming another workspace is refused, and a run outside any
+// workspace has the personal scope.
 func workspaceForRun(ctx context.Context, request events.APIGatewayV2HTTPRequest, claims *authorizer.Claims, handlerName string) (*requestWorkspace, *events.APIGatewayV2HTTPResponse) {
-	if request.QueryStringParameters["organization_id"] == "" && isCallbackRequest(request) &&
-		claims != nil && claims.OrgClaim != nil && claims.OrgClaim.NodeId != "" {
-		return verifyWorkspace(ctx, claims.OrgClaim.NodeId, claims, handlerName)
+	if !isCallbackRequest(request) {
+		return workspaceFromRequest(ctx, request, claims, handlerName)
 	}
-	return workspaceFromRequest(ctx, request, claims, handlerName)
+	runOrgNodeId := ""
+	if claims != nil && claims.OrgClaim != nil {
+		runOrgNodeId = claims.OrgClaim.NodeId
+	}
+	if named := request.QueryStringParameters["organization_id"]; named != "" && named != runOrgNodeId {
+		log.Printf("%s: run in workspace %q named workspace %s", handlerName, runOrgNodeId, named)
+		return nil, &events.APIGatewayV2HTTPResponse{StatusCode: http.StatusForbidden, Body: handlerError(handlerName, ErrNotPermitted)}
+	}
+	if runOrgNodeId == "" {
+		return nil, nil
+	}
+	return verifyWorkspace(ctx, runOrgNodeId, claims, handlerName)
 }
 
 // verifyWorkspace returns orgNodeId as the request's workspace once the
