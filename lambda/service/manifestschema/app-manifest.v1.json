@@ -158,9 +158,9 @@
         },
         "diskGiB": {
           "type": "integer",
-          "minimum": 21,
+          "minimum": 1,
           "maximum": 16384,
-          "description": "The local disk (GiB) a step of the app needs for its inputs, outputs and scratch (TMPDIR), when that is more than Pennsieve plans from its inputs (it assumes outputs as large as the inputs). A floor: Pennsieve still gives more when the inputs need it. Up to 200 GiB is the task's own storage; more is an EBS volume for the data. Applies on standard compute; a GPU step uses its instance's disk and a Lambda step its 10 GB /tmp, so an app declaring diskGiB is not run on Lambda."
+          "description": "The least local disk (GiB) a step of the app needs for its inputs, outputs and scratch (TMPDIR), when that is more than Pennsieve plans from its inputs (it assumes outputs as large as the inputs). A floor: Pennsieve still gives more when the inputs need it. On standard compute Fargate rounds it up to 21 GiB; up to 200 GiB is the task's own storage, more an EBS volume for the data. A Lambda step has 10 GB of /tmp, so an app declaring more is not run on Lambda; a GPU step uses its instance's 100 GiB disk."
         },
         "optimize": {
           "type": "boolean",

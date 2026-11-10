@@ -67,9 +67,9 @@ func TestProblems(t *testing.T) {
 		{"an unknown parameter type", "application:\n  name: a\nparameters:\n  - name: p\n    type: file\n", "/parameters/0/type"},
 		{"a license, which comes from the repository", "application:\n  name: a\n  license: MIT\n", "license"},
 		{"llm that isn't a boolean", "application:\n  name: a\nruntime:\n  llm: claude\n", "/runtime/llm"},
-		{"a disk under Fargate's least", "application:\n  name: a\nruntime:\n  diskGiB: 10\n", "/runtime/diskGiB"},
+		{"no disk", "application:\n  name: a\nruntime:\n  diskGiB: 0\n", "/runtime/diskGiB"},
 		{"a disk over a volume's most", "application:\n  name: a\nruntime:\n  diskGiB: 20000\n", "/runtime/diskGiB"},
-		{"a variant's disk under Fargate's least", variantsYML("  - id: a\n    runtime: { diskGiB: 8 }\n"), "/variants/0/runtime/diskGiB"},
+		{"a variant's negative disk", variantsYML("  - id: a\n    runtime: { diskGiB: -8 }\n"), "/variants/0/runtime/diskGiB"},
 		{"a relation that isn't a DataCite type", "application:\n  name: a\n  relations:\n    10.1038/nbt.4314: Cites\n", "/application/relations/10.1038/nbt.4314"},
 		{"a relation keyed by something that isn't a DOI", "application:\n  name: a\n  relations:\n    flowsom: References\n", "flowsom"},
 	}
@@ -153,7 +153,8 @@ func TestVariantsAndBuildAreValid(t *testing.T) {
     parameters:
       MODEL: { defaultValue: y, validValues: [y], required: true, label: Detector, description: d }
 `),
-		"only an id": variantsYML("  - id: a\n"),
+		"only an id":              variantsYML("  - id: a\n"),
+		"a disk that fits Lambda": "application:\n  name: a\nruntime:\n  diskGiB: 2\n",
 		"a top-level disk, raised by a variant to a volume": "application:\n  name: a\nruntime:\n  diskGiB: 40\nvariants:\n  - id: a\n  - id: b\n    runtime: { diskGiB: 400 }\n",
 		"no default: the first":                             variantsYML("  - id: a\n  - id: b-2\n"),
 		"default: false on several":                         variantsYML("  - id: a\n    default: false\n  - id: b\n    default: false\n"),

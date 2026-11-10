@@ -34,9 +34,9 @@ type appConfig struct {
 		Memory         int      `yaml:"memory"`
 		ComputeTypes   []string `yaml:"computeTypes"`
 		TimeoutSeconds int      `yaml:"timeoutSeconds"`
-		// DiskGiB is the local disk a step needs (inputs, outputs,
-		// scratch), a floor on what the compute node plans; 0 when not
-		// declared.
+		// DiskGiB is the least local disk a step needs (inputs, outputs,
+		// scratch), a floor on what the compute node plans (Fargate rounds
+		// it up to 21); 0 when not declared.
 		DiskGiB int `yaml:"diskGiB"`
 		// LLM: the app calls language models through Pennsieve, so its runs
 		// get the LLM proxy sidecar (opt-in).

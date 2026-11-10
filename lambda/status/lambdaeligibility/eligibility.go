@@ -33,10 +33,14 @@ const (
 	// Lambda step at 840 s (lambdaStepTimeoutSeconds, a minute under the
 	// step runner's 900 s), as before.
 	MaxTimeoutSeconds = 900
-	// MaxDiskGiB is the most local disk a Lambda step has: its function's
-	// /tmp, 10240 MB (the compute node sets the most Lambda allows). A
-	// declared runtime.diskGiB is at least 21 (Fargate's least), so an app
-	// that declares one never fits.
+	// MaxDiskGiB is the most runtime.diskGiB that fits a Lambda step: its
+	// function's /tmp, 10240 MB, the most Lambda allows, which the compute
+	// node sets (compute-node-aws-provisioner-v2,
+	// internal/aslconverter/lambda_image.go). Everything a step writes is
+	// there (INPUT_DIR, OUTPUT_DIR, HOME and TMPDIR, under /tmp/pennsieve);
+	// the image and the step runtime are not, so none of it is reserved.
+	// (The runtime also caps inputs and outputs together at 8 GiB,
+	// lambdastep.MaxBytes, checked per run against the real sizes.)
 	MaxDiskGiB = 10
 )
 
