@@ -178,7 +178,7 @@ config blob through `GetDownloadUrlForLayer`), and records `lambda` next to
 
 `imageBytes` is the compressed size (the sum of the layers). `overridable`
 is true (and otherwise omitted) when the version isn't eligible only because
-of its declared `memory`, `cpu` or `timeoutSeconds`, so a user may choose
+of its declared `memory`, `cpu`, `timeoutSeconds` or `diskGiB`, so a user may choose
 Lambda for a run anyway; any other reason makes it false. A version is
 **not** eligible, with a reason for each that applies, when:
 
@@ -190,6 +190,7 @@ Lambda for a run anyway; any other reason makes it false. A version is
 | `memory` > 10240 MiB | it needs N GB of memory; a Lambda step has at most 10 GB |
 | `cpu` > 6144 units | it needs N vCPU; a Lambda step has at most 6 |
 | `timeoutSeconds` > 900 (unset is fine; 900, Lambda's own limit, fits, and the compute node still stops a step at 840 s) | it may run up to …; a Lambda step runs at most 15 minutes |
+| `diskGiB` > 10 (a Lambda step's /tmp is 10240 MB; 10 or less fits) | it needs N GiB of local disk; a Lambda step has at most 10 GB |
 | image > 10 GB compressed | the image is N GB; Lambda takes images up to 10 GB |
 | no `net.pennsieve.lambda-step-runtime` label | the image has no Lambda step runtime: rebuild the app |
 | not linux/amd64 | the image is not linux/amd64 |

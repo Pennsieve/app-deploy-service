@@ -34,6 +34,10 @@ type appConfig struct {
 		Memory         int      `yaml:"memory"`
 		ComputeTypes   []string `yaml:"computeTypes"`
 		TimeoutSeconds int      `yaml:"timeoutSeconds"`
+		// DiskGiB is the least local disk a step needs (inputs, outputs,
+		// scratch), a floor on what the compute node plans (Fargate rounds
+		// it up to 21); 0 when not declared.
+		DiskGiB int `yaml:"diskGiB"`
 		// LLM: the app calls language models through Pennsieve, so its runs
 		// get the LLM proxy sidecar (opt-in).
 		LLM bool `yaml:"llm"`
@@ -179,6 +183,7 @@ type appVariantRuntime struct {
 	Memory         *int     `yaml:"memory"`
 	ComputeTypes   []string `yaml:"computeTypes"`
 	TimeoutSeconds *int     `yaml:"timeoutSeconds"`
+	DiskGiB        *int     `yaml:"diskGiB"`
 	LLM            *bool    `yaml:"llm"`
 	Optimize       *bool    `yaml:"optimize"`
 }
@@ -395,6 +400,7 @@ func appManifest(c appConfig) *store_dynamodb.AppManifest {
 			Memory:         c.Runtime.Memory,
 			ComputeTypes:   c.Runtime.ComputeTypes,
 			TimeoutSeconds: c.Runtime.TimeoutSeconds,
+			DiskGiB:        c.Runtime.DiskGiB,
 			LLM:            c.Runtime.LLM,
 			Interactive:    c.Runtime.Interactive || c.Runtime.SessionType != "",
 			SessionType:    c.Runtime.SessionType,

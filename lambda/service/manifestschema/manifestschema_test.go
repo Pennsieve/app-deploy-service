@@ -67,6 +67,9 @@ func TestProblems(t *testing.T) {
 		{"an unknown parameter type", "application:\n  name: a\nparameters:\n  - name: p\n    type: file\n", "/parameters/0/type"},
 		{"a license, which comes from the repository", "application:\n  name: a\n  license: MIT\n", "license"},
 		{"llm that isn't a boolean", "application:\n  name: a\nruntime:\n  llm: claude\n", "/runtime/llm"},
+		{"no disk", "application:\n  name: a\nruntime:\n  diskGiB: 0\n", "/runtime/diskGiB"},
+		{"a disk over a volume's most", "application:\n  name: a\nruntime:\n  diskGiB: 20000\n", "/runtime/diskGiB"},
+		{"a variant's negative disk", variantsYML("  - id: a\n    runtime: { diskGiB: -8 }\n"), "/variants/0/runtime/diskGiB"},
 		{"a relation that isn't a DataCite type", "application:\n  name: a\n  relations:\n    10.1038/nbt.4314: Cites\n", "/application/relations/10.1038/nbt.4314"},
 		{"a relation keyed by something that isn't a DOI", "application:\n  name: a\n  relations:\n    flowsom: References\n", "flowsom"},
 	}
@@ -146,17 +149,19 @@ func TestVariantsAndBuildAreValid(t *testing.T) {
     name: GPU (ONCET)
     description: CUDA PyTorch.
     build: { args: { TORCH_FLAVOUR: cuda, N: 2, DEBUG: false }, target: gpu, dockerfile: docker/Dockerfile.gpu }
-    runtime: { computeTypes: [gpu], memory: 14336, cpu: 4096, timeoutSeconds: 60, llm: true }
+    runtime: { computeTypes: [gpu], memory: 14336, cpu: 4096, timeoutSeconds: 60, diskGiB: 120, llm: true }
     parameters:
       MODEL: { defaultValue: y, validValues: [y], required: true, label: Detector, description: d }
 `),
-		"only an id":                     variantsYML("  - id: a\n"),
-		"no default: the first":          variantsYML("  - id: a\n  - id: b-2\n"),
-		"default: false on several":      variantsYML("  - id: a\n    default: false\n  - id: b\n    default: false\n"),
-		"a 32-character id":              variantsYML("  - id: abcdefghijklmnopqrstuvwxyz012345\n"),
-		"eight variants":                 variantsYML("  - id: a\n  - id: b\n  - id: c\n  - id: d\n  - id: e\n  - id: f\n  - id: g\n  - id: h\n"),
-		"a top-level build, no variants": "application:\n  name: a\nbuild:\n  args: { A_1: x }\n  target: runtime\n  dockerfile: ./Dockerfile\n",
-		"a notebook app with variants":   "application:\n  name: a\nruntime:\n  interactive: true\n  sessionType: jupyter\n  kernel: python\nvariants:\n  - id: cpu\n  - id: gpu\n    runtime: { computeTypes: [gpu] }\n",
+		"only an id":              variantsYML("  - id: a\n"),
+		"a disk that fits Lambda": "application:\n  name: a\nruntime:\n  diskGiB: 2\n",
+		"a top-level disk, raised by a variant to a volume": "application:\n  name: a\nruntime:\n  diskGiB: 40\nvariants:\n  - id: a\n  - id: b\n    runtime: { diskGiB: 400 }\n",
+		"no default: the first":                             variantsYML("  - id: a\n  - id: b-2\n"),
+		"default: false on several":                         variantsYML("  - id: a\n    default: false\n  - id: b\n    default: false\n"),
+		"a 32-character id":                                 variantsYML("  - id: abcdefghijklmnopqrstuvwxyz012345\n"),
+		"eight variants":                                    variantsYML("  - id: a\n  - id: b\n  - id: c\n  - id: d\n  - id: e\n  - id: f\n  - id: g\n  - id: h\n"),
+		"a top-level build, no variants":                    "application:\n  name: a\nbuild:\n  args: { A_1: x }\n  target: runtime\n  dockerfile: ./Dockerfile\n",
+		"a notebook app with variants":                      "application:\n  name: a\nruntime:\n  interactive: true\n  sessionType: jupyter\n  kernel: python\nvariants:\n  - id: cpu\n  - id: gpu\n    runtime: { computeTypes: [gpu] }\n",
 	}
 	for name, yml := range cases {
 		ps, err := Validate([]byte(yml))

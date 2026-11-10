@@ -364,13 +364,14 @@ type AppManifestVariant struct {
 	Description string `json:"description,omitempty"`
 }
 
-// AppRuntime: CPU units and MiB, compute types and timeout; 0 or empty when
-// the manifest doesn't declare them.
+// AppRuntime: CPU units and MiB, compute types, timeout and local disk
+// (GiB); 0 or empty when the manifest doesn't declare them.
 type AppRuntime struct {
 	CPU            int      `json:"cpu,omitempty"`
 	Memory         int      `json:"memory,omitempty"`
 	ComputeTypes   []string `json:"computeTypes,omitempty"`
 	TimeoutSeconds int      `json:"timeoutSeconds,omitempty"`
+	DiskGiB        int      `json:"diskGiB,omitempty"`
 	// LLM: the app calls language models through Pennsieve (opt-in to the
 	// LLM proxy sidecar).
 	LLM bool `json:"llm,omitempty"`

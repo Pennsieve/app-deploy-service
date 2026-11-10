@@ -373,6 +373,10 @@ type AppRuntime struct {
 	Memory         int      `dynamodbav:"memory,omitempty"`
 	ComputeTypes   []string `dynamodbav:"computeTypes,omitempty"`
 	TimeoutSeconds int      `dynamodbav:"timeoutSeconds,omitempty"`
+	// DiskGiB: the local disk a step needs (app.yml runtime.diskGiB), a
+	// floor on what the compute node plans; workflow-service reads it at
+	// run start.
+	DiskGiB int `dynamodbav:"diskGiB,omitempty"`
 	// LLM: the app calls language models through Pennsieve (opt-in to the
 	// LLM proxy sidecar); workflow-service reads it at run start.
 	LLM bool `dynamodbav:"llm,omitempty"`

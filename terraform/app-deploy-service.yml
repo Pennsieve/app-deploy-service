@@ -419,6 +419,9 @@ components:
                 type: string
             timeoutSeconds:
               type: integer
+            diskGiB:
+              type: integer
+              description: The local disk (GiB) a step needs (app.yml runtime.diskGiB), a floor on what the compute node plans.
             llm:
               type: boolean
             optimize:

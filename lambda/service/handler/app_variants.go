@@ -101,6 +101,9 @@ func resolveVariant(top appConfig, topBuild *appBuild, v appVariant) resolvedVar
 	if v.Runtime.TimeoutSeconds != nil {
 		cfg.Runtime.TimeoutSeconds = *v.Runtime.TimeoutSeconds
 	}
+	if v.Runtime.DiskGiB != nil {
+		cfg.Runtime.DiskGiB = *v.Runtime.DiskGiB
+	}
 	if v.Runtime.LLM != nil {
 		cfg.Runtime.LLM = *v.Runtime.LLM
 	}
