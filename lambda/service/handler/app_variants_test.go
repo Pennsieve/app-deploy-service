@@ -119,6 +119,7 @@ runtime:
   memory: 2048
   computeTypes: [standard, gpu]
   timeoutSeconds: 60
+  diskGiB: 40
   llm: true
   interactive: true
   sessionType: jupyter
@@ -140,7 +141,7 @@ variants:
   - id: big
     name: Big
     build: {args: {B: big, C: 3}, target: gpu, dockerfile: docker/Dockerfile.gpu}
-    runtime: {cpu: 4096, computeTypes: [gpu], llm: false}
+    runtime: {cpu: 4096, computeTypes: [gpu], diskGiB: 400, llm: false}
     parameters:
       P: {defaultValue: 2, validValues: [2], required: true, description: big}
       NOPE: {defaultValue: x}
@@ -164,6 +165,9 @@ variants:
 	assert.Equal(t, 2048, rt.Memory)
 	assert.Equal(t, []string{"gpu"}, rt.ComputeTypes)
 	assert.Equal(t, 60, rt.TimeoutSeconds)
+	assert.Equal(t, 400, rt.DiskGiB)
+	assert.Equal(t, 40, small.Config.Runtime.DiskGiB, "a variant that doesn't set it keeps the top level's")
+	assert.Equal(t, 400, big.manifest().Runtime.DiskGiB)
 	assert.False(t, rt.LLM)
 	assert.True(t, rt.Interactive)
 	assert.Equal(t, "jupyter", rt.SessionType)

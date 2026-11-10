@@ -33,6 +33,11 @@ const (
 	// Lambda step at 840 s (lambdaStepTimeoutSeconds, a minute under the
 	// step runner's 900 s), as before.
 	MaxTimeoutSeconds = 900
+	// MaxDiskGiB is the most local disk a Lambda step has: its function's
+	// /tmp, 10240 MB (the compute node sets the most Lambda allows). A
+	// declared runtime.diskGiB is at least 21 (Fargate's least), so an app
+	// that declares one never fits.
+	MaxDiskGiB = 10
 )
 
 // Eligibility is the decision, as stored on a version and on each variant
@@ -40,7 +45,7 @@ const (
 // ImageBytes is the image's compressed size (the sum of its layers);
 // CheckedAt is when it was decided, RFC 3339. Overridable is true when it
 // isn't eligible only because of declared resource limits (memory, cpu,
-// timeoutSeconds), so a user may choose Lambda for a run anyway; any other
+// timeoutSeconds, diskGiB), so a user may choose Lambda for a run anyway; any other
 // reason makes it false, and it is always false when Eligible.
 type Eligibility struct {
 	Eligible    bool     `dynamodbav:"eligible" json:"eligible"`
@@ -57,6 +62,7 @@ type Runtime struct {
 	Memory         int      `dynamodbav:"memory,omitempty"`
 	ComputeTypes   []string `dynamodbav:"computeTypes,omitempty"`
 	TimeoutSeconds int      `dynamodbav:"timeoutSeconds,omitempty"`
+	DiskGiB        int      `dynamodbav:"diskGiB,omitempty"`
 	Interactive    bool     `dynamodbav:"interactive,omitempty"`
 	SessionType    string   `dynamodbav:"sessionType,omitempty"`
 	// Optimize is app.yml's runtime.optimize: false runs the app only as
@@ -83,7 +89,7 @@ type ImageFacts struct {
 // Decide is the eligibility of a runtime and image, checked at now.
 func Decide(rt Runtime, img ImageFacts, now time.Time) Eligibility {
 	// hard reasons rule Lambda out; soft ones are declared resource limits
-	// (memory, cpu, timeoutSeconds) a user may override for a run.
+	// (memory, cpu, timeoutSeconds, diskGiB) a user may override for a run.
 	var reasons []string
 	hard := false
 	addHard := func(r string) { reasons = append(reasons, r); hard = true }
@@ -105,6 +111,9 @@ func Decide(rt Runtime, img ImageFacts, now time.Time) Eligibility {
 	}
 	if rt.TimeoutSeconds > MaxTimeoutSeconds {
 		addSoft(fmt.Sprintf("it may run up to %s; a Lambda step runs at most 15 minutes", duration(rt.TimeoutSeconds)))
+	}
+	if rt.DiskGiB > MaxDiskGiB {
+		addSoft(fmt.Sprintf("it needs %d GiB of local disk; a Lambda step has at most 10 GB", rt.DiskGiB))
 	}
 	if img.CompressedBytes > MaxImageBytes {
 		addHard(fmt.Sprintf("the image is %.1f GB; Lambda takes images up to 10 GB", float64(img.CompressedBytes)/1e9))

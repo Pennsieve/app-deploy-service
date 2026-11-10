@@ -61,6 +61,8 @@ func TestDecide(t *testing.T) {
 		{name: "a 15 minute timeout fits", rt: Runtime{TimeoutSeconds: 900}, img: lambdaImage()},
 		{name: "a 16 minute timeout", rt: Runtime{TimeoutSeconds: 960}, img: lambdaImage(),
 			want: []string{"it may run up to 16 minutes; a Lambda step runs at most 15 minutes"}, overridable: true},
+		{name: "a declared disk", rt: Runtime{DiskGiB: 40}, img: lambdaImage(),
+			want: []string{"it needs 40 GiB of local disk; a Lambda step has at most 10 GB"}, overridable: true},
 		{name: "an image built before the runtime, too big, for arm64",
 			img: ImageFacts{OS: "linux", Architecture: "arm64", CompressedBytes: 12_340_000_000},
 			want: []string{
@@ -119,6 +121,7 @@ func TestManifest_ReadsTheRuntime(t *testing.T) {
 	item := map[string]types.AttributeValue{
 		"runtime": &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
 			"memory":   &types.AttributeValueMemberN{Value: "2048"},
+			"diskGiB":  &types.AttributeValueMemberN{Value: "40"},
 			"optimize": &types.AttributeValueMemberBOOL{Value: false},
 		}},
 		"inputs": &types.AttributeValueMemberL{Value: []types.AttributeValue{
@@ -131,6 +134,7 @@ func TestManifest_ReadsTheRuntime(t *testing.T) {
 	var m Manifest
 	require.NoError(t, attributevalue.UnmarshalMap(item, &m))
 	assert.Equal(t, 2048, m.Runtime.Memory)
+	assert.Equal(t, 40, m.Runtime.DiskGiB)
 	require.NotNil(t, m.Runtime.Optimize)
 	assert.False(t, *m.Runtime.Optimize)
 }

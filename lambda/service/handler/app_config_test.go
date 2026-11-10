@@ -209,6 +209,7 @@ runtime:
   memory: 4096
   computeTypes: [standard, lambda]
   timeoutSeconds: 300
+  diskGiB: 60
 parameters:
   - name: threshold
     type: number
@@ -237,6 +238,7 @@ func TestAppManifest_FromFullAppYml(t *testing.T) {
 	assert.Equal(t, 4096, m.Runtime.Memory)
 	assert.Equal(t, []string{"standard", "lambda"}, m.Runtime.ComputeTypes)
 	assert.Equal(t, 300, m.Runtime.TimeoutSeconds)
+	assert.Equal(t, 60, m.Runtime.DiskGiB)
 	assert.Len(t, m.Parameters, 2)
 	assert.Equal(t, "0.5", m.Parameters[0].DefaultValue)
 	assert.Len(t, m.Inputs, 1)
