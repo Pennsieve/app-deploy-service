@@ -127,6 +127,7 @@ variable "image_builder_allowed_domains" {
     # and its assets; public endpoints only, the build VPC has no route to
     # anything internal
     "pennsieve.io", "*.pennsieve.io", "pennsieve.net", "*.pennsieve.net", "pennsieve.org", "*.pennsieve.org",
+    "pennsieve.ai", "*.pennsieve.ai",
     # AWS: ECR, S3, STS, CodeBuild, CloudWatch
     "*.amazonaws.com",
     # code hosts
