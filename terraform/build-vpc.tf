@@ -200,6 +200,12 @@ resource "aws_route53_resolver_firewall_rule" "build_allow" {
   firewall_domain_list_id = aws_route53_resolver_firewall_domain_list.build_allowed[0].id
   firewall_rule_group_id  = aws_route53_resolver_firewall_rule_group.build[0].id
   priority                = 100
+  # The list governs the names a build asks for, not the CDN behind them:
+  # auth.docker.io is a CNAME to auth.docker.io.cdn.cloudflare.net, and with
+  # the default (INSPECT_REDIRECTION_DOMAIN) the allow rule checks every name
+  # in the chain against the list, so the block rule below caught it and no
+  # base image could be pulled (2026-11-11).
+  firewall_domain_redirection_action = "TRUST_REDIRECTION_DOMAIN"
 }
 
 resource "aws_route53_resolver_firewall_rule" "build_block_rest" {
