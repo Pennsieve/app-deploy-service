@@ -390,7 +390,8 @@ resource "aws_codebuild_project" "image_builder" {
   source {
     type = "NO_SOURCE"
     buildspec = templatefile("${path.module}/image-builder/buildspec.yml.tpl", {
-      build_script = base64encode(file("${path.module}/image-builder/build.sh"))
+      buildkitd_lib = base64encode(file("${path.module}/image-builder/buildkitd.sh"))
+      build_script  = base64encode(file("${path.module}/image-builder/build.sh"))
     })
   }
 

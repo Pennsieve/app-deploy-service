@@ -18,6 +18,7 @@ phases:
       - tar -C /usr/local -xzf /tmp/buildkit.tgz && rm /tmp/buildkit.tgz
   build:
     commands:
-      # build.sh (terraform/image-builder/build.sh), inlined by Terraform
+      # buildkitd.sh and build.sh (terraform/image-builder/), inlined by Terraform
+      - echo "${buildkitd_lib}" | base64 -d > /tmp/buildkitd.sh
       - echo "${build_script}" | base64 -d > /tmp/build.sh
       - sh /tmp/build.sh

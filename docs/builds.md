@@ -102,7 +102,9 @@ status go through the same steps.
   so the token never appears among the build's recorded variables. BuildKit
   gets it as the secret `GIT_AUTH_TOKEN`. The status lambda deletes the
   parameter when the build ends.
-- **Build** (`terraform/image-builder/build.sh`, inlined into the buildspec):
+- **Build** (`terraform/image-builder/build.sh`, inlined into the buildspec
+  with `buildkitd.sh`, the registry login and buildkitd start it shares
+  with fixtures.sh):
   - the install phase downloads the pinned BuildKit release tarball and checks
     its sha256;
   - build.sh logs in to ECR with `aws ecr get-login-password`;
@@ -420,6 +422,78 @@ The digest is the tag's at the moment the build ends, recorded before the status
 found) is logged as a warning and the build's status is recorded as usual. All of them are
 in the API's version model. Versions registered before these were kept have none of them.
 
+## Fixture bundles
+
+A sample run (App Sample Documents epic) needs the app's declared test
+inputs, the `review` block of app.yml ([app-manifest-review.md](app-manifest-review.md)).
+Building them inside the run needs internet on the compute node and repeats
+every fetch; building them once at release, where the code already runs with
+internet under the sandbox above, makes sample runs credential-free and
+network-free and bounds the cost to once per release.
+
+- **What.** With `fixture_builder` on (needs `image_builder_in_vpc` and
+  `app_fixtures_image`), a second CodeBuild project,
+  `<env>-app-deploy-service-fixture-builder`, in the build VPC with the same
+  security group and BuildKit install, runs `image-builder/fixtures.sh`. It
+  builds a two-stage Dockerfile: `FROM` the platform's own
+  [app-fixtures](https://github.com/pennsieve-apps/app-fixtures) image
+  (pinned per environment), a `RUN` step that executes app-fixtures with
+  `REPOSITORY`, `TAG`, `PORTS` and the caps as build args, and a `scratch`
+  stage holding only its output, exported locally (`--output type=local`,
+  `--no-cache`, no push). The generators and dataset fetches app-fixtures
+  runs are the app author's code, which is why they run as a `RUN` step:
+  own network namespace on the bridge, the credential and metadata
+  endpoints dropped, the DNS Firewall allow-list (which lists the dataset
+  hosts), 80 and 443 only. fixtures.sh, platform code, only tars what the
+  step exported and uploads it; nothing from the export is executed or put
+  on a command line.
+- **Where.** Bucket `<env>-app-deploy-service-fixtures-<region>` (private,
+  SSE-S3, public access blocked; platform-internal, never published, never
+  on Discover). Under `fixtures/<applicationId>/<tag>/`: the bundle
+  `<sha256>.tar.gz` (the target app's `INPUT_DIR` layout plus
+  `.pennsieve-fixtures/` with the provenance crate or `error.json`) and
+  `manifest.json`, always written: `status` ready or failed, the bundle's
+  key, bytes and sha256, `warnings`, the `error` code and message
+  (app-fixtures' codes such as `no_review_block`, `dataset_too_large`,
+  `generator_failed`, or `too_large` from the cap), the ports built, the
+  app-fixtures image, the build id, and the provenance crate inline. The
+  log carries one `FIXTURES_RESULT` line with the manifest. The build is
+  SUCCEEDED whenever a manifest was written, failed only when fixtures.sh
+  itself failed (buildkit, upload).
+- **Caps** (variables with these defaults): a compressed bundle over
+  `fixture_bundle_max_bytes` (2 GiB) is not uploaded and the manifest says
+  `too_large`; over `fixture_bundle_warn_bytes` (200 MiB) it is uploaded
+  with a warning; one declared dataset over `fixture_dataset_max_bytes`
+  (2 GiB) fails its port in app-fixtures; a generator may run
+  `fixture_generate_timeout_seconds` (1200); the build
+  `fixture_builder_timeout_minutes` (30) on
+  `fixture_builder_compute_type` (`BUILD_GENERAL1_MEDIUM`, 7 GB).
+- **Retention.** The status lambda tags an app's bundles older than its
+  previous release `retain=no`; the bucket's lifecycle expires those after
+  `fixture_bundle_expiry_days` (30). The current and previous release's
+  bundles stay. Bundles are content-addressed, so an unchanged review block
+  costs no storage twice.
+- **Role** (`aws_iam_role.fixture_builder`), and nothing else: ECR login;
+  pull from appstore-private (app-fixtures lives there); `s3:PutObject`
+  under `fixtures/` of its bucket; its own log group; the ENI permissions
+  every VPC build needs. No staging push, no SSM, no secrets, no git token
+  (private repositories are out of scope: app-fixtures clones the app).
+- **Status lambda** (next step, not in this module yet): starts the fixture
+  build after a release's image is promoted, skipping with a recorded
+  reason when the version has no `review` block, the repository is
+  private, the variant is not the default, or the app is app-fixtures
+  itself; reads `manifest.json` from the fixture build's state-change
+  event; records `fixtures{status, bytes, sha256, builtAt, warnings, error}`
+  on the version; tags superseded bundles; emits the `App Release Ready`
+  event curation-service consumes. Until it exists the fixture project is
+  not on the status rule, so a fixture build cannot be mistaken for an
+  image build.
+- **Locally:** fixtures.sh runs in the rootful BuildKit image like build.sh
+  (see [Testing locally](#testing-locally)), with `APP_FIXTURES_IMAGE`
+  pointing at a local registry's copy of app-fixtures and
+  `FIXTURES_BUCKET` empty, which leaves the bundle and manifest in
+  `/tmp/fixtures-build/`; the image needs `python3` (`apk add python3`).
+
 ## Environments
 
 The module is environment-agnostic:
@@ -498,6 +572,7 @@ docker run -d --name cbtest-registry --network cbtest -p 5066:5000 registry:2.8.
 printf '[registry."cbtest-registry:5000"]\n  http = true\n' > buildkitd.toml
 docker run --rm --privileged --network cbtest \
   -v $PWD/buildkitd.toml:/etc/buildkit/buildkitd.toml:ro \
+  -v $PWD/terraform/image-builder/buildkitd.sh:/buildkitd.sh:ro \
   -v $PWD/terraform/image-builder/build.sh:/build.sh:ro \
   -e CONTEXT='https://github.com/pennsieve-apps/processor-seizure-dynasd#refs/tags/v0.2.0' \
   -e DESTINATION=cbtest-registry:5000/appstore-private:1-v0.2.0 \

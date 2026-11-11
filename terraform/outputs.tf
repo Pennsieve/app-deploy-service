@@ -34,3 +34,12 @@ output "appstore_versions_table_name" {
 output "appstore_versions_table_arn" {
   value = aws_dynamodb_table.appstore_versions_table.arn
 }
+
+# Fixture bundles (fixtures.tf): empty when the fixture builder is off.
+output "fixtures_bucket_name" {
+  value = local.fixtures_bucket_name_or_empty
+}
+
+output "fixture_builder_project_name" {
+  value = local.fixture_builder_project_name_or_empty
+}
