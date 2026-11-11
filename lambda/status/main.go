@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/pennsieve/app-deploy-service/status/handler"
+	"github.com/pennsieve/app-deploy-service/status/imagecopy"
 	"github.com/pennsieve/app-deploy-service/status/logging"
 	"github.com/pennsieve/pennsieve-go-core/pkg/realtime"
 	"github.com/pusher/pusher-http-go/v5"
@@ -48,6 +49,7 @@ func init() {
 			cloudwatchlogs.NewFromConfig(awsConfig),
 			ssm.NewFromConfig(awsConfig)).
 		WithECR(ecr.NewFromConfig(awsConfig)).
+		WithImageCopier(imagecopy.New(ecr.NewFromConfig(awsConfig))).
 		WithProvisionerGroup(os.Getenv(handler.ProvisionerTaskGroupEnvVar))
 
 	// live status updates: AppSync Events where configured, otherwise Pusher

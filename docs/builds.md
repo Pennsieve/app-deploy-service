@@ -30,6 +30,37 @@ release ─► service lambda (post_appstore_handler) ─► provisioner task (A
               CodeBuild Build State Change ────────┘
 ```
 
+With `image_builder_staging` on, the build pushes to a staging repository
+and the status lambda promotes the image to appstore-private before the
+version is told it is deployed (see "Isolation").
+
+## Isolation
+
+Builds run app authors' code (their Dockerfile's `RUN` steps), so the
+builder is confined on three sides (Platform Maintenance ticket 868mvbq5b;
+probe: Pennsieve/test-egress-probe, branch `build-probe`):
+
+- **Credentials.** `RUN` steps run in BuildKit's process sandbox (own PID
+  and mount namespaces) and on BuildKit's bridge network (own network
+  namespace); build.sh drops forwarded traffic to the container-credentials
+  endpoint 169.254.170.2 and the instance metadata endpoint
+  169.254.169.254 before buildkitd starts. See "RUN steps are isolated"
+  under the CodeBuild path.
+- **What the build's role can write.** With `image_builder_staging` on, a
+  build pushes to `<env>-appstore-staging-<region>:<deploymentId>`
+  (`DESTINATION`) and names its App Store image in `PROMOTE_TO`; the
+  builder role can write only staging and the build cache. The status
+  lambda, platform code, copies a SUCCEEDED build's image to its
+  destination (`lambda/status/handler/promote.go`, go-containerregistry,
+  digest preserved), then deletes the staging tag; the staging
+  repository's lifecycle expires anything left after a day. A promotion
+  that fails fails the build (`PROMOTE_FAILED`, the reason on the
+  deployment), so a deployed version always names a promoted image. Turn
+  the variable on after a status lambda with promotion is deployed; off,
+  builds push straight to appstore-private as before.
+- **Egress.** The project's VPC placement and egress allow-list are the
+  ticket's third step.
+
 The build's inputs: the source URL, the tag, the destination
 `<appstore-private>:<hash>-<tag>`, a GitHub token for a private repo, and the
 storage a GPU build needs (`APP_STORAGE` from app.yml). Its

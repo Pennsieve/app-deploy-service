@@ -78,9 +78,11 @@ resource "aws_lambda_function" "status_lambda" {
   architectures = ["arm64"]
   role          = aws_iam_role.status_lambda_role.arn
   timeout       = 300
-  memory_size   = 128
-  s3_bucket     = var.lambda_bucket
-  s3_key        = "${var.service_name}/${var.service_name}-status-${var.image_tag}.zip"
+  # Promotion streams a staged image's layers to appstore-private
+  # (promote.go); 128 MB was enough for status updates alone.
+  memory_size = 512
+  s3_bucket   = var.lambda_bucket
+  s3_key      = "${var.service_name}/${var.service_name}-status-${var.image_tag}.zip"
 
   # Resource tag: discoverable in the Console (Tags tab) and fleet-wide via the
   # Resource Groups Tagging API (get-resources --tag-filters Key=ImageTag).

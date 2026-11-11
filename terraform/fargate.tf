@@ -18,6 +18,7 @@ data "template_file" "app_provisioner_ecs_task_definition" {
     image_builder            = var.image_builder
     image_builder_project    = local.image_builder_project_name_or_empty
     build_cache_ecr_url      = local.build_cache_ecr_url_or_empty
+    build_staging_ecr_url    = local.build_staging_ecr_url_or_empty
     image_build_param_prefix = local.image_build_parameter_prefix
   }
 }

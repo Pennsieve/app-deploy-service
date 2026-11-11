@@ -88,6 +88,14 @@ variable "image_builder_compute_type" {
   default = "BUILD_GENERAL1_LARGE"
 }
 
+# Builds push to a staging repository and the status lambda promotes them
+# (codebuild.tf). Turn on after a status lambda with promotion is deployed;
+# the builder role then loses write access to appstore-private.
+variable "image_builder_staging" {
+  type    = bool
+  default = false
+}
+
 variable "image_builder_timeout_minutes" {
   type    = number
   default = 60

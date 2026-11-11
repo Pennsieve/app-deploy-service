@@ -17,6 +17,7 @@
       { "name" : "IMAGE_BUILDER", "value": "${image_builder}" },
       { "name" : "IMAGE_BUILDER_PROJECT", "value": "${image_builder_project}" },
       { "name" : "BUILD_CACHE_ECR_URL", "value": "${build_cache_ecr_url}" },
+      { "name" : "IMAGE_BUILD_STAGING_ECR_URL", "value": "${build_staging_ecr_url}" },
       { "name" : "IMAGE_BUILD_PARAMETER_PREFIX", "value": "${image_build_param_prefix}" }
     ],
     "name": "${tier}",

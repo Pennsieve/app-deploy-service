@@ -54,6 +54,46 @@ locals {
 # Build cache: one tag per app (provisioner imagebuild.CacheRef), never shared
 # between apps. A repository of its own, NOT appstore-private: pushes there
 # trigger the SOCI index builder, and cache tags would mix with app tags.
+# Staging: where builds push (image_builder_staging). A build's role can only
+# write here; the status lambda promotes a SUCCEEDED build's image to
+# appstore-private (lambda/status/handler/promote.go), so author code never
+# holds credentials that can write the registry users pull from. Promoted
+# tags are deleted; the lifecycle expires what is left.
+resource "aws_ecr_repository" "build_staging" {
+  count = local.use_codebuild && var.image_builder_staging ? 1 : 0
+
+  name                 = "${var.environment_name}-appstore-staging-${local.region_shortname}"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = false
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_ecr_lifecycle_policy" "build_staging" {
+  count = local.use_codebuild && var.image_builder_staging ? 1 : 0
+
+  repository = aws_ecr_repository.build_staging[0].name
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Staged images are promoted within minutes; expire anything older than a day"
+      selection    = { tagStatus = "any", countType = "sinceImagePushed", countUnit = "days", countNumber = 1 }
+      action       = { type = "expire" }
+    }]
+  })
+}
+
+locals {
+  build_staging_ecr_url_or_empty = local.use_codebuild && var.image_builder_staging ? aws_ecr_repository.build_staging[0].repository_url : ""
+  # What the build's role may push to: staging when it exists, else the
+  # App Store registry itself (the pre-staging arrangement).
+  image_builder_push_arn = local.use_codebuild && var.image_builder_staging ? aws_ecr_repository.build_staging[0].arn : local.appstore_private_ecr_arn
+}
+
 resource "aws_ecr_repository" "build_cache" {
   count = local.use_codebuild ? 1 : 0
 
@@ -163,7 +203,7 @@ data "aws_iam_policy_document" "image_builder" {
       # HEAD on a manifest during the push (does the tag exist yet)
       "ecr:BatchGetImage",
     ]
-    resources = [local.appstore_private_ecr_arn]
+    resources = [local.image_builder_push_arn]
   }
 
   statement {
