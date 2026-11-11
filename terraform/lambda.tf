@@ -113,6 +113,9 @@ resource "aws_lambda_function" "status_lambda" {
       # empty where the environment has no fixture builder.
       FIXTURE_BUILDER_PROJECT = local.fixture_builder_project_name_or_empty
       FIXTURES_BUCKET         = local.fixtures_bucket_name_or_empty
+      # Sample runs (samples.tf): the project and the compute types by memory.
+      SAMPLE_RUNNER_PROJECT = local.sample_runner_project_name_or_empty
+      SAMPLE_RUNNER_COMPUTE = var.sample_runner_compute
     }
   }
 }

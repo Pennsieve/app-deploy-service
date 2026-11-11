@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/pennsieve/app-deploy-service/status/external"
+	"github.com/pennsieve/app-deploy-service/status/lambdaeligibility"
 	"github.com/pennsieve/app-deploy-service/status/models"
 )
 
@@ -78,6 +79,13 @@ type FixtureBuilder struct {
 	Events                    external.EventsApi
 	// Now is the clock; nil: time.Now.
 	Now func() time.Time
+
+	// SampleProject is the sample-runner project (samples.go); empty: no
+	// sample runs, the release event goes out when the fixtures are decided.
+	SampleProject string
+	// SampleCompute are the runner's compute types by the most memory (MiB)
+	// an app may declare for each, in order (ParseSampleCompute).
+	SampleCompute []ComputeTier
 }
 
 func (fb *FixtureBuilder) now() string {
@@ -108,7 +116,12 @@ type release struct {
 	ApplicationId string
 	Tag           string
 	ImageDigest   string
+	Destination   string // the version's image, <registry>/<repo>:<tag>
 	HasReview     bool
+	Parameters    map[string]string // the review block's parameters
+	Runtime       lambdaeligibility.Runtime
+	Fixtures      *models.Fixtures
+	SampleRun     *models.SampleRun
 	SourceUrl     string
 	Visibility    string
 	IsPrivate     bool
@@ -119,10 +132,14 @@ type release struct {
 func (h *DeployTaskStateChangeHandler) releaseFacts(ctx context.Context, versionId, versionsTable string) (release, error) {
 	rel := release{VersionId: versionId}
 	out, err := h.DynamoDBApi.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:                aws.String(versionsTable),
-		Key:                      models.ApplicationKey(versionId),
-		ProjectionExpression:     aws.String("#a, #v, #d, #r"),
-		ExpressionAttributeNames: map[string]string{"#a": "applicationId", "#v": "version", "#d": models.ImageDigestField, "#r": "review"},
+		TableName:            aws.String(versionsTable),
+		Key:                  models.ApplicationKey(versionId),
+		ProjectionExpression: aws.String("#a, #v, #d, #dest, #r, #m.#rt, #f, #sr"),
+		ExpressionAttributeNames: map[string]string{
+			"#a": "applicationId", "#v": "version", "#d": models.ImageDigestField, "#dest": models.ApplicationDestinationUrlField,
+			"#r": "review", "#m": models.ManifestField, "#rt": models.ManifestRuntimeField,
+			"#f": models.FixturesField, "#sr": models.SampleRunField,
+		},
 	})
 	if err != nil {
 		return rel, fmt.Errorf("error reading version %s: %w", versionId, err)
@@ -134,12 +151,28 @@ func (h *DeployTaskStateChangeHandler) releaseFacts(ctx context.Context, version
 		ApplicationId string         `dynamodbav:"applicationId"`
 		Version       string         `dynamodbav:"version"`
 		ImageDigest   string         `dynamodbav:"imageDigest"`
+		Destination   string         `dynamodbav:"destinationUrl"`
 		Review        map[string]any `dynamodbav:"review"`
+		Manifest      *struct {
+			Runtime lambdaeligibility.Runtime `dynamodbav:"runtime"`
+		} `dynamodbav:"manifest"`
+		Fixtures  *models.Fixtures  `dynamodbav:"fixtures"`
+		SampleRun *models.SampleRun `dynamodbav:"sampleRun"`
 	}
 	if err := attributevalue.UnmarshalMap(out.Item, &v); err != nil {
 		return rel, fmt.Errorf("error reading version %s: %w", versionId, err)
 	}
 	rel.ApplicationId, rel.Tag, rel.ImageDigest, rel.HasReview = v.ApplicationId, v.Version, v.ImageDigest, len(v.Review) > 0
+	rel.Destination, rel.Fixtures, rel.SampleRun = strings.TrimSpace(v.Destination), v.Fixtures, v.SampleRun
+	if v.Manifest != nil {
+		rel.Runtime = v.Manifest.Runtime
+	}
+	rel.Parameters = map[string]string{}
+	if params, ok := v.Review["parameters"].(map[string]any); ok {
+		for k, val := range params {
+			rel.Parameters[k] = fmt.Sprint(val)
+		}
+	}
 	if rel.ApplicationId == "" || rel.Tag == "" {
 		return rel, fmt.Errorf("version %s has no applicationId or version", versionId)
 	}
@@ -193,7 +226,7 @@ func (h *DeployTaskStateChangeHandler) startFixtureBuild(ctx context.Context, lo
 		logger.Info("fixtures: skipped", slog.String("reason", code))
 		rec := models.Fixtures{Status: models.FixturesSkipped, Error: &models.FixturesError{Code: code, Message: message}, UpdatedAt: fb.now()}
 		h.setFixtures(ctx, logger, rel, versionsTable, rec)
-		h.emitReleaseReady(ctx, logger, rel, rec)
+		h.emitReleaseReady(ctx, logger, rel, rec, nil)
 	}
 	switch {
 	case sameRepository(rel.SourceUrl, fb.AppFixturesRepository):
@@ -226,7 +259,7 @@ func (h *DeployTaskStateChangeHandler) runFixtureBuild(ctx context.Context, logg
 		logger.Warn("fixtures: unable to start the fixture build", slog.Any("error", err))
 		rec := models.Fixtures{Status: models.FixturesFailed, Error: &models.FixturesError{Code: models.FixturesErrorBuildFailed, Message: "the fixture build could not be started: " + err.Error()}, UpdatedAt: fb.now()}
 		h.setFixtures(ctx, logger, rel, versionsTable, rec)
-		h.emitReleaseReady(ctx, logger, rel, rec)
+		h.emitReleaseReady(ctx, logger, rel, rec, nil)
 		return
 	}
 	buildId := ""
@@ -277,7 +310,7 @@ func (h *DeployTaskStateChangeHandler) HandleFixtureBuild(ctx context.Context, e
 	rel := release{VersionId: versionId, ApplicationId: applicationId, Tag: tag}
 	h.setFixtures(ctx, logger, rel, versionsTable, rec)
 	if rec.Status == models.FixturesReady {
-		h.expireSupersededBundles(ctx, logger, applicationId, tag)
+		h.expireSuperseded(ctx, logger, fixturesKeyPrefix+applicationId+"/", ".tar.gz", tag)
 	}
 	// The event carries the release's image and visibility too.
 	if full, err := h.releaseFacts(ctx, versionId, versionsTable); err == nil {
@@ -285,8 +318,14 @@ func (h *DeployTaskStateChangeHandler) HandleFixtureBuild(ctx context.Context, e
 	} else {
 		logger.Warn("fixtures: unable to read the release for its event; sending what is known", slog.Any("error", err))
 	}
-	h.emitReleaseReady(ctx, logger, rel, rec)
 	logger.Info("fixtures: recorded", slog.String("status", rec.Status))
+	// A ready bundle is run next (samples.go); the release event then waits
+	// for that outcome. Otherwise, or without a runner, it goes out now.
+	if rec.Status == models.FixturesReady && h.Fixtures.SampleProject != "" {
+		h.startSampleRun(ctx, logger, rel, rec, versionsTable)
+		return nil
+	}
+	h.emitReleaseReady(ctx, logger, rel, rec, nil)
 	return nil
 }
 
@@ -391,13 +430,12 @@ func FixturesUpdate(versionId, versionsTable string, rec models.Fixtures) (*dyna
 	}, nil
 }
 
-// expireSupersededBundles tags the bundles of an app's releases before its
-// previous one retain=no; the bucket's lifecycle expires them. The current
-// release (the one just built) and the most recent other one stay. Best
-// effort.
-func (h *DeployTaskStateChangeHandler) expireSupersededBundles(ctx context.Context, logger *slog.Logger, applicationId, currentTag string) {
+// expireSuperseded tags the objects (with the suffix) of an app's releases
+// before its previous one retain=no under prefix (fixtures/<app>/ or
+// samples/<app>/); the bucket's lifecycle expires them. The current release
+// (the one just built) and the most recent other one stay. Best effort.
+func (h *DeployTaskStateChangeHandler) expireSuperseded(ctx context.Context, logger *slog.Logger, prefix, suffix, currentTag string) {
 	fb := h.Fixtures
-	prefix := fixturesKeyPrefix + applicationId + "/"
 	type bundle struct {
 		key      string
 		tag      string
@@ -413,7 +451,7 @@ func (h *DeployTaskStateChangeHandler) expireSupersededBundles(ctx context.Conte
 		}
 		for _, o := range out.Contents {
 			key := aws.ToString(o.Key)
-			if !strings.HasSuffix(key, ".tar.gz") {
+			if !strings.HasSuffix(key, suffix) {
 				continue
 			}
 			rest := strings.TrimPrefix(key, prefix)
@@ -467,8 +505,10 @@ func (h *DeployTaskStateChangeHandler) expireSupersededBundles(ctx context.Conte
 	}
 }
 
-// emitReleaseReady sends the App Release Ready event. Best effort.
-func (h *DeployTaskStateChangeHandler) emitReleaseReady(ctx context.Context, logger *slog.Logger, rel release, rec models.Fixtures) {
+// emitReleaseReady sends the App Release Ready event: once per version,
+// when its image is deployed and its fixtures (and sample run, where one
+// is made) are decided. Best effort.
+func (h *DeployTaskStateChangeHandler) emitReleaseReady(ctx context.Context, logger *slog.Logger, rel release, rec models.Fixtures, sample *models.SampleRun) {
 	fb := h.Fixtures
 	if fb.Events == nil {
 		return
@@ -483,6 +523,7 @@ func (h *DeployTaskStateChangeHandler) emitReleaseReady(ctx context.Context, log
 		Visibility:    rel.Visibility,
 		IsPrivate:     rel.IsPrivate,
 		Fixtures:      rec,
+		SampleRun:     sample,
 	})
 	if err != nil {
 		logger.Warn("fixtures: unable to encode the release event", slog.Any("error", err))
@@ -501,5 +542,9 @@ func (h *DeployTaskStateChangeHandler) emitReleaseReady(ctx context.Context, log
 		logger.Warn("fixtures: unable to send the release event", slog.Any("error", err))
 		return
 	}
-	logger.Info("fixtures: release event sent", slog.String("fixtures", rec.Status))
+	sampleStatus := ""
+	if sample != nil {
+		sampleStatus = sample.Status
+	}
+	logger.Info("fixtures: release event sent", slog.String("fixtures", rec.Status), slog.String("sampleRun", sampleStatus))
 }

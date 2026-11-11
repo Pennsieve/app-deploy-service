@@ -45,7 +45,11 @@ func (f *fakeFixtureCodeBuild) StartBuild(_ context.Context, in *codebuild.Start
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &codebuild.StartBuildOutput{Build: &cbtypes.Build{Id: aws.String(testFixtureBuildId)}}, nil
+	id := testFixtureBuildId
+	if aws.ToString(in.ProjectName) == testSampleProject {
+		id = testSampleBuildId
+	}
+	return &codebuild.StartBuildOutput{Build: &cbtypes.Build{Id: aws.String(id)}}, nil
 }
 
 type fakeS3 struct {

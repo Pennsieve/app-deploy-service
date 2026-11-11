@@ -65,6 +65,8 @@ func init() {
 			CodeBuild:                 codebuild.NewFromConfig(awsConfig),
 			S3:                        s3.NewFromConfig(awsConfig),
 			Events:                    eventbridge.NewFromConfig(awsConfig),
+			SampleProject:             strings.TrimSpace(os.Getenv(handler.SampleRunnerProjectEnvVar)),
+			SampleCompute:             handler.ParseSampleCompute(os.Getenv(handler.SampleRunnerComputeEnvVar)),
 		})
 	}
 

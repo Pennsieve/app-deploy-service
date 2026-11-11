@@ -417,6 +417,7 @@ So a review verdict can be tied to the exact code and image tested, a version re
 | `lambda`, `variants.<id>.lambda` | status lambda, with the digest | Whether the version (variant) can run as a Lambda step, and why not ([Lambda eligibility](#lambda-eligibility)). |
 | `review` | service lambda, at registration | app.yml's `review` block ([app-manifest-review.md](app-manifest-review.md)) as parsed: what a review run uses. Parts that don't parse are left out (the schema reports them). |
 | `fixtures` | status lambda, after the version is deployed | The release's fixture bundle ([Fixture bundles](#fixture-bundles)): `status` building, ready, skipped or failed, the bundle's `bucket`, `key`, `bytes` and `sha256`, `warnings`, and an `error` code and message when there is no bundle. |
+| `sampleRun` | status lambda, after the fixtures are ready | The run of the image on the bundle ([Sample runs](#sample-runs)): `status` running, ready, skipped or failed, the results' `bucket`, `key`, `bytes`, `sha256` and `files`, `exitCode`, `durationSeconds`, `computeType`, and an `error` when there are no results. |
 
 The digest is the tag's at the moment the build ends, recorded before the status says
 `deployed`. A digest that can't be read (no `destinationUrl`, an ECR error, the tag not
@@ -513,6 +514,56 @@ network-free and bounds the cost to once per release.
   pointing at a local registry's copy of app-fixtures and
   `FIXTURES_BUCKET` empty, which leaves the bundle and manifest in
   `/tmp/fixtures-build/`; the image needs `python3` (`apk add python3`).
+
+## Sample runs
+
+With `sample_runner` on (needs the fixture builder), each release is run
+once on its fixture bundle, and the results feed the sample document
+(App Sample Documents epic, curation-service).
+
+- **What.** Once a version's fixtures are `ready`, the status lambda starts
+  a build of `<env>-app-deploy-service-sample-runner` (`samples.tf`), in
+  the build VPC, which runs `image-builder/sample-run.sh`: pull the promoted
+  image **by digest**, fetch and unpack the bundle, and `docker run` the
+  image once with its own entrypoint and command, `INPUT_DIR=/input`,
+  `OUTPUT_DIR=/output` and the review block's `parameters` as environment.
+  A single run of a finished image is what `docker run` is for; BuildKit
+  is for building them.
+- **Isolation.** `--network none` (nothing reachable, not even the
+  credential endpoint), every capability dropped, no new privileges, a pids
+  limit, the app's declared memory as the limit, `/input` read-only, only
+  `/output` and `/tmp` writable, no environment beyond the three above. The
+  bundle is unpacked and the output zipped by the script, platform code;
+  nothing from either is executed.
+- **Compute.** `sample_runner_compute` lists compute types by the most
+  memory an app may declare for each (`BUILD_GENERAL1_MEDIUM=6144,
+  BUILD_GENERAL1_LARGE=14336`); the lambda overrides the project's compute
+  type per run. An app that runs on GPU only, or declares more memory than
+  the largest tier, is not run: `sampleRun.status = skipped`,
+  `error.code = needs_hardware`, and the release event goes out at once.
+  That is what the owner's own-node fallback is for.
+- **Caps.** `sample_run_timeout_seconds` (1200) for the container, the build
+  `sample_runner_timeout_minutes` (30), `sample_output_max_bytes` (2 GiB)
+  on the zipped results (`too_large`).
+- **Where.** Under `samples/<applicationId>/<tag>/` in the fixtures bucket:
+  `<sha256>.zip` (the app's `OUTPUT_DIR` as it left it) and `manifest.json`,
+  always written: `status` ready or failed, the exit code, timing, the
+  results' key, bytes and sha256, the last lines of the app's log, the
+  error (`run_failed`, `timed_out`, `too_large`, `no_outputs`,
+  `image_unavailable`, `bundle_unavailable`, `invalid_parameters`). The log
+  carries one `SAMPLE_RESULT` line. The build is SUCCEEDED whenever a
+  manifest was written; a failed app run is a result. Retention as for
+  bundles: the current and previous release's results stay, older ones are
+  tagged `retain=no`.
+- **Status lambda.** Records `sampleRun {status, bucket, key, bytes, sha256,
+  files, exitCode, durationSeconds, computeType, warnings, error, startedAt,
+  finishedAt, buildId}` on the version (running, ready, skipped, failed;
+  `build_<status>` with the log tail when the build itself failed,
+  `manifest_missing`), publishes `application_sample_run_status_event` on
+  the version's channel, and sends the release event once the run is
+  decided: `App Release Ready` then carries `fixtures` and `sampleRun`. When
+  the fixtures are not ready, or no runner is configured, the event goes out
+  when the fixtures are decided, without `sampleRun`.
 
 ## Environments
 

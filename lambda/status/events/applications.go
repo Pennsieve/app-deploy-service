@@ -45,3 +45,19 @@ type FixturesStatusEvent struct {
 	Time          *time.Time `json:"time,omitempty"`
 	Source        string     `json:"source"`
 }
+
+// SampleRunStatusEventName is a change of the version's sample run (docs/
+// builds.md "Sample runs"), on the version's channel: running, ready,
+// skipped or failed.
+const SampleRunStatusEventName = "application_sample_run_status_event"
+
+type SampleRunStatusEvent struct {
+	ApplicationId string     `json:"application_id"`
+	Status        string     `json:"status"`
+	ErrorCode     string     `json:"error_code,omitempty"`
+	ErrorMessage  string     `json:"error_message,omitempty"`
+	Bytes         int64      `json:"bytes,omitempty"`
+	Files         int        `json:"files,omitempty"`
+	Time          *time.Time `json:"time,omitempty"`
+	Source        string     `json:"source"`
+}

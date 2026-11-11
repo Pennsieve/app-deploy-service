@@ -294,3 +294,43 @@ variable "fixture_bundle_expiry_days" {
   type    = number
   default = 30
 }
+
+# --- sample runs (samples.tf, docs/builds.md "Sample runs") -----------------
+# Run each release once on its fixture bundle, with no network, for the
+# sample document. Needs fixture_builder.
+variable "sample_runner" {
+  type    = bool
+  default = false
+}
+
+# Seconds the app's container may run.
+variable "sample_run_timeout_seconds" {
+  type    = number
+  default = 1200
+}
+
+# Hard cap on the zipped results.
+variable "sample_output_max_bytes" {
+  type    = number
+  default = 2147483648 # 2 GiB
+}
+
+variable "sample_runner_timeout_minutes" {
+  type    = number
+  default = 30
+}
+
+# The project's default compute type; the status lambda overrides it per run
+# from sample_runner_compute.
+variable "sample_runner_compute_type" {
+  type    = string
+  default = "BUILD_GENERAL1_MEDIUM"
+}
+
+# Compute types the status lambda picks from, with the most memory (MiB) an
+# app may declare for each, in order: the first that fits is used; an app
+# that fits none (or runs on GPU only) is not run here (needs_hardware).
+variable "sample_runner_compute" {
+  type    = string
+  default = "BUILD_GENERAL1_MEDIUM=6144,BUILD_GENERAL1_LARGE=14336"
+}

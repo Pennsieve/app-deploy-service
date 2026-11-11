@@ -43,3 +43,7 @@ output "fixtures_bucket_name" {
 output "fixture_builder_project_name" {
   value = local.fixture_builder_project_name_or_empty
 }
+
+output "sample_runner_project_name" {
+  value = local.sample_runner_project_name_or_empty
+}

@@ -54,6 +54,9 @@ func (h *DeployTaskStateChangeHandler) HandleBuild(ctx context.Context, event mo
 	if h.isFixtureBuild(event) {
 		return h.HandleFixtureBuild(ctx, event)
 	}
+	if h.isSampleRun(event) {
+		return h.HandleSampleRun(ctx, event)
+	}
 	logger := h.logger.With(slog.String("buildId", event.Detail.BuildId), slog.String("buildStatus", event.Detail.BuildStatus))
 	logger.Info("handling build event", slog.String("project", event.Detail.ProjectName), slog.String("phase", event.Detail.CurrentPhase))
 
