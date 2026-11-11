@@ -416,6 +416,7 @@ So a review verdict can be tied to the exact code and image tested, a version re
 | `variants.<id>.imageDigest` | status lambda, when that variant's build succeeds | The variant's image digest (`<hash>-<tag>--<id>`; the default variant's is also the version's `imageDigest`). |
 | `lambda`, `variants.<id>.lambda` | status lambda, with the digest | Whether the version (variant) can run as a Lambda step, and why not ([Lambda eligibility](#lambda-eligibility)). |
 | `review` | service lambda, at registration | app.yml's `review` block ([app-manifest-review.md](app-manifest-review.md)) as parsed: what a review run uses. Parts that don't parse are left out (the schema reports them). |
+| `fixtures` | status lambda, after the version is deployed | The release's fixture bundle ([Fixture bundles](#fixture-bundles)): `status` building, ready, skipped or failed, the bundle's `bucket`, `key`, `bytes` and `sha256`, `warnings`, and an `error` code and message when there is no bundle. |
 
 The digest is the tag's at the moment the build ends, recorded before the status says
 `deployed`. A digest that can't be read (no `destinationUrl`, an ECR error, the tag not
@@ -478,16 +479,31 @@ network-free and bounds the cost to once per release.
   under `fixtures/` of its bucket; its own log group; the ENI permissions
   every VPC build needs. No staging push, no SSM, no secrets, no git token
   (private repositories are out of scope: app-fixtures clones the app).
-- **Status lambda** (next step, not in this module yet): starts the fixture
-  build after a release's image is promoted, skipping with a recorded
-  reason when the version has no `review` block, the repository is
-  private, the variant is not the default, or the app is app-fixtures
-  itself; reads `manifest.json` from the fixture build's state-change
-  event; records `fixtures{status, bytes, sha256, builtAt, warnings, error}`
-  on the version; tags superseded bundles; emits the `App Release Ready`
-  event curation-service consumes. Until it exists the fixture project is
-  not on the status rule, so a fixture build cannot be mistaken for an
-  image build.
+- **Status lambda** (`lambda/status/handler/fixtures.go`). When a release's
+  image is deployed (built, promoted, its digest recorded; an app without
+  variants or its default variant), the lambda reads the version and its
+  App Store application and starts the fixture build with `REPOSITORY`,
+  `TAG`, `APPLICATION_ID`, `VERSION_ID` and `APPLICATIONS_TABLE`, recording
+  `fixtures.status = building` on the version. It starts none, records why
+  and sends the release event at once when the version has no `review`
+  block (`no_review_block`), the repository is private
+  (`private_repository`: app-fixtures clones it and has no token) or the
+  app is app-fixtures itself (`platform_app`). The fixture build's own
+  state change (the same EventBridge rule, matched by project name) ends
+  here too: the lambda reads `manifest.json`, records
+  `fixtures {status, bucket, key, bytes, sha256, files, warnings, error,
+  startedAt, builtAt, buildId}` on the version (`failed` with
+  `build_<status>` and the log tail when the build itself failed, or
+  `manifest_missing`), tags the app's bundles older than its previous
+  release `retain=no`, and sends the release event. Nothing here changes a
+  version's deployed status or fails the image build's event.
+- **Release event.** Once per version, when the image is deployed and the
+  fixtures are decided (ready, skipped or failed): EventBridge default bus,
+  source `pennsieve.app-deploy-service`, detail-type `App Release Ready`,
+  detail `{environment, applicationId, versionId, tag, imageDigest,
+  sourceUrl, visibility, isPrivate, fixtures{...}}`, resources
+  `[versionId]`. curation-service subscribes to it for sample documents;
+  `applicationId` and `tag` are its idempotency key.
 - **Locally:** fixtures.sh runs in the rootful BuildKit image like build.sh
   (see [Testing locally](#testing-locally)), with `APP_FIXTURES_IMAGE`
   pointing at a local registry's copy of app-fixtures and

@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/ecs"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/pennsieve/app-deploy-service/status/handler"
 	"github.com/pennsieve/app-deploy-service/status/imagecopy"
@@ -51,6 +53,20 @@ func init() {
 		WithECR(ecr.NewFromConfig(awsConfig)).
 		WithImageCopier(imagecopy.New(ecr.NewFromConfig(awsConfig))).
 		WithProvisionerGroup(os.Getenv(handler.ProvisionerTaskGroupEnvVar))
+
+	// fixture bundles (handler/fixtures.go), where the environment builds them
+	if project := strings.TrimSpace(os.Getenv(handler.FixtureBuilderProjectEnvVar)); project != "" {
+		stateChangeHandler = stateChangeHandler.WithFixtureBuilder(&handler.FixtureBuilder{
+			Project:                   project,
+			Bucket:                    os.Getenv(handler.FixturesBucketEnvVar),
+			AppStoreApplicationsTable: os.Getenv(handler.AppStoreApplicationsTableEnvVar),
+			Environment:               os.Getenv(handler.EnvironmentEnvVar),
+			AppFixturesRepository:     os.Getenv(handler.AppFixturesRepositoryEnvVar),
+			CodeBuild:                 codebuild.NewFromConfig(awsConfig),
+			S3:                        s3.NewFromConfig(awsConfig),
+			Events:                    eventbridge.NewFromConfig(awsConfig),
+		})
+	}
 
 	// live status updates: AppSync Events where configured, otherwise Pusher
 	if strings.TrimSpace(os.Getenv(realtime.EnvEventsEndpoint)) != "" {

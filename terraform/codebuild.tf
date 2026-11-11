@@ -409,16 +409,18 @@ resource "aws_codebuild_project" "image_builder" {
 
 # Build state changes (IN_PROGRESS, SUCCEEDED, FAILED, FAULT, STOPPED,
 # TIMED_OUT) to the status lambda, beside the provisioner task's ECS events.
+# The fixture builder's too (fixtures.tf); the lambda tells them apart by
+# project name.
 resource "aws_cloudwatch_event_rule" "image_builder_status" {
   count = local.use_codebuild ? 1 : 0
 
   name        = "${var.environment_name}-${var.service_name}-image-builder-status-${local.region_shortname}"
-  description = "App Store image build state changes"
+  description = "App Store image and fixture build state changes"
   event_pattern = jsonencode({
     "source" : ["aws.codebuild"],
     "detail-type" : ["CodeBuild Build State Change"],
     "detail" : {
-      "project-name" : [aws_codebuild_project.image_builder[0].name]
+      "project-name" : concat([aws_codebuild_project.image_builder[0].name], aws_codebuild_project.fixture_builder[*].name)
     }
   })
 }

@@ -109,6 +109,10 @@ resource "aws_lambda_function" "status_lambda" {
       APPSTORE_APPLICATIONS_TABLE = aws_dynamodb_table.appstore_applications_table.name,
       DEPLOYMENTS_TABLE           = aws_dynamodb_table.deployments_table.name
       PROVISIONER_TASK_GROUP      = "family:${aws_ecs_task_definition.app_provisioner_ecs_task_definition.family}"
+      # Fixture bundles (fixtures.tf, lambda/status/handler/fixtures.go);
+      # empty where the environment has no fixture builder.
+      FIXTURE_BUILDER_PROJECT = local.fixture_builder_project_name_or_empty
+      FIXTURES_BUCKET         = local.fixtures_bucket_name_or_empty
     }
   }
 }

@@ -51,6 +51,9 @@ var buildFinalStates = map[string]bool{
 // error. A failed build's reason (its failed phase, the tail of its log and a
 // link to the log) goes in the deployment's stoppedReason.
 func (h *DeployTaskStateChangeHandler) HandleBuild(ctx context.Context, event models.BuildStateChangeEvent) error {
+	if h.isFixtureBuild(event) {
+		return h.HandleFixtureBuild(ctx, event)
+	}
 	logger := h.logger.With(slog.String("buildId", event.Detail.BuildId), slog.String("buildStatus", event.Detail.BuildStatus))
 	logger.Info("handling build event", slog.String("project", event.Detail.ProjectName), slog.String("phase", event.Detail.CurrentPhase))
 
@@ -71,7 +74,7 @@ func (h *DeployTaskStateChangeHandler) HandleBuild(ctx context.Context, event mo
 
 	reason := ""
 	if final && failed {
-		reason = h.buildFailureReason(ctx, event)
+		reason = h.buildFailureReason(ctx, event, "image build")
 	}
 	// A staged build's image is promoted before the version is told it is
 	// deployed; a promotion that fails is recorded as a failed build.
@@ -93,6 +96,12 @@ func (h *DeployTaskStateChangeHandler) HandleBuild(ctx context.Context, event mo
 	recordErr := h.recordStateChange(ctx, ids, task)
 	if final {
 		h.deleteGitToken(ctx, logger, env)
+	}
+	// The version is deployed: its fixture bundle is next (an app without
+	// variants, or the default variant; another variant shares the
+	// version's bundle).
+	if final && !failed && !promoteFailed && recordErr == nil && h.isAppStoreBuild(ids) && (ids.Variant == "" || ids.VariantDefault) {
+		h.startFixtureBuild(ctx, logger.With(slog.String("versionId", ids.ApplicationId)), ids.ApplicationId, ids.ApplicationsTable)
 	}
 	return recordErr
 }
@@ -178,10 +187,10 @@ func idsFromBuildVariables(env models.BuildEnvironment) DeploymentApplicationIds
 // buildFailureReason says why a build failed: its status and failed phase,
 // that phase's context, the last lines of the build's own output and a link
 // to the whole log.
-func (h *DeployTaskStateChangeHandler) buildFailureReason(ctx context.Context, event models.BuildStateChangeEvent) string {
+func (h *DeployTaskStateChangeHandler) buildFailureReason(ctx context.Context, event models.BuildStateChangeEvent, what string) string {
 	detail := event.Detail
 	var b strings.Builder
-	fmt.Fprintf(&b, "image build %s", detail.BuildStatus)
+	fmt.Fprintf(&b, "%s %s", what, detail.BuildStatus)
 	for _, phase := range detail.Additional.Phases {
 		if phase.PhaseStatus == "" || phase.PhaseStatus == models.BuildSucceeded {
 			continue
