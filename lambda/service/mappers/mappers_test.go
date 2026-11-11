@@ -213,3 +213,28 @@ func TestAppStoreVersionToModel_LambdaEligibility(t *testing.T) {
 
 	assert.Nil(t, AppStoreVersionToModel(store_dynamodb.AppStoreVersion{}).Lambda, "absent until recorded")
 }
+
+// The fixture bundle the status lambda records: shown without its bucket,
+// key or build id.
+func TestAppStoreVersionToModel_Fixtures(t *testing.T) {
+	m := AppStoreVersionToModel(store_dynamodb.AppStoreVersion{Uuid: "u", Version: "v1.0.0", Fixtures: &store_dynamodb.AppFixtures{
+		Status: "ready", BuildId: "arn:build", Bucket: "dev-fixtures", Key: "fixtures/app/v1.0.0/abc.tar.gz",
+		Bytes: 2256444, Sha256: "abc", Files: 7, Warnings: []string{"large_bundle: 300000000 bytes"}, BuiltAt: "2026-11-11T19:59:00Z", UpdatedAt: "2026-11-11T20:00:00Z",
+	}})
+	require.NotNil(t, m.Fixtures)
+	assert.Equal(t, "ready", m.Fixtures.Status)
+	assert.Equal(t, int64(2256444), m.Fixtures.Bytes)
+	assert.Equal(t, "abc", m.Fixtures.Sha256)
+	assert.Equal(t, 7, m.Fixtures.Files)
+	assert.Equal(t, []string{"large_bundle: 300000000 bytes"}, m.Fixtures.Warnings)
+	assert.Equal(t, "2026-11-11T19:59:00Z", m.Fixtures.BuiltAt)
+	assert.Nil(t, m.Fixtures.Error)
+
+	skipped := AppStoreVersionToModel(store_dynamodb.AppStoreVersion{Fixtures: &store_dynamodb.AppFixtures{
+		Status: "skipped", Error: &store_dynamodb.AppFixturesError{Code: "no_review_block", Message: "app.yml declares no review block"},
+	}})
+	require.NotNil(t, skipped.Fixtures.Error)
+	assert.Equal(t, "no_review_block", skipped.Fixtures.Error.Code)
+
+	assert.Nil(t, AppStoreVersionToModel(store_dynamodb.AppStoreVersion{}).Fixtures)
+}
