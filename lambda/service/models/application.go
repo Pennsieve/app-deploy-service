@@ -192,6 +192,34 @@ type AppStoreVersion struct {
 	// Lambda: whether the version can run as a Lambda step, and why not;
 	// absent until its build succeeds.
 	Lambda *LambdaEligibility `json:"lambda,omitempty"`
+	// Fixtures: the release's fixture bundle, its review-block inputs built
+	// once at release for sample runs (docs/builds.md "Fixture bundles");
+	// absent until the version is deployed, or where none are built.
+	Fixtures *AppFixtures `json:"fixtures,omitempty"`
+}
+
+// AppFixtures is a version's fixture bundle as the API shows it. Status:
+// building (a build is running), ready (Bytes, Sha256 and Files describe
+// the bundle), skipped (no build: Error.Code is no_review_block,
+// private_repository or platform_app) or failed (Error.Code is
+// app-fixtures' own code such as dataset_too_large or generator_failed,
+// too_large for the cap, build_<status> or manifest_missing). Warnings:
+// large_bundle and the like. The bundle itself is platform-internal: its
+// location is not shown.
+type AppFixtures struct {
+	Status    string            `json:"status"`
+	Bytes     int64             `json:"bytes,omitempty"`
+	Sha256    string            `json:"sha256,omitempty"`
+	Files     int               `json:"files,omitempty"`
+	Warnings  []string          `json:"warnings,omitempty"`
+	Error     *AppFixturesError `json:"error,omitempty"`
+	BuiltAt   string            `json:"builtAt,omitempty"`
+	UpdatedAt string            `json:"updatedAt,omitempty"`
+}
+
+type AppFixturesError struct {
+	Code    string `json:"code"`
+	Message string `json:"message,omitempty"`
 }
 
 // LambdaEligibility is the platform's decision whether a version (or a

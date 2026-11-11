@@ -244,6 +244,55 @@ components:
           description: The digest of the image built for this version (the default variant's, with variants). Absent until its build succeeds.
         lambda:
           $ref: '#/components/schemas/LambdaEligibility'
+        fixtures:
+          $ref: '#/components/schemas/AppFixtures'
+    AppFixtures:
+      type: object
+      description: The release's fixture bundle, its app.yml review-block inputs built once at release for sample runs (platform-internal; the bundle's location is not shown). Absent until the version is deployed, or where the environment builds none.
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [building, ready, skipped, failed]
+          description: >-
+            building while a fixture build runs; ready when the bundle is in place; skipped when no build
+            was started (see error); failed when the build or the fixtures failed (see error).
+        bytes:
+          type: integer
+          format: int64
+          description: The compressed bundle's size. Present when ready.
+        sha256:
+          type: string
+          description: The bundle's SHA-256. Present when ready.
+        files:
+          type: integer
+          description: How many input files the bundle holds. Present when ready.
+        warnings:
+          type: array
+          description: >-
+            Such as "large_bundle: ..." for a bundle above the warning size. Absent when none.
+          items:
+            type: string
+        error:
+          type: object
+          description: >-
+            Why there is no bundle. Codes for skipped: no_review_block, private_repository, platform_app.
+            For failed: app-fixtures' own codes (no_source_for_port, dataset_too_large, generator_failed, ...),
+            too_large (above the cap), build_failed, build_timed_out, manifest_missing.
+          required: [code]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        builtAt:
+          type: string
+          format: date-time
+          description: When the bundle was built. Present when ready.
+        updatedAt:
+          type: string
+          format: date-time
+          description: When this record last changed.
     LambdaEligibility:
       type: object
       description: Whether the version (or variant) can run as a Lambda step, decided by the platform from its runtime and image after a successful build. Absent until then.
