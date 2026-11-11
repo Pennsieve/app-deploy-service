@@ -130,11 +130,21 @@ if [ -z "${BUILDKIT_HOST:-}" ]; then
   run_network=${RUN_NETWORK:-bridge}
   if [ "$run_network" = bridge ]; then
     command -v iptables >/dev/null 2>&1 || die "iptables is required for bridge networking of RUN steps"
+    # A FORWARD drop alone is not enough: the credentials endpoint is a
+    # DNAT in nat PREROUTING (169.254.170.2:80 to the agent's local port),
+    # which rewrites the destination before FORWARD sees the packet. Probe
+    # v0.2.4 on 2026-11-11 still got HTTP 404/400 from it through the bridge.
+    # raw PREROUTING runs before nat, so the drop goes there (mangle when the
+    # raw table is missing); FORWARD keeps the plain case. The build
+    # container's own traffic leaves through OUTPUT and is untouched.
+    pre_table=raw
+    iptables -t raw -L PREROUTING -n >/dev/null 2>&1 || pre_table=mangle
     for addr in 169.254.170.2/32 169.254.169.254/32; do
       # Insert once; a retried phase must not stack rules.
+      iptables -t "$pre_table" -C PREROUTING -d "$addr" -j DROP 2>/dev/null || iptables -t "$pre_table" -I PREROUTING 1 -d "$addr" -j DROP
       iptables -C FORWARD -d "$addr" -j DROP 2>/dev/null || iptables -I FORWARD 1 -d "$addr" -j DROP
     done
-    log "RUN steps: bridge network; 169.254.170.2 and 169.254.169.254 dropped on FORWARD"
+    log "RUN steps: bridge network; 169.254.170.2 and 169.254.169.254 dropped in $pre_table PREROUTING and FORWARD"
     BUILDKITD_FLAGS="--oci-worker-net=bridge ${BUILDKITD_FLAGS:-}"
   else
     log "RUN steps: ${run_network} network (RUN_NETWORK override)"

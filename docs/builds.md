@@ -130,16 +130,20 @@ status go through the same steps.
 - **RUN steps are isolated.** The process sandbox gives each `RUN` step its
   own PID and mount namespaces; `--oci-worker-net=bridge` gives it its own
   network namespace on BuildKit's bridge (`buildkit0`, 10.10.0.0/16, the CNI
-  plugins from the release tarball), and build.sh drops forwarded traffic to
-  the container-credentials endpoint 169.254.170.2 and the instance metadata
-  endpoint 169.254.169.254 before buildkitd starts. A probe on 2026-11-11
-  (Pennsieve/test-egress-probe, branch `build-probe`) had shown that with
-  BuildKit's default "auto" mode a step shared the build container's network
-  and could reach 169.254.170.2 (it still lacked the credentials URI). The
-  step keeps internet access for package indexes and code hosts. build.sh
-  refuses to build when the worker does not report `network: cni`;
-  `RUN_NETWORK=host` is an explicit override for a diagnosis. Re-run the
-  probe (a pre-release of that branch) after any change here.
+  plugins from the release tarball), and build.sh drops traffic from the
+  bridge to the container-credentials endpoint 169.254.170.2 and the
+  instance metadata endpoint 169.254.169.254 before buildkitd starts, in
+  raw `PREROUTING` (before the agent's nat DNAT of 169.254.170.2:80 to its
+  local port, which a `FORWARD` drop never sees) and in `FORWARD`. Probes on
+  2026-11-11 (Pennsieve/test-egress-probe, branch `build-probe`) showed first
+  that BuildKit's default "auto" mode shared the build container's network
+  and could reach 169.254.170.2, then that the bridge with only the
+  `FORWARD` drop still got HTTP 404/400 from it. The step keeps internet
+  access for package indexes and code hosts. build.sh refuses to build when
+  the worker does not report `network: cni`; `RUN_NETWORK=host` is an
+  explicit override for a diagnosis. Re-run the probe (a pre-release of that
+  branch, with a bumped version line so the step is not served from cache)
+  after any change here.
 - **Status:** an EventBridge rule sends the project's `CodeBuild Build State
   Change` events to the status lambda (`lambda/status/handler/codebuild.go`).
   It reads the ids from the build's environment variables, or from
