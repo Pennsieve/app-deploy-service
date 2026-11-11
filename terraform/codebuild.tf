@@ -54,6 +54,46 @@ locals {
 # Build cache: one tag per app (provisioner imagebuild.CacheRef), never shared
 # between apps. A repository of its own, NOT appstore-private: pushes there
 # trigger the SOCI index builder, and cache tags would mix with app tags.
+# Staging: where builds push (image_builder_staging). A build's role can only
+# write here; the status lambda promotes a SUCCEEDED build's image to
+# appstore-private (lambda/status/handler/promote.go), so author code never
+# holds credentials that can write the registry users pull from. Promoted
+# tags are deleted; the lifecycle expires what is left.
+resource "aws_ecr_repository" "build_staging" {
+  count = local.use_codebuild && var.image_builder_staging ? 1 : 0
+
+  name                 = "${var.environment_name}-appstore-staging-${local.region_shortname}"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = false
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_ecr_lifecycle_policy" "build_staging" {
+  count = local.use_codebuild && var.image_builder_staging ? 1 : 0
+
+  repository = aws_ecr_repository.build_staging[0].name
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Staged images are promoted within minutes; expire anything older than a day"
+      selection    = { tagStatus = "any", countType = "sinceImagePushed", countUnit = "days", countNumber = 1 }
+      action       = { type = "expire" }
+    }]
+  })
+}
+
+locals {
+  build_staging_ecr_url_or_empty = local.use_codebuild && var.image_builder_staging ? aws_ecr_repository.build_staging[0].repository_url : ""
+  # What the build's role may push to: staging when it exists, else the
+  # App Store registry itself (the pre-staging arrangement).
+  image_builder_push_arn = local.use_codebuild && var.image_builder_staging ? aws_ecr_repository.build_staging[0].arn : local.appstore_private_ecr_arn
+}
+
 resource "aws_ecr_repository" "build_cache" {
   count = local.use_codebuild ? 1 : 0
 
@@ -163,7 +203,7 @@ data "aws_iam_policy_document" "image_builder" {
       # HEAD on a manifest during the push (does the tag exist yet)
       "ecr:BatchGetImage",
     ]
-    resources = [local.appstore_private_ecr_arn]
+    resources = [local.image_builder_push_arn]
   }
 
   statement {
@@ -186,6 +226,43 @@ data "aws_iam_policy_document" "image_builder" {
     effect    = "Allow"
     actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
     resources = ["${aws_cloudwatch_log_group.image_builder[0].arn}:*"]
+  }
+
+  dynamic "statement" {
+    for_each = local.build_vpc_enabled ? [1] : []
+    content {
+      sid    = "BuildVpcInterfaces"
+      effect = "Allow"
+      actions = [
+        "ec2:CreateNetworkInterface",
+        "ec2:DescribeDhcpOptions",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DeleteNetworkInterface",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeVpcs",
+      ]
+      resources = ["*"]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.build_vpc_enabled ? [1] : []
+    content {
+      sid       = "BuildVpcInterfacePermission"
+      effect    = "Allow"
+      actions   = ["ec2:CreateNetworkInterfacePermission"]
+      resources = ["arn:aws:ec2:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:network-interface/*"]
+      condition {
+        test     = "StringEquals"
+        variable = "ec2:AuthorizedService"
+        values   = ["codebuild.amazonaws.com"]
+      }
+      condition {
+        test     = "ArnEquals"
+        variable = "ec2:Subnet"
+        values   = aws_subnet.build_private[*].arn
+      }
+    }
   }
 
   statement {
@@ -296,6 +373,17 @@ resource "aws_codebuild_project" "image_builder" {
         type  = "SECRETS_MANAGER"
         value = "${local.docker_hub_credentials_arn}:${environment_variable.value}"
       }
+    }
+  }
+
+  # The build VPC (build-vpc.tf): egress through its NAT gateway only, HTTP,
+  # HTTPS and DNS, to allow-listed domains.
+  dynamic "vpc_config" {
+    for_each = local.build_vpc_enabled ? [1] : []
+    content {
+      vpc_id             = aws_vpc.build[0].id
+      subnets            = aws_subnet.build_private[*].id
+      security_group_ids = [aws_security_group.image_builder[0].id]
     }
   }
 

@@ -35,6 +35,12 @@ const (
 	ProjectEnv          = "IMAGE_BUILDER_PROJECT"
 	CacheRepoEnv        = "BUILD_CACHE_ECR_URL"
 	GitTokenPrefixEnv   = "IMAGE_BUILD_PARAMETER_PREFIX"
+	// StagingRepoEnv is the staging ECR repository builds push to when set:
+	// the build's role can then only write there, and the status lambda
+	// promotes a successful image to its App Store destination
+	// (docs/builds.md "Isolation"). Empty: builds push straight to the
+	// destination, as before.
+	StagingRepoEnv = "IMAGE_BUILD_STAGING_ECR_URL"
 	defaultCacheKeySize = 40 // hex characters of the sha256 of the source URL
 )
 
@@ -42,6 +48,9 @@ const (
 const (
 	ContextVar           = "CONTEXT"
 	DestinationVar       = "DESTINATION"
+	// PromoteToVar is the App Store destination the status lambda copies
+	// DESTINATION to after a successful build; set only with a staging repo.
+	PromoteToVar = "PROMOTE_TO"
 	CacheRefVar          = "BUILD_CACHE_REF"
 	GitTokenVar          = "GIT_TOKEN"
 	DeploymentIdVar      = "DEPLOYMENT_ID"
@@ -93,6 +102,9 @@ type Config struct {
 	// GitTokenParameterPrefix is the SSM path a private repo's token is
 	// put under for the build to read (never a plaintext build variable).
 	GitTokenParameterPrefix string
+	// StagingRepoUrl is the staging repository builds push to (StagingRepoEnv);
+	// "" pushes straight to the destination.
+	StagingRepoUrl string
 }
 
 // ConfigFromEnv reads Config from the provisioner's environment.
@@ -101,6 +113,7 @@ func ConfigFromEnv(getenv func(string) string) (Config, error) {
 		ProjectName:             getenv(ProjectEnv),
 		CacheRepoUrl:            getenv(CacheRepoEnv),
 		GitTokenParameterPrefix: strings.TrimSuffix(getenv(GitTokenPrefixEnv), "/"),
+		StagingRepoUrl:          strings.TrimSpace(getenv(StagingRepoEnv)),
 	}
 	var missing []string
 	if c.ProjectName == "" {
@@ -249,6 +262,17 @@ func ComputeTypeOverride(storageGiB int32) (cbtypes.ComputeType, bool) {
 	return "", false
 }
 
+// BuildDestination is the image a build pushes: with a staging repository,
+// <staging>:<deploymentId> (the deployment id is unique per build, variants
+// included), promoted to r.Destination by the status lambda; without one,
+// r.Destination itself.
+func BuildDestination(cfg Config, r Request) string {
+	if cfg.StagingRepoUrl == "" {
+		return r.Destination
+	}
+	return cfg.StagingRepoUrl + ":" + r.DeploymentId
+}
+
 // GitTokenParameterName is where a build's GitHub token is put in SSM.
 func GitTokenParameterName(prefix, deploymentId string) string {
 	return fmt.Sprintf("%s/%s/git-token", prefix, deploymentId)
@@ -261,10 +285,13 @@ func GitTokenParameterName(prefix, deploymentId string) string {
 func StartBuildInput(cfg Config, r Request, gitTokenParameter string) *codebuild.StartBuildInput {
 	vars := []cbtypes.EnvironmentVariable{
 		plain(ContextVar, GitContext(r.SourceUrl, r.Tag)),
-		plain(DestinationVar, r.Destination),
+		plain(DestinationVar, BuildDestination(cfg, r)),
 		plain(CacheRefVar, VariantCacheRef(cfg.CacheRepoUrl, r.SourceUrl, r.Variant, r.DefaultVariant)),
 		plain(DeploymentIdVar, r.DeploymentId),
 		plain(ApplicationIdVar, r.ApplicationId),
+	}
+	if cfg.StagingRepoUrl != "" {
+		vars = append(vars, plain(PromoteToVar, r.Destination))
 	}
 	if r.secondaryVariant() {
 		// shared layers (base image, dependencies) hit the default's cache

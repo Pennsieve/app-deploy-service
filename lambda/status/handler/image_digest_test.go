@@ -27,6 +27,7 @@ const (
 
 // fakeECR knows the digests of some image tags.
 type fakeECR struct {
+	deleted []*ecr.BatchDeleteImageInput
 	digests map[string]string // tag → digest
 	err     error
 	calls   []*ecr.DescribeImagesInput
@@ -35,6 +36,11 @@ type fakeECR struct {
 	images        map[string]string
 	blobs         *httptest.Server
 	manifestReads []*ecr.BatchGetImageInput
+}
+
+func (f *fakeECR) BatchDeleteImage(_ context.Context, in *ecr.BatchDeleteImageInput, _ ...func(*ecr.Options)) (*ecr.BatchDeleteImageOutput, error) {
+	f.deleted = append(f.deleted, in)
+	return &ecr.BatchDeleteImageOutput{}, nil
 }
 
 func (f *fakeECR) DescribeImages(_ context.Context, in *ecr.DescribeImagesInput, _ ...func(*ecr.Options)) (*ecr.DescribeImagesOutput, error) {

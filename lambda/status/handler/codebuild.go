@@ -73,7 +73,24 @@ func (h *DeployTaskStateChangeHandler) HandleBuild(ctx context.Context, event mo
 	if final && failed {
 		reason = h.buildFailureReason(ctx, event)
 	}
-	recordErr := h.recordStateChange(ctx, ids, BuildToTaskEvent(event, reason))
+	// A staged build's image is promoted before the version is told it is
+	// deployed; a promotion that fails is recorded as a failed build.
+	promoteFailed := false
+	if final && !failed {
+		if p, ok := promotionOf(env); ok {
+			if err := h.promote(ctx, logger, p); err != nil {
+				logger.Error("promotion failed", slog.String("error", err.Error()))
+				promoteFailed = true
+				reason = "the image was built but could not be promoted to the App Store: " + err.Error()
+			}
+		}
+	}
+	task := BuildToTaskEvent(event, reason)
+	if promoteFailed {
+		task.Detail.BuildFailed = true
+		task.Detail.StopCode = StopCodePromoteFailed
+	}
+	recordErr := h.recordStateChange(ctx, ids, task)
 	if final {
 		h.deleteGitToken(ctx, logger, env)
 	}

@@ -31,6 +31,9 @@ type DeployTaskStateChangeHandler struct {
 	// ECRApi reads the digest of an App Store build's image; nil where
 	// unused (then no digest is recorded).
 	ECRApi external.ECRApi
+	// ImageCopier promotes a staged build's image to its App Store
+	// destination (promote.go); nil where builds push straight there.
+	ImageCopier ImageCopier
 	// HTTPClient downloads an image's configuration from ECR; nil: a
 	// default client.
 	HTTPClient lambdaeligibility.HTTPDoer

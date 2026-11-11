@@ -323,6 +323,43 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
     resources = ["arn:aws:ecr:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:repository/*"]
   }
 
+  # Promotion of staged builds (codebuild.tf, lambda/status/handler/
+  # promote.go): copy a SUCCEEDED build's image from staging to
+  # appstore-private, then delete the staging tag.
+  dynamic "statement" {
+    for_each = local.use_codebuild && var.image_builder_staging ? [1] : []
+    content {
+      sid       = "StatusLambdaPromoteLogin"
+      effect    = "Allow"
+      actions   = ["ecr:GetAuthorizationToken"]
+      resources = ["*"]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.use_codebuild && var.image_builder_staging ? [1] : []
+    content {
+      sid    = "StatusLambdaPromoteWrite"
+      effect = "Allow"
+      actions = [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage",
+      ]
+      resources = [local.appstore_private_ecr_arn]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.use_codebuild && var.image_builder_staging ? [1] : []
+    content {
+      sid       = "StatusLambdaPromoteStaging"
+      effect    = "Allow"
+      actions   = ["ecr:BatchDeleteImage"]
+      resources = [aws_ecr_repository.build_staging[0].arn]
+    }
+  }
+
   # CodeBuild image builds (codebuild.tf): look up a build, read a failed
   # build's log for its error, delete its GitHub token parameter.
   dynamic "statement" {

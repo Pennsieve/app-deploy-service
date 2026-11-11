@@ -269,3 +269,20 @@ func TestStart_InvalidSettingsStartNothing(t *testing.T) {
 	assert.Nil(t, cb.in)
 	assert.Empty(t, params.put)
 }
+
+func TestStartBuildInput_StagingRepoPushesThereAndNamesThePromotion(t *testing.T) {
+	cfg := Config{ProjectName: "p", CacheRepoUrl: "123.dkr.ecr.us-east-1.amazonaws.com/dev-appstore-buildcache-use1",
+		GitTokenParameterPrefix: "/dev/app-deploy-service/image-builds",
+		StagingRepoUrl:          "123.dkr.ecr.us-east-1.amazonaws.com/dev-appstore-staging-use1"}
+	r := Request{DeploymentId: "dep-1", ApplicationId: "ver-1", SourceUrl: "https://github.com/pennsieve-apps/nwb-inspect", Tag: "v0.1.1",
+		Destination: "123.dkr.ecr.us-east-1.amazonaws.com/dev-appstore-private-use1:42-v0.1.1"}
+	v := vars(StartBuildInput(cfg, r, ""))
+	assert.Equal(t, "123.dkr.ecr.us-east-1.amazonaws.com/dev-appstore-staging-use1:dep-1", aws.ToString(v[DestinationVar].Value), "the build pushes to staging under its deployment id")
+	assert.Equal(t, r.Destination, aws.ToString(v[PromoteToVar].Value), "and names the App Store image the status lambda promotes it to")
+
+	cfg.StagingRepoUrl = ""
+	v = vars(StartBuildInput(cfg, r, ""))
+	assert.Equal(t, r.Destination, aws.ToString(v[DestinationVar].Value), "without staging the build pushes straight to its destination")
+	_, promoted := v[PromoteToVar]
+	assert.False(t, promoted)
+}
