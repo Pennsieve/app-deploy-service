@@ -110,9 +110,36 @@ fi
 # Rootful, with the process sandbox on (the default): RUN steps get their own
 # PID and mount namespaces and cannot see buildkitd, buildctl or their
 # credentials. CodeBuild runs the project privileged so buildkitd can do this.
+#
+# RUN steps also get their own network namespace (--oci-worker-net=bridge:
+# BuildKit's own bridge, buildkit0 on 10.10.0.0/16, with the CNI plugins
+# from the release tarball). Without it BuildKit's "auto" mode falls back to
+# the build container's network, where a RUN step can reach CodeBuild's
+# container-credentials endpoint (169.254.170.2): a probe on 2026-11-11
+# showed it answering. The step still has no credentials URI, but a network
+# boundary should not depend on that secret. Forwarded traffic from the
+# bridge to the link-local credential and metadata endpoints is dropped
+# before buildkitd starts; everything else (package indexes, code hosts)
+# stays reachable. RUN_NETWORK=host turns this off for a diagnosis.
+started_buildkitd=""
 if [ -z "${BUILDKIT_HOST:-}" ]; then
   # buildkitd clones git contexts with the git binary.
   command -v git >/dev/null 2>&1 || die "git is required to build from a git context"
+  started_buildkitd=1
+
+  run_network=${RUN_NETWORK:-bridge}
+  if [ "$run_network" = bridge ]; then
+    command -v iptables >/dev/null 2>&1 || die "iptables is required for bridge networking of RUN steps"
+    for addr in 169.254.170.2/32 169.254.169.254/32; do
+      # Insert once; a retried phase must not stack rules.
+      iptables -C FORWARD -d "$addr" -j DROP 2>/dev/null || iptables -I FORWARD 1 -d "$addr" -j DROP
+    done
+    log "RUN steps: bridge network; 169.254.170.2 and 169.254.169.254 dropped on FORWARD"
+    BUILDKITD_FLAGS="--oci-worker-net=bridge ${BUILDKITD_FLAGS:-}"
+  else
+    log "RUN steps: ${run_network} network (RUN_NETWORK override)"
+    BUILDKITD_FLAGS="--oci-worker-net=${run_network} ${BUILDKITD_FLAGS:-}"
+  fi
 
   # The overlayfs snapshotter cannot sit on an overlay filesystem (a
   # container's root); buildkitd then falls back to "native", which copies
@@ -155,7 +182,16 @@ if [ -z "${BUILDKIT_HOST:-}" ]; then
   done
 fi
 log "buildkit: $(buildctl --version)"
-buildctl debug workers -v 2>/dev/null | grep -i -E 'snapshotter|platforms' | head -3 || true
+buildctl debug workers -v 2>/dev/null | grep -i -E 'snapshotter|platforms|network' | head -4 || true
+# The worker must report its RUN network as cni (what bridge mode uses);
+# "auto" silently falls back to host, which is what the isolation above
+# prevents. Label: org.mobyproject.buildkit.worker.network.
+if [ -n "$started_buildkitd" ] && [ "${RUN_NETWORK:-bridge}" = bridge ]; then
+  if ! buildctl debug workers -v 2>/dev/null | grep -q -E 'worker\.network:[[:space:]]+(cni|bridge)$'; then
+    cat /tmp/buildkitd.log >&2
+    die "buildkitd is not using bridge networking for RUN steps"
+  fi
+fi
 
 # --- the Lambda step runtime ----------------------------------------------
 # Every App Store image carries the Lambda step runtime
