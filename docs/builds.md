@@ -495,8 +495,12 @@ network-free and bounds the cost to once per release.
   startedAt, builtAt, buildId}` on the version (`failed` with
   `build_<status>` and the log tail when the build itself failed, or
   `manifest_missing`), tags the app's bundles older than its previous
-  release `retain=no`, and sends the release event. Nothing here changes a
-  version's deployed status or fails the image build's event.
+  release `retain=no`, and sends the release event. Every change of the
+  record is also published on the version's realtime channel as
+  `application_fixtures_status_event` (status, error code, bytes, files),
+  next to the build's `application_status_event`, so the app page follows
+  the whole release live. Nothing here changes a version's deployed status
+  or fails the image build's event.
 - **Release event.** Once per version, when the image is deployed and the
   fixtures are decided (ready, skipped or failed): EventBridge default bus,
   source `pennsieve.app-deploy-service`, detail-type `App Release Ready`,

@@ -367,7 +367,9 @@ func (h *DeployTaskStateChangeHandler) setFixtures(ctx context.Context, logger *
 	}
 	if err != nil {
 		logger.Warn("fixtures: unable to record on the version", slog.String("status", rec.Status), slog.Any("error", err))
+		return
 	}
+	h.SendFixturesStatusEvent(ctx, rel.VersionId, rec)
 }
 
 // FixturesUpdate is the update setFixtures makes.

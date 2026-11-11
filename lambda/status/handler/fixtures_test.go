@@ -18,7 +18,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/pennsieve/app-deploy-service/status/events"
 	"github.com/pennsieve/app-deploy-service/status/models"
+	"github.com/pennsieve/pennsieve-go-core/pkg/realtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -86,6 +88,36 @@ func (f *fakeS3) PutObjectTagging(_ context.Context, in *s3.PutObjectTaggingInpu
 	return &s3.PutObjectTaggingOutput{}, nil
 }
 
+// fakeRealtime records what is published on version channels.
+type fakeRealtime struct {
+	published []struct {
+		channel string
+		name    string
+		event   any
+	}
+}
+
+func (f *fakeRealtime) Publish(_ context.Context, channel realtime.Channel, name string, data any) error {
+	f.published = append(f.published, struct {
+		channel string
+		name    string
+		event   any
+	}{channel.Path(), name, data})
+	return nil
+}
+
+func (f *fakeRealtime) PublishBatch(_ context.Context, _ []realtime.Event) error { return nil }
+
+func (f *fakeRealtime) fixtureEvents() []events.FixturesStatusEvent {
+	var out []events.FixturesStatusEvent
+	for _, p := range f.published {
+		if e, ok := p.event.(events.FixturesStatusEvent); ok && p.name == events.FixturesStatusEventName {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
 type fakeEvents struct{ entries []*eventbridge.PutEventsInput }
 
 func (f *fakeEvents) PutEvents(_ context.Context, in *eventbridge.PutEventsInput, _ ...func(*eventbridge.Options)) (*eventbridge.PutEventsOutput, error) {
@@ -132,6 +164,7 @@ func newFixtureTestHandler(items map[string]map[string]types.AttributeValue) (*D
 	cb, store, events := &fakeFixtureCodeBuild{}, &fakeS3{}, &fakeEvents{}
 	h := NewDeployTaskStateChangeHandler(nil, db, testApplicationsTable, testDeploymentsTable).
 		WithCodeBuild(&fakeCodeBuild{}, &fakeLogs{}, &fakeSSM{}).
+		WithRealtime(&fakeRealtime{}).
 		WithFixtureBuilder(&FixtureBuilder{
 			Project: testFixtureProject, Bucket: testFixturesBucket, AppStoreApplicationsTable: testStoreAppsTable,
 			Environment: "dev", CodeBuild: cb, S3: store, Events: events,
@@ -180,6 +213,12 @@ func TestHandleBuild_DeployedVersionStartsFixtureBuild(t *testing.T) {
 	assert.Equal(t, models.FixturesBuilding, rec.Status)
 	assert.Equal(t, testFixtureBuildId, rec.BuildId)
 	assert.Empty(t, events.entries, "the release event waits for the fixture build")
+
+	live := h.Realtime.(*fakeRealtime).fixtureEvents()
+	require.Len(t, live, 1, "the version's channel hears that fixtures are building")
+	assert.Equal(t, "version-1", live[0].ApplicationId)
+	assert.Equal(t, models.FixturesBuilding, live[0].Status)
+	assert.Equal(t, "/applications/version-1", h.Realtime.(*fakeRealtime).published[len(h.Realtime.(*fakeRealtime).published)-1].channel)
 }
 
 func TestHandleBuild_SkipsWithoutReviewBlock(t *testing.T) {
@@ -190,6 +229,10 @@ func TestHandleBuild_SkipsWithoutReviewBlock(t *testing.T) {
 	require.NotNil(t, rec)
 	assert.Equal(t, models.FixturesSkipped, rec.Status)
 	assert.Equal(t, models.FixturesErrorNoReviewBlock, rec.Error.Code)
+	live := h.Realtime.(*fakeRealtime).fixtureEvents()
+	require.Len(t, live, 1)
+	assert.Equal(t, models.FixturesSkipped, live[0].Status)
+	assert.Equal(t, models.FixturesErrorNoReviewBlock, live[0].ErrorCode)
 	details := events.details(t)
 	require.Len(t, details, 1, "the release event goes out at once")
 	assert.Equal(t, "version-1", details[0].VersionId)
@@ -306,6 +349,12 @@ func TestHandleFixtureBuild_ReadyBundleIsRecordedAndAnnounced(t *testing.T) {
 	assert.Equal(t, 7, rec.Files)
 	assert.Equal(t, "2026-11-11T19:59:00+00:00", rec.BuiltAt)
 	assert.Nil(t, rec.Error)
+	live := h.Realtime.(*fakeRealtime).fixtureEvents()
+	require.Len(t, live, 1)
+	assert.Equal(t, models.FixturesReady, live[0].Status)
+	assert.Equal(t, int64(2256444), live[0].Bytes)
+	assert.Equal(t, 7, live[0].Files)
+	require.NotNil(t, live[0].Time)
 
 	assert.Equal(t, map[string]string{
 		"fixtures/app-1/v0.8.0/old2.tar.gz":  retainTagNo,
