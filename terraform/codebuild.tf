@@ -420,7 +420,7 @@ resource "aws_cloudwatch_event_rule" "image_builder_status" {
     "source" : ["aws.codebuild"],
     "detail-type" : ["CodeBuild Build State Change"],
     "detail" : {
-      "project-name" : concat([aws_codebuild_project.image_builder[0].name], aws_codebuild_project.fixture_builder[*].name)
+      "project-name" : concat([aws_codebuild_project.image_builder[0].name], aws_codebuild_project.fixture_builder[*].name, aws_codebuild_project.sample_runner[*].name)
     }
   })
 }

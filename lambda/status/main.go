@@ -52,7 +52,8 @@ func init() {
 			ssm.NewFromConfig(awsConfig)).
 		WithECR(ecr.NewFromConfig(awsConfig)).
 		WithImageCopier(imagecopy.New(ecr.NewFromConfig(awsConfig))).
-		WithProvisionerGroup(os.Getenv(handler.ProvisionerTaskGroupEnvVar))
+		WithProvisionerGroup(os.Getenv(handler.ProvisionerTaskGroupEnvVar)).
+		WithAppStoreVersionsTable(os.Getenv(handler.AppStoreVersionsTableEnvVar))
 
 	// fixture bundles (handler/fixtures.go), where the environment builds them
 	if project := strings.TrimSpace(os.Getenv(handler.FixtureBuilderProjectEnvVar)); project != "" {
@@ -65,6 +66,8 @@ func init() {
 			CodeBuild:                 codebuild.NewFromConfig(awsConfig),
 			S3:                        s3.NewFromConfig(awsConfig),
 			Events:                    eventbridge.NewFromConfig(awsConfig),
+			SampleProject:             strings.TrimSpace(os.Getenv(handler.SampleRunnerProjectEnvVar)),
+			SampleCompute:             handler.ParseSampleCompute(os.Getenv(handler.SampleRunnerComputeEnvVar)),
 		})
 	}
 

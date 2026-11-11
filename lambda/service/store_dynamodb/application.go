@@ -169,6 +169,53 @@ type AppStoreVersion struct {
 	// the status lambda after the version is deployed. Nil until then, or
 	// where the environment builds none.
 	Fixtures *AppFixtures `dynamodbav:"fixtures,omitempty"`
+	// SampleRun is the run of the image on the bundle (docs/builds.md "Sample
+	// runs"), recorded by the status lambda; nil until the fixtures are ready.
+	SampleRun *AppSampleRun `dynamodbav:"sampleRun,omitempty"`
+	// Sample is the sample document curation-service made from that run
+	// (docs/builds.md "The sample document"); nil until it has.
+	Sample *AppSample `dynamodbav:"sample,omitempty"`
+}
+
+// AppSampleRun is what the status lambda records about a version's sample
+// run (lambda/status/models/samples.go). Status: running, ready, skipped or
+// failed; Key locates the results zip when ready; Error says why not.
+type AppSampleRun struct {
+	Status          string            `dynamodbav:"status"`
+	BuildId         string            `dynamodbav:"buildId,omitempty"`
+	Bucket          string            `dynamodbav:"bucket,omitempty"`
+	Key             string            `dynamodbav:"key,omitempty"`
+	Bytes           int64             `dynamodbav:"bytes,omitempty"`
+	Sha256          string            `dynamodbav:"sha256,omitempty"`
+	Files           int               `dynamodbav:"files,omitempty"`
+	ExitCode        *int              `dynamodbav:"exitCode,omitempty"`
+	DurationSeconds int               `dynamodbav:"durationSeconds,omitempty"`
+	ComputeType     string            `dynamodbav:"computeType,omitempty"`
+	Warnings        []string          `dynamodbav:"warnings,omitempty"`
+	Error           *AppFixturesError `dynamodbav:"error,omitempty"`
+	StartedAt       string            `dynamodbav:"startedAt,omitempty"`
+	FinishedAt      string            `dynamodbav:"finishedAt,omitempty"`
+	UpdatedAt       string            `dynamodbav:"updatedAt,omitempty"`
+}
+
+// AppSample is what the status lambda records about a version's sample
+// document (lambda/status/models/sample.go). Status: ready or failed.
+type AppSample struct {
+	Status      string            `dynamodbav:"status"`
+	JobId       string            `dynamodbav:"jobId,omitempty"`
+	Bucket      string            `dynamodbav:"bucket,omitempty"`
+	DocumentKey string            `dynamodbav:"documentKey,omitempty"`
+	PreviewKey  string            `dynamodbav:"previewKey,omitempty"`
+	CrateKey    string            `dynamodbav:"crateKey,omitempty"`
+	Sha256      string            `dynamodbav:"sha256,omitempty"`
+	Bytes       int64             `dynamodbav:"bytes,omitempty"`
+	Pages       int               `dynamodbav:"pages,omitempty"`
+	Figures     int               `dynamodbav:"figures,omitempty"`
+	Narrative   bool              `dynamodbav:"narrative,omitempty"`
+	Public      map[string]string `dynamodbav:"public,omitempty"`
+	Error       *AppFixturesError `dynamodbav:"error,omitempty"`
+	GeneratedAt string            `dynamodbav:"generatedAt,omitempty"`
+	UpdatedAt   string            `dynamodbav:"updatedAt,omitempty"`
 }
 
 // AppFixtures is what the status lambda records about a version's fixture

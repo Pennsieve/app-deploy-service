@@ -196,6 +196,52 @@ type AppStoreVersion struct {
 	// once at release for sample runs (docs/builds.md "Fixture bundles");
 	// absent until the version is deployed, or where none are built.
 	Fixtures *AppFixtures `json:"fixtures,omitempty"`
+	// SampleRun: the one run of the image on the bundle, for the sample
+	// document (docs/builds.md "Sample runs"); absent until the fixtures
+	// are ready, or where none is made.
+	SampleRun *AppSampleRun `json:"sampleRun,omitempty"`
+	// Sample: the sample document made from that run (docs/builds.md "The
+	// sample document"); absent until there is one.
+	Sample *AppSample `json:"sample,omitempty"`
+}
+
+// AppSampleRun is a version's sample run as the API shows it. Status:
+// running, ready (Bytes, Files, DurationSeconds describe the results),
+// skipped (Error.Code needs_hardware or no_bundle) or failed (Error.Code
+// run_failed, timed_out, too_large, no_outputs, build_<status>, ...).
+// Results are platform-internal: their location is not shown.
+type AppSampleRun struct {
+	Status          string            `json:"status"`
+	Bytes           int64             `json:"bytes,omitempty"`
+	Files           int               `json:"files,omitempty"`
+	ExitCode        *int              `json:"exitCode,omitempty"`
+	DurationSeconds int               `json:"durationSeconds,omitempty"`
+	Warnings        []string          `json:"warnings,omitempty"`
+	Error           *AppFixturesError `json:"error,omitempty"`
+	FinishedAt      string            `json:"finishedAt,omitempty"`
+	UpdatedAt       string            `json:"updatedAt,omitempty"`
+}
+
+// AppSample is a version's sample document as the API shows it. Status:
+// ready (DocumentKey, PreviewKey and CrateKey are keys in the curation
+// bucket, served through the platform's assets distribution; Public holds
+// the unsigned copies of a public app) or failed (Error.Code is the
+// curation job's: no_test_data, no_outputs, results_unavailable,
+// budget_blocked, ...).
+type AppSample struct {
+	Status      string            `json:"status"`
+	DocumentKey string            `json:"documentKey,omitempty"`
+	PreviewKey  string            `json:"previewKey,omitempty"`
+	CrateKey    string            `json:"crateKey,omitempty"`
+	Sha256      string            `json:"sha256,omitempty"`
+	Bytes       int64             `json:"bytes,omitempty"`
+	Pages       int               `json:"pages,omitempty"`
+	Figures     int               `json:"figures,omitempty"`
+	Narrative   bool              `json:"narrative,omitempty"`
+	Public      map[string]string `json:"public,omitempty"`
+	Error       *AppFixturesError `json:"error,omitempty"`
+	GeneratedAt string            `json:"generatedAt,omitempty"`
+	UpdatedAt   string            `json:"updatedAt,omitempty"`
 }
 
 // AppFixtures is a version's fixture bundle as the API shows it. Status:

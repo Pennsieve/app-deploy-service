@@ -45,6 +45,16 @@ type DeployTaskStateChangeHandler struct {
 	// Fixtures builds fixture bundles for deployed versions and records
 	// their outcome (fixtures.go); nil where the environment has none.
 	Fixtures *FixtureBuilder
+	// AppStoreVersionsTable is where a sample event's version is recorded
+	// (sample_doc.go); empty: sample events are refused.
+	AppStoreVersionsTable string
+}
+
+// WithAppStoreVersionsTable names the App Store versions table, for events
+// that name a version rather than a build (the sample document).
+func (h *DeployTaskStateChangeHandler) WithAppStoreVersionsTable(table string) *DeployTaskStateChangeHandler {
+	h.AppStoreVersionsTable = table
+	return h
 }
 
 // WithProvisionerGroup names the App Store provisioner task's ECS group. That
@@ -104,6 +114,13 @@ func (h *DeployTaskStateChangeHandler) HandleEvent(ctx context.Context, raw json
 			return fmt.Errorf("error reading CodeBuild event: %w", err)
 		}
 		return h.HandleBuild(ctx, event)
+	}
+	if envelope.Source == models.SampleReadySource {
+		event, err := parseSampleReady(raw)
+		if err != nil {
+			return err
+		}
+		return h.HandleSampleReady(ctx, event)
 	}
 	var event models.TaskStateChangeEvent
 	if err := json.Unmarshal(raw, &event); err != nil {

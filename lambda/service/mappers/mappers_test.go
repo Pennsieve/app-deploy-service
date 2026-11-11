@@ -238,3 +238,36 @@ func TestAppStoreVersionToModel_Fixtures(t *testing.T) {
 
 	assert.Nil(t, AppStoreVersionToModel(store_dynamodb.AppStoreVersion{}).Fixtures)
 }
+
+// The sample run and the sample document the status lambda records: shown
+// without the results' location, the build or the job.
+func TestAppStoreVersionToModel_SampleRunAndSample(t *testing.T) {
+	exit := 0
+	m := AppStoreVersionToModel(store_dynamodb.AppStoreVersion{
+		SampleRun: &store_dynamodb.AppSampleRun{Status: "ready", BuildId: "arn:b", Bucket: "fx", Key: "samples/app/v1/r.zip", Bytes: 551680,
+			Files: 11, ExitCode: &exit, DurationSeconds: 8, ComputeType: "BUILD_GENERAL1_MEDIUM", FinishedAt: "2026-11-11T21:43:57Z"},
+		Sample: &store_dynamodb.AppSample{Status: "ready", JobId: "sample-1", Bucket: "cur", DocumentKey: "examples/apps/app/v1/abc.pdf",
+			PreviewKey: "examples/apps/app/v1/abc.preview.png", CrateKey: "examples/apps/app/v1/abc.ro-crate-metadata.json",
+			Sha256: "abc", Bytes: 120000, Pages: 6, Figures: 3, Narrative: true, Public: map[string]string{"document": "public/apps/app/v1/abc.pdf"},
+			GeneratedAt: "2026-11-11T22:00:00Z"},
+	})
+	require.NotNil(t, m.SampleRun)
+	assert.Equal(t, "ready", m.SampleRun.Status)
+	assert.Equal(t, 11, m.SampleRun.Files)
+	assert.Equal(t, 8, m.SampleRun.DurationSeconds)
+	require.NotNil(t, m.SampleRun.ExitCode)
+	assert.Equal(t, 0, *m.SampleRun.ExitCode)
+	require.NotNil(t, m.Sample)
+	assert.Equal(t, "examples/apps/app/v1/abc.pdf", m.Sample.DocumentKey)
+	assert.Equal(t, 6, m.Sample.Pages)
+	assert.Equal(t, map[string]string{"document": "public/apps/app/v1/abc.pdf"}, m.Sample.Public)
+	assert.Nil(t, m.Sample.Error)
+
+	failed := AppStoreVersionToModel(store_dynamodb.AppStoreVersion{
+		SampleRun: &store_dynamodb.AppSampleRun{Status: "skipped", Error: &store_dynamodb.AppFixturesError{Code: "needs_hardware"}},
+		Sample:    &store_dynamodb.AppSample{Status: "failed", Error: &store_dynamodb.AppFixturesError{Code: "no_outputs", Message: "nothing written"}},
+	})
+	assert.Equal(t, "needs_hardware", failed.SampleRun.Error.Code)
+	assert.Equal(t, "no_outputs", failed.Sample.Error.Code)
+	assert.Nil(t, AppStoreVersionToModel(store_dynamodb.AppStoreVersion{}).Sample)
+}

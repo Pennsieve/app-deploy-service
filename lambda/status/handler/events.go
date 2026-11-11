@@ -58,6 +58,25 @@ func (h *DeployTaskStateChangeHandler) SendFixturesStatusEvent(ctx context.Conte
 	h.publish(ctx, versionId, events.FixturesStatusEventName, event)
 }
 
+// SendSampleRunStatusEvent says how the version's sample run stands
+// (samples.go).
+func (h *DeployTaskStateChangeHandler) SendSampleRunStatusEvent(ctx context.Context, versionId string, rec models.SampleRun) {
+	event := events.SampleRunStatusEvent{
+		ApplicationId: versionId,
+		Status:        rec.Status,
+		Bytes:         rec.Bytes,
+		Files:         rec.Files,
+		Source:        "DeployTaskStateChangeHandler",
+	}
+	if rec.Error != nil {
+		event.ErrorCode, event.ErrorMessage = rec.Error.Code, rec.Error.Message
+	}
+	if t, err := time.Parse(time.RFC3339, rec.UpdatedAt); err == nil {
+		event.Time = &t
+	}
+	h.publish(ctx, versionId, events.SampleRunStatusEventName, event)
+}
+
 // publish sends an event on the version's channel (realtime, or Pusher
 // where still configured). status is for the log.
 func (h *DeployTaskStateChangeHandler) publish(ctx context.Context, applicationId, name string, event any) {

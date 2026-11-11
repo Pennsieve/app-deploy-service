@@ -150,7 +150,42 @@ func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVer
 		ImageDigest:      v.ImageDigest,
 		Lambda:           LambdaEligibilityToModel(v.Lambda),
 		Fixtures:         AppFixturesToModel(v.Fixtures),
+		SampleRun:        AppSampleRunToModel(v.SampleRun),
+		Sample:           AppSampleToModel(v.Sample),
 	}
+}
+
+// AppSampleRunToModel shows a version's sample run without the results'
+// location, build id or compute type.
+func AppSampleRunToModel(r *store_dynamodb.AppSampleRun) *models.AppSampleRun {
+	if r == nil {
+		return nil
+	}
+	out := &models.AppSampleRun{
+		Status: r.Status, Bytes: r.Bytes, Files: r.Files, ExitCode: r.ExitCode, DurationSeconds: r.DurationSeconds,
+		Warnings: r.Warnings, FinishedAt: r.FinishedAt, UpdatedAt: r.UpdatedAt,
+	}
+	if r.Error != nil {
+		out.Error = &models.AppFixturesError{Code: r.Error.Code, Message: r.Error.Message}
+	}
+	return out
+}
+
+// AppSampleToModel shows a version's sample document: its keys (served
+// through the assets distribution), not the bucket or the job.
+func AppSampleToModel(s *store_dynamodb.AppSample) *models.AppSample {
+	if s == nil {
+		return nil
+	}
+	out := &models.AppSample{
+		Status: s.Status, DocumentKey: s.DocumentKey, PreviewKey: s.PreviewKey, CrateKey: s.CrateKey, Sha256: s.Sha256,
+		Bytes: s.Bytes, Pages: s.Pages, Figures: s.Figures, Narrative: s.Narrative, Public: s.Public,
+		GeneratedAt: s.GeneratedAt, UpdatedAt: s.UpdatedAt,
+	}
+	if s.Error != nil {
+		out.Error = &models.AppFixturesError{Code: s.Error.Code, Message: s.Error.Message}
+	}
+	return out
 }
 
 // AppFixturesToModel shows a version's fixture bundle without its location

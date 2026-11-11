@@ -45,7 +45,6 @@ resource "aws_lambda_function" "service_lambda" {
       TASK_DEF_CONTAINER_NAME     = var.tier,
       APPLICATIONS_TABLE          = aws_dynamodb_table.applications_table.name,
       APPSTORE_APPLICATIONS_TABLE = aws_dynamodb_table.appstore_applications_table.name,
-      APPSTORE_VERSIONS_TABLE     = aws_dynamodb_table.appstore_versions_table.name,
       DEPLOYMENTS_TABLE           = aws_dynamodb_table.deployments_table.name,
       APP_ACCESS_TABLE            = aws_dynamodb_table.app_access_table.name,
       ACCOUNTS_TABLE              = data.terraform_remote_state.account_service.outputs.accounts_table_name
@@ -107,12 +106,16 @@ resource "aws_lambda_function" "status_lambda" {
       LOG_LEVEL                   = "info",
       APPLICATIONS_TABLE          = aws_dynamodb_table.applications_table.name,
       APPSTORE_APPLICATIONS_TABLE = aws_dynamodb_table.appstore_applications_table.name,
+      APPSTORE_VERSIONS_TABLE     = aws_dynamodb_table.appstore_versions_table.name,
       DEPLOYMENTS_TABLE           = aws_dynamodb_table.deployments_table.name
       PROVISIONER_TASK_GROUP      = "family:${aws_ecs_task_definition.app_provisioner_ecs_task_definition.family}"
       # Fixture bundles (fixtures.tf, lambda/status/handler/fixtures.go);
       # empty where the environment has no fixture builder.
       FIXTURE_BUILDER_PROJECT = local.fixture_builder_project_name_or_empty
       FIXTURES_BUCKET         = local.fixtures_bucket_name_or_empty
+      # Sample runs (samples.tf): the project and the compute types by memory.
+      SAMPLE_RUNNER_PROJECT = local.sample_runner_project_name_or_empty
+      SAMPLE_RUNNER_COMPUTE = var.sample_runner_compute
     }
   }
 }

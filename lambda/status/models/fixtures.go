@@ -85,4 +85,7 @@ type ReleaseReady struct {
 	Visibility    string   `json:"visibility,omitempty"`
 	IsPrivate     bool     `json:"isPrivate"`
 	Fixtures      Fixtures `json:"fixtures"`
+	// SampleRun is the run of the image on the bundle (samples.go); absent
+	// where the environment runs none, or when the fixtures are not ready.
+	SampleRun *SampleRun `json:"sampleRun,omitempty"`
 }

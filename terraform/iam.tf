@@ -420,7 +420,27 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
       sid       = "StatusLambdaFixtureBundles"
       effect    = "Allow"
       actions   = ["s3:GetObject", "s3:GetObjectTagging", "s3:PutObjectTagging"]
-      resources = ["${aws_s3_bucket.fixtures[0].arn}/fixtures/*"]
+      resources = ["${aws_s3_bucket.fixtures[0].arn}/fixtures/*", "${aws_s3_bucket.fixtures[0].arn}/samples/*"]
+    }
+  }
+  # Sample runs (samples.tf): start one for a version whose bundle is ready,
+  # look it up, read a failed one's log.
+  dynamic "statement" {
+    for_each = local.sample_runner_enabled ? [1] : []
+    content {
+      sid       = "StatusLambdaSampleRuns"
+      effect    = "Allow"
+      actions   = ["codebuild:StartBuild", "codebuild:BatchGetBuilds"]
+      resources = [aws_codebuild_project.sample_runner[0].arn]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.sample_runner_enabled ? [1] : []
+    content {
+      sid       = "StatusLambdaSampleRunLogs"
+      effect    = "Allow"
+      actions   = ["logs:GetLogEvents"]
+      resources = ["${aws_cloudwatch_log_group.sample_runner[0].arn}:*"]
     }
   }
   dynamic "statement" {
