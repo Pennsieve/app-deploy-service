@@ -123,6 +123,10 @@ variable "image_builder_vpc_cidr" {
 variable "image_builder_allowed_domains" {
   type = list(string)
   default = [
+    # Pennsieve: the API, the App Store's schemas (app.yml $schema), Discover
+    # and its assets; public endpoints only, the build VPC has no route to
+    # anything internal
+    "pennsieve.io", "*.pennsieve.io", "pennsieve.net", "*.pennsieve.net", "pennsieve.org", "*.pennsieve.org",
     # AWS: ECR, S3, STS, CodeBuild, CloudWatch
     "*.amazonaws.com",
     # code hosts

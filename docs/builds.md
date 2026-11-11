@@ -62,8 +62,9 @@ probe: Pennsieve/test-egress-probe, branch `build-probe`):
   own (`build-vpc.tf`): private subnets behind one NAT gateway, an S3
   gateway endpoint, a security group that allows only HTTP, HTTPS and DNS
   out, and a Route 53 Resolver DNS Firewall that resolves only
-  `image_builder_allowed_domains` (package indexes, code hosts, registries,
-  AWS, the review block's dataset hosts, model hubs) and answers NXDOMAIN
+  `image_builder_allowed_domains` (Pennsieve's own public domains, package
+  indexes, code hosts, registries, AWS, the review block's dataset hosts,
+  model hubs) and answers NXDOMAIN
   to everything else, failing closed. Every query is logged
   (`/aws/route53resolver/<build vpc>`) and so is every flow
   (`/aws/vpc/<build vpc>-flow`): what a build tried to reach is on record.
