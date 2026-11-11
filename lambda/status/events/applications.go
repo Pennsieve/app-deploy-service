@@ -28,3 +28,20 @@ type ApplicationStatusEvent struct {
 func ApplicationStatusChannel(applicationUuid string) string {
 	return fmt.Sprintf("application-%s", applicationUuid)
 }
+
+// FixturesStatusEventName is a change of the version's fixture bundle
+// (docs/builds.md "Fixture bundles"), on the version's channel: building,
+// ready, skipped or failed. Not an application_status_event: fixtures
+// never change the version's own status.
+const FixturesStatusEventName = "application_fixtures_status_event"
+
+type FixturesStatusEvent struct {
+	ApplicationId string     `json:"application_id"`
+	Status        string     `json:"status"`
+	ErrorCode     string     `json:"error_code,omitempty"`
+	ErrorMessage  string     `json:"error_message,omitempty"`
+	Bytes         int64      `json:"bytes,omitempty"`
+	Files         int        `json:"files,omitempty"`
+	Time          *time.Time `json:"time,omitempty"`
+	Source        string     `json:"source"`
+}

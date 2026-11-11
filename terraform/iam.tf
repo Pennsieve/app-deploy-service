@@ -392,6 +392,56 @@ data "aws_iam_policy_document" "status_iam_policy_document" {
     }
   }
 
+  # Fixture bundles (fixtures.tf, lambda/status/handler/fixtures.go): start
+  # a fixture build for a deployed version and look it up, read a failed
+  # one's log, read its manifest, tag superseded bundles for expiry, and
+  # send the App Release Ready event.
+  dynamic "statement" {
+    for_each = local.fixture_builder_enabled ? [1] : []
+    content {
+      sid       = "StatusLambdaFixtureBuilds"
+      effect    = "Allow"
+      actions   = ["codebuild:StartBuild", "codebuild:BatchGetBuilds"]
+      resources = [aws_codebuild_project.fixture_builder[0].arn]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.fixture_builder_enabled ? [1] : []
+    content {
+      sid       = "StatusLambdaFixtureBuildLogs"
+      effect    = "Allow"
+      actions   = ["logs:GetLogEvents"]
+      resources = ["${aws_cloudwatch_log_group.fixture_builder[0].arn}:*"]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.fixture_builder_enabled ? [1] : []
+    content {
+      sid       = "StatusLambdaFixtureBundles"
+      effect    = "Allow"
+      actions   = ["s3:GetObject", "s3:GetObjectTagging", "s3:PutObjectTagging"]
+      resources = ["${aws_s3_bucket.fixtures[0].arn}/fixtures/*"]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.fixture_builder_enabled ? [1] : []
+    content {
+      sid       = "StatusLambdaFixtureBucket"
+      effect    = "Allow"
+      actions   = ["s3:ListBucket"]
+      resources = [aws_s3_bucket.fixtures[0].arn]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.fixture_builder_enabled ? [1] : []
+    content {
+      sid       = "StatusLambdaReleaseEvents"
+      effect    = "Allow"
+      actions   = ["events:PutEvents"]
+      resources = ["arn:aws:events:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:event-bus/default"]
+    }
+  }
+
 }
 
 # Fargate Task

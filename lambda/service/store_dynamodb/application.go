@@ -164,6 +164,35 @@ type AppStoreVersion struct {
 	// variants) can run as a Lambda step, recorded by the status lambda
 	// with ImageDigest (docs/builds.md); nil until then.
 	Lambda *LambdaEligibility `dynamodbav:"lambda,omitempty"`
+	// Fixtures is the release's fixture bundle (docs/builds.md "Fixture
+	// bundles"): its review-block inputs built once at release, recorded by
+	// the status lambda after the version is deployed. Nil until then, or
+	// where the environment builds none.
+	Fixtures *AppFixtures `dynamodbav:"fixtures,omitempty"`
+}
+
+// AppFixtures is what the status lambda records about a version's fixture
+// bundle (lambda/status/models/fixtures.go writes it). Status: building,
+// ready, skipped or failed; Bucket and Key locate the bundle when ready;
+// Error says why there is none.
+type AppFixtures struct {
+	Status    string            `dynamodbav:"status"`
+	BuildId   string            `dynamodbav:"buildId,omitempty"`
+	Bucket    string            `dynamodbav:"bucket,omitempty"`
+	Key       string            `dynamodbav:"key,omitempty"`
+	Bytes     int64             `dynamodbav:"bytes,omitempty"`
+	Sha256    string            `dynamodbav:"sha256,omitempty"`
+	Files     int               `dynamodbav:"files,omitempty"`
+	Warnings  []string          `dynamodbav:"warnings,omitempty"`
+	Error     *AppFixturesError `dynamodbav:"error,omitempty"`
+	StartedAt string            `dynamodbav:"startedAt,omitempty"`
+	BuiltAt   string            `dynamodbav:"builtAt,omitempty"`
+	UpdatedAt string            `dynamodbav:"updatedAt,omitempty"`
+}
+
+type AppFixturesError struct {
+	Code    string `dynamodbav:"code"`
+	Message string `dynamodbav:"message,omitempty"`
 }
 
 // LambdaEligibility is the platform's decision whether a version (or a

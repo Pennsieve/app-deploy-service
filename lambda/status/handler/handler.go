@@ -41,6 +41,10 @@ type DeployTaskStateChangeHandler struct {
 	// ProvisionerGroup is the App Store provisioner task's ECS group
 	// ("family:..."); empty: its events aren't told apart.
 	ProvisionerGroup string
+
+	// Fixtures builds fixture bundles for deployed versions and records
+	// their outcome (fixtures.go); nil where the environment has none.
+	Fixtures *FixtureBuilder
 }
 
 // WithProvisionerGroup names the App Store provisioner task's ECS group. That

@@ -233,3 +233,64 @@ locals {
     environment_name = var.environment_name
   }
 }
+
+# --- fixture bundles (fixtures.tf, docs/builds.md "Fixture bundles") --------
+# Build each release's review-block inputs once, into a bundle sample runs
+# unpack. Needs image_builder_in_vpc (the fixture step runs author code) and
+# app_fixtures_image.
+variable "fixture_builder" {
+  type    = bool
+  default = false
+}
+
+# The platform's app-fixtures image in this environment's App Store registry,
+# <registry>/<repository>:<tag>, e.g. the dev App Store's build of
+# pennsieve-apps/app-fixtures v0.1.1. Pinned per environment on purpose.
+variable "app_fixtures_image" {
+  type    = string
+  default = ""
+}
+
+# Hard cap on a compressed bundle: above it nothing is uploaded and the
+# version records fixtures.error = too_large.
+variable "fixture_bundle_max_bytes" {
+  type    = number
+  default = 2147483648 # 2 GiB
+}
+
+# Above this a bundle is uploaded with a warning on the version.
+variable "fixture_bundle_warn_bytes" {
+  type    = number
+  default = 209715200 # 200 MiB
+}
+
+# Cap on one declared dataset (app-fixtures MAX_DATASET_BYTES).
+variable "fixture_dataset_max_bytes" {
+  type    = number
+  default = 2147483648 # 2 GiB
+}
+
+# Seconds one generator command may run (app-fixtures GENERATE_TIMEOUT).
+variable "fixture_generate_timeout_seconds" {
+  type    = number
+  default = 1200
+}
+
+variable "fixture_builder_timeout_minutes" {
+  type    = number
+  default = 30
+}
+
+# 7 GB of memory: a generator that needs more is a reason to raise this per
+# environment, not a default.
+variable "fixture_builder_compute_type" {
+  type    = string
+  default = "BUILD_GENERAL1_MEDIUM"
+}
+
+# Bundles the status lambda has tagged retain=no (older than an app's
+# previous release) expire after this many days.
+variable "fixture_bundle_expiry_days" {
+  type    = number
+  default = 30
+}

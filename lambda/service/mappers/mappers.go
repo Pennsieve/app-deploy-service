@@ -149,7 +149,29 @@ func AppStoreVersionToModel(v store_dynamodb.AppStoreVersion) models.AppStoreVer
 		CommitSha:        v.CommitSha,
 		ImageDigest:      v.ImageDigest,
 		Lambda:           LambdaEligibilityToModel(v.Lambda),
+		Fixtures:         AppFixturesToModel(v.Fixtures),
 	}
+}
+
+// AppFixturesToModel shows a version's fixture bundle without its location
+// (the bundle is platform-internal) or build id.
+func AppFixturesToModel(f *store_dynamodb.AppFixtures) *models.AppFixtures {
+	if f == nil {
+		return nil
+	}
+	out := &models.AppFixtures{
+		Status:    f.Status,
+		Bytes:     f.Bytes,
+		Sha256:    f.Sha256,
+		Files:     f.Files,
+		Warnings:  f.Warnings,
+		BuiltAt:   f.BuiltAt,
+		UpdatedAt: f.UpdatedAt,
+	}
+	if f.Error != nil {
+		out.Error = &models.AppFixturesError{Code: f.Error.Code, Message: f.Error.Message}
+	}
+	return out
 }
 
 func AppReviewToModel(r *store_dynamodb.AppReview) *models.AppReview {

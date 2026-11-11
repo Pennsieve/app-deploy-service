@@ -273,7 +273,7 @@ func TestBuildFailureReasonIsBounded(t *testing.T) {
 	}
 	var event models.BuildStateChangeEvent
 	require.NoError(t, json.Unmarshal(buildEvent(models.BuildFailed, true), &event))
-	reason := h.buildFailureReason(context.Background(), event)
+	reason := h.buildFailureReason(context.Background(), event, "image build")
 	assert.LessOrEqual(t, len(reason), maxFailureReasonSize)
 	assert.True(t, strings.HasPrefix(reason, "image build FAILED in phase BUILD"))
 	assert.Contains(t, reason, "\nlog: https://")
