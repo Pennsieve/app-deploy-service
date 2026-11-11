@@ -128,8 +128,9 @@ variable "image_builder_allowed_domains" {
     # anything internal
     "pennsieve.io", "*.pennsieve.io", "pennsieve.net", "*.pennsieve.net", "pennsieve.org", "*.pennsieve.org",
     "pennsieve.ai", "*.pennsieve.ai",
-    # AWS: ECR, S3, STS, CodeBuild, CloudWatch
-    "*.amazonaws.com",
+    # AWS: ECR, S3 (the AWS Open Data buckets included), STS, CodeBuild,
+    # CloudWatch; and the Open Data registry site
+    "*.amazonaws.com", "registry.opendata.aws", "*.opendata.aws",
     # code hosts
     "github.com", "*.github.com", "*.githubusercontent.com", "gitlab.com", "*.gitlab.com", "bitbucket.org",
     # container registries (Docker Hub is mirrored through ECR; the fallback stays)
