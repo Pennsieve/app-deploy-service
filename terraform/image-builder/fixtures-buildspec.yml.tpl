@@ -15,7 +15,7 @@ phases:
       - tar -C /usr/local -xzf /tmp/buildkit.tgz && rm /tmp/buildkit.tgz
   build:
     commands:
-      # buildkitd.sh and fixtures.sh (terraform/image-builder/), inlined by Terraform
-      - echo "${buildkitd_lib}" | base64 -d > /tmp/buildkitd.sh
-      - echo "${fixtures_script}" | base64 -d > /tmp/fixtures.sh
+      # buildkitd.sh and fixtures.sh (terraform/image-builder/), gzipped and base64-encoded by Terraform (CodeBuild caps a buildspec at 25,600 characters)
+      - echo "${buildkitd_lib}" | base64 -d | gunzip > /tmp/buildkitd.sh
+      - echo "${fixtures_script}" | base64 -d | gunzip > /tmp/fixtures.sh
       - sh /tmp/fixtures.sh

@@ -81,7 +81,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "fixtures" {
   rule {
     id     = "abort-incomplete-uploads"
     status = "Enabled"
-    filter {}
+    filter {
+      prefix = "fixtures/"
+    }
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
     }
@@ -263,8 +265,8 @@ resource "aws_codebuild_project" "fixture_builder" {
   source {
     type = "NO_SOURCE"
     buildspec = templatefile("${path.module}/image-builder/fixtures-buildspec.yml.tpl", {
-      buildkitd_lib   = base64encode(file("${path.module}/image-builder/buildkitd.sh"))
-      fixtures_script = base64encode(file("${path.module}/image-builder/fixtures.sh"))
+      buildkitd_lib   = base64gzip(file("${path.module}/image-builder/buildkitd.sh"))
+      fixtures_script = base64gzip(file("${path.module}/image-builder/fixtures.sh"))
     })
   }
 
