@@ -72,7 +72,11 @@ probe: Pennsieve/test-egress-probe, branch `build-probe`):
   connection by raw IP on 80 or 443, which the flow log shows; an egress
   proxy would close it if it is ever seen. The build timeout is 30 minutes.
   To extend the allow-list for an app, add the domain to the environment's
-  `image_builder_allowed_domains`.
+  `image_builder_allowed_domains`. The list is matched against the name a
+  build asks for; the CNAME chain behind an allowed name is trusted
+  (`TRUST_REDIRECTION_DOMAIN`), so a listed host served through a CDN
+  (auth.docker.io is a CNAME into cloudflare.net) resolves without the
+  CDN being listed.
 
 The build's inputs: the source URL, the tag, the destination
 `<appstore-private>:<hash>-<tag>`, a GitHub token for a private repo, and the
