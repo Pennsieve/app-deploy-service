@@ -246,6 +246,103 @@ components:
           $ref: '#/components/schemas/LambdaEligibility'
         fixtures:
           $ref: '#/components/schemas/AppFixtures'
+        sampleRun:
+          $ref: '#/components/schemas/AppSampleRun'
+        sample:
+          $ref: '#/components/schemas/AppSample'
+    AppSampleRun:
+      type: object
+      description: The one run of the release's image on its fixture bundle, for the sample document (platform-internal results; their location is not shown). Absent until the fixtures are ready, or where no run is made.
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [running, ready, skipped, failed]
+        bytes:
+          type: integer
+          format: int64
+          description: The zipped results' size. Present when ready.
+        files:
+          type: integer
+          description: How many files the app wrote. Present when ready.
+        exitCode:
+          type: integer
+          description: The app's exit status, when it ran.
+        durationSeconds:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+        error:
+          type: object
+          description: >-
+            Why there are no results. Codes for skipped: needs_hardware (GPU only, or more memory than the runner has),
+            no_bundle. For failed: run_failed, timed_out, too_large, no_outputs, image_unavailable, bundle_unavailable,
+            invalid_parameters, build_failed, build_timed_out, manifest_missing.
+          required: [code]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        finishedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AppSample:
+      type: object
+      description: The sample document curation-service made from the sample run. Keys are in the curation bucket, served through the platform's assets distribution (signed; public copies unsigned). Absent until there is one.
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ready, failed]
+        documentKey:
+          type: string
+          description: The PDF's key. Present when ready.
+        previewKey:
+          type: string
+          description: The first page as PNG. Present when ready.
+        crateKey:
+          type: string
+          description: The RO-Crate sidecar describing the document, its inputs and the run. Present when ready.
+        sha256:
+          type: string
+        bytes:
+          type: integer
+          format: int64
+        pages:
+          type: integer
+        figures:
+          type: integer
+        narrative:
+          type: boolean
+          description: Whether the model-written overview is in the document (false when the job's budget cut it).
+        public:
+          type: object
+          description: For a public app, the unsigned copies under public/apps/, by kind (document, preview, crate).
+          additionalProperties:
+            type: string
+        error:
+          type: object
+          description: >-
+            Why there is no document: the curation job's code (no_test_data, no_outputs, results_unavailable,
+            budget_blocked, internal).
+          required: [code]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+        generatedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
     AppFixtures:
       type: object
       description: The release's fixture bundle, its app.yml review-block inputs built once at release for sample runs (platform-internal; the bundle's location is not shown). Absent until the version is deployed, or where the environment builds none.

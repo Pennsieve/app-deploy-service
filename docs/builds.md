@@ -418,6 +418,7 @@ So a review verdict can be tied to the exact code and image tested, a version re
 | `review` | service lambda, at registration | app.yml's `review` block ([app-manifest-review.md](app-manifest-review.md)) as parsed: what a review run uses. Parts that don't parse are left out (the schema reports them). |
 | `fixtures` | status lambda, after the version is deployed | The release's fixture bundle ([Fixture bundles](#fixture-bundles)): `status` building, ready, skipped or failed, the bundle's `bucket`, `key`, `bytes` and `sha256`, `warnings`, and an `error` code and message when there is no bundle. |
 | `sampleRun` | status lambda, after the fixtures are ready | The run of the image on the bundle ([Sample runs](#sample-runs)): `status` running, ready, skipped or failed, the results' `bucket`, `key`, `bytes`, `sha256` and `files`, `exitCode`, `durationSeconds`, `computeType`, and an `error` when there are no results. |
+| `sample` | status lambda, from curation-service's event | The sample document ([The sample document](#the-sample-document)): `status` ready or failed, the document's, preview's and crate's keys in the curation bucket, `bytes`, `pages`, `figures`, `public` copies, or an `error`. |
 
 The digest is the tag's at the moment the build ends, recorded before the status says
 `deployed`. A digest that can't be read (no `destinationUrl`, an ECR error, the tag not
@@ -564,6 +565,20 @@ once on its fixture bundle, and the results feed the sample document
   decided: `App Release Ready` then carries `fixtures` and `sampleRun`. When
   the fixtures are not ready, or no runner is configured, the event goes out
   when the fixtures are decided, without `sampleRun`.
+
+## The sample document
+
+curation-service makes the sample document from the sample run (its
+README, "The sample pipeline") and announces it with an `App Sample Ready`
+event (source `pennsieve.curation-service`), once per job that ended. An
+EventBridge rule (`samples.tf`) sends it to the status lambda, which
+records `sample {status, bucket, documentKey, previewKey, crateKey,
+sha256, bytes, pages, figures, narrative, public, error, generatedAt}` on
+the version named by the event (`lambda/status/handler/sample_doc.go`) and
+publishes `application_sample_status_event` on the version's channel. The
+API shows `versions[].sample` (and `versions[].sampleRun`) with the keys,
+not the bucket: the app page serves them through the platform's assets
+distribution, unsigned for a public app's `public` copies.
 
 ## Environments
 

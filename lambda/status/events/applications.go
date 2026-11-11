@@ -61,3 +61,20 @@ type SampleRunStatusEvent struct {
 	Time          *time.Time `json:"time,omitempty"`
 	Source        string     `json:"source"`
 }
+
+// SampleStatusEventName is a change of the version's sample document
+// (docs/builds.md "The sample document"), on the version's channel: ready
+// or failed.
+const SampleStatusEventName = "application_sample_status_event"
+
+type SampleStatusEvent struct {
+	ApplicationId string     `json:"application_id"`
+	Status        string     `json:"status"`
+	DocumentKey   string     `json:"document_key,omitempty"`
+	PreviewKey    string     `json:"preview_key,omitempty"`
+	Pages         int        `json:"pages,omitempty"`
+	ErrorCode     string     `json:"error_code,omitempty"`
+	ErrorMessage  string     `json:"error_message,omitempty"`
+	Time          *time.Time `json:"time,omitempty"`
+	Source        string     `json:"source"`
+}

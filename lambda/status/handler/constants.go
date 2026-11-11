@@ -24,3 +24,7 @@ const ApplicationsTableTag = "ApplicationsTable"
 // version's default variant (fargate/app-provisioner/provisioner/constants.go).
 const VariantTag = "Variant"
 const VariantDefaultTag = "VariantDefault"
+
+// AppStoreVersionsTableEnvVar is the App Store versions table, for events
+// that name a version (the sample document, handler/sample_doc.go).
+const AppStoreVersionsTableEnvVar = "APPSTORE_VERSIONS_TABLE"

@@ -195,3 +195,38 @@ resource "aws_codebuild_project" "sample_runner" {
 
   tags = local.common_tags
 }
+
+# --- the sample document --------------------------------------------------
+# curation-service's App Sample Ready events (once per sample job that
+# ended) go to the status lambda, which records sample{...} on the version
+# (lambda/status/handler/sample_doc.go).
+resource "aws_cloudwatch_event_rule" "sample_ready" {
+  count = local.sample_runner_enabled ? 1 : 0
+
+  name        = "${var.environment_name}-${var.service_name}-sample-ready-${local.region_shortname}"
+  description = "Sample documents curation-service made for App Store releases"
+  event_pattern = jsonencode({
+    "source" : ["pennsieve.curation-service"],
+    "detail-type" : ["App Sample Ready"],
+  })
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "sample_ready" {
+  count = local.sample_runner_enabled ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.sample_ready[0].name
+  target_id = "${var.environment_name}-${var.service_name}-sample-ready-${local.region_shortname}"
+  arn       = aws_lambda_function.status_lambda.arn
+}
+
+resource "aws_lambda_permission" "sample_ready" {
+  count = local.sample_runner_enabled ? 1 : 0
+
+  statement_id  = "AllowExecutionFromSampleReadyRule"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.status_lambda.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.sample_ready[0].arn
+}
+
