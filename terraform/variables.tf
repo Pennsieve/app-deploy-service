@@ -96,9 +96,59 @@ variable "image_builder_staging" {
   default = false
 }
 
+# A build's hard stop. Ours finish well inside 30 minutes; a longer build
+# is more likely a runaway RUN step than a bigger image.
 variable "image_builder_timeout_minutes" {
   type    = number
-  default = 60
+  default = 30
+}
+
+# Builds in a VPC of their own (build-vpc.tf): private subnets behind a NAT
+# gateway, HTTP/HTTPS/DNS egress only, DNS Firewall allow-list, query and
+# flow logs. Off: CodeBuild's managed network, open egress.
+variable "image_builder_in_vpc" {
+  type    = bool
+  default = false
+}
+
+variable "image_builder_vpc_cidr" {
+  type    = string
+  default = "10.250.0.0/20"
+}
+
+# The domains a build may resolve. Package indexes, code hosts, container
+# registries, AWS (ECR, S3, CodeBuild), the fixture dataset hosts of the
+# review block, and the model hubs ML apps download weights from. Anything
+# else answers NXDOMAIN and is in the query log. Extend per environment.
+variable "image_builder_allowed_domains" {
+  type = list(string)
+  default = [
+    # AWS: ECR, S3, STS, CodeBuild, CloudWatch
+    "*.amazonaws.com",
+    # code hosts
+    "github.com", "*.github.com", "*.githubusercontent.com", "gitlab.com", "*.gitlab.com", "bitbucket.org",
+    # container registries (Docker Hub is mirrored through ECR; the fallback stays)
+    "*.docker.io", "*.docker.com", "ghcr.io", "*.pkg.github.com", "quay.io", "*.quay.io", "public.ecr.aws",
+    # Python
+    "pypi.org", "*.pypi.org", "files.pythonhosted.org", "*.pythonhosted.org",
+    "conda.anaconda.org", "repo.anaconda.com", "*.anaconda.org", "*.anaconda.com", "conda-forge.org",
+    "download.pytorch.org", "*.pytorch.org",
+    # R
+    "cran.r-project.org", "cloud.r-project.org", "*.r-project.org", "packagemanager.posit.co", "*.posit.co",
+    "bioconductor.org", "*.bioconductor.org",
+    # Node, Go, Rust, Julia
+    "registry.npmjs.org", "*.npmjs.org", "proxy.golang.org", "sum.golang.org", "storage.googleapis.com",
+    "crates.io", "static.crates.io", "pkg.julialang.org", "*.julialang.org",
+    # Linux distributions
+    "deb.debian.org", "security.debian.org", "*.debian.org", "archive.ubuntu.com", "security.ubuntu.com", "*.ubuntu.com",
+    "dl-cdn.alpinelinux.org", "*.alpinelinux.org", "*.fedoraproject.org", "*.centos.org", "*.rockylinux.org",
+    # GPU runtimes
+    "developer.download.nvidia.com", "*.nvidia.com",
+    # model hubs
+    "huggingface.co", "*.huggingface.co", "*.hf.co", "cdn-lfs.huggingface.co",
+    # the review block's dataset hosts (fixtures built at release)
+    "zenodo.org", "*.zenodo.org", "openneuro.org", "*.openneuro.org", "figshare.com", "*.figshare.com", "osf.io", "*.osf.io",
+  ]
 }
 
 # BuildKit release the builds run, checked against its sha256 (the

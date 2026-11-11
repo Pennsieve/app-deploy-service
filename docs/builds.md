@@ -58,8 +58,20 @@ probe: Pennsieve/test-egress-probe, branch `build-probe`):
   deployment), so a deployed version always names a promoted image. Turn
   the variable on after a status lambda with promotion is deployed; off,
   builds push straight to appstore-private as before.
-- **Egress.** The project's VPC placement and egress allow-list are the
-  ticket's third step.
+- **Egress.** With `image_builder_in_vpc` on, builds run in a VPC of their
+  own (`build-vpc.tf`): private subnets behind one NAT gateway, an S3
+  gateway endpoint, a security group that allows only HTTP, HTTPS and DNS
+  out, and a Route 53 Resolver DNS Firewall that resolves only
+  `image_builder_allowed_domains` (package indexes, code hosts, registries,
+  AWS, the review block's dataset hosts, model hubs) and answers NXDOMAIN
+  to everything else, failing closed. Every query is logged
+  (`/aws/route53resolver/<build vpc>`) and so is every flow
+  (`/aws/vpc/<build vpc>-flow`): what a build tried to reach is on record.
+  A build cannot reach the platform VPC at all. The one gap is a
+  connection by raw IP on 80 or 443, which the flow log shows; an egress
+  proxy would close it if it is ever seen. The build timeout is 30 minutes.
+  To extend the allow-list for an app, add the domain to the environment's
+  `image_builder_allowed_domains`.
 
 The build's inputs: the source URL, the tag, the destination
 `<appstore-private>:<hash>-<tag>`, a GitHub token for a private repo, and the

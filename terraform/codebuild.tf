@@ -228,6 +228,43 @@ data "aws_iam_policy_document" "image_builder" {
     resources = ["${aws_cloudwatch_log_group.image_builder[0].arn}:*"]
   }
 
+  dynamic "statement" {
+    for_each = local.build_vpc_enabled ? [1] : []
+    content {
+      sid    = "BuildVpcInterfaces"
+      effect = "Allow"
+      actions = [
+        "ec2:CreateNetworkInterface",
+        "ec2:DescribeDhcpOptions",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DeleteNetworkInterface",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeVpcs",
+      ]
+      resources = ["*"]
+    }
+  }
+  dynamic "statement" {
+    for_each = local.build_vpc_enabled ? [1] : []
+    content {
+      sid       = "BuildVpcInterfacePermission"
+      effect    = "Allow"
+      actions   = ["ec2:CreateNetworkInterfacePermission"]
+      resources = ["arn:aws:ec2:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:network-interface/*"]
+      condition {
+        test     = "StringEquals"
+        variable = "ec2:AuthorizedService"
+        values   = ["codebuild.amazonaws.com"]
+      }
+      condition {
+        test     = "ArnEquals"
+        variable = "ec2:Subnet"
+        values   = aws_subnet.build_private[*].arn
+      }
+    }
+  }
+
   statement {
     sid       = "GitTokenParameter"
     effect    = "Allow"
@@ -336,6 +373,17 @@ resource "aws_codebuild_project" "image_builder" {
         type  = "SECRETS_MANAGER"
         value = "${local.docker_hub_credentials_arn}:${environment_variable.value}"
       }
+    }
+  }
+
+  # The build VPC (build-vpc.tf): egress through its NAT gateway only, HTTP,
+  # HTTPS and DNS, to allow-listed domains.
+  dynamic "vpc_config" {
+    for_each = local.build_vpc_enabled ? [1] : []
+    content {
+      vpc_id             = aws_vpc.build[0].id
+      subnets            = aws_subnet.build_private[*].id
+      security_group_ids = [aws_security_group.image_builder[0].id]
     }
   }
 
