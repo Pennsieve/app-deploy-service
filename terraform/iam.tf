@@ -166,6 +166,36 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
 
   }
 
+  # A version's sample run on the owner's compute node (handler/sample_run_node.go):
+  # presign the fixture bundle, put the run's results archive and manifest
+  # under samples/, tell the status lambda.
+  dynamic "statement" {
+    for_each = local.fixture_builder_enabled ? [1] : []
+    content {
+      sid       = "ServiceLambdaFixtureBundleLinks"
+      actions   = ["s3:GetObject"]
+      resources = ["${aws_s3_bucket.fixtures[0].arn}/fixtures/*"]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = local.fixture_builder_enabled ? [1] : []
+    content {
+      sid       = "ServiceLambdaSampleResults"
+      actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"]
+      resources = ["${aws_s3_bucket.fixtures[0].arn}/samples/*"]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = local.fixture_builder_enabled ? [1] : []
+    content {
+      sid       = "ServiceLambdaSampleRegisteredEvents"
+      actions   = ["events:PutEvents"]
+      resources = ["arn:aws:events:${var.aws_region}:${var.aws_account}:event-bus/default"]
+    }
+  }
+
   statement {
     sid    = "AppStoreRegistryECRRead"
     effect = "Allow"

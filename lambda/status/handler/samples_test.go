@@ -278,3 +278,61 @@ func TestHandleSampleRun_InProgressIsIgnored(t *testing.T) {
 	assert.Empty(t, db.updates)
 	assert.Empty(t, ev.entries)
 }
+
+// An owner's sample run on their compute node, registered by the service
+// lambda: the version is recorded from the manifest as a runner's would be,
+// keeping the run and node, and the release event goes out.
+func TestHandleSampleRegistered_RecordsFromManifestAndAnnounces(t *testing.T) {
+	running := &models.SampleRun{Status: models.SampleRunning, RunId: "run-7", ComputeNodeId: "node-1", StartedBy: "N:user:owner", Source: "node", UpdatedAt: "2026-11-12T15:00:00Z"}
+	items := sampleItems(4096, nil, readyFixtures())
+	av, _ := attributevalue.Marshal(running)
+	items[testVersionsTable]["sampleRun"] = av
+	h, db, _, store, ev := newSampleTestHandler(items)
+	manifest, _ := json.Marshal(models.SampleRunManifest{Version: 1, Status: "ready", Results: &models.SampleResults{Key: "samples/app-1/v1.0.0/r7.zip", Bytes: 4096, Sha256: "r7"},
+		Warnings: []string{}, Files: 9, DurationSeconds: 750, StartedAt: "2026-11-12T15:00:00Z", FinishedAt: "2026-11-12T15:12:30Z", BuildId: "run:run-7",
+		Node: &models.SampleNode{ComputeNodeId: "node-1", Source: "node"}})
+	store.objects = map[string]string{"samples/app-1/v1.0.0/manifest.json": string(manifest)}
+	raw, _ := json.Marshal(map[string]any{
+		"source": models.ReleaseReadySource, "detail-type": models.SampleRegisteredDetailType,
+		"detail": models.SampleRegistered{Environment: "dev", ApplicationId: testStoreAppId, VersionId: "version-1", Tag: testFixtureBuildTag, RunId: "run-7", ComputeNodeId: "node-1", VersionsTable: testVersionsTable},
+	})
+	require.NoError(t, h.HandleEvent(context.Background(), raw))
+
+	rec := sampleRunRecorded(t, db)
+	require.NotNil(t, rec)
+	assert.Equal(t, models.SampleReady, rec.Status)
+	assert.Equal(t, "samples/app-1/v1.0.0/r7.zip", rec.Key)
+	assert.Equal(t, testFixturesBucket, rec.Bucket)
+	assert.Equal(t, 9, rec.Files)
+	assert.Equal(t, 750, rec.DurationSeconds)
+	assert.Equal(t, "run:run-7", rec.BuildId)
+	assert.Equal(t, "run-7", rec.RunId)
+	assert.Equal(t, "node-1", rec.ComputeNodeId)
+	assert.Equal(t, "N:user:owner", rec.StartedBy, "kept from the running record")
+	assert.Equal(t, "node", rec.Source)
+
+	details := ev.details(t)
+	require.Len(t, details, 1)
+	require.NotNil(t, details[0].SampleRun)
+	assert.Equal(t, models.SampleReady, details[0].SampleRun.Status)
+	assert.Equal(t, "samples/app-1/v1.0.0/r7.zip", details[0].SampleRun.Key)
+	assert.Equal(t, "node", details[0].SampleRun.Source)
+	live := sampleEvents(h)
+	require.Len(t, live, 1)
+	assert.Equal(t, models.SampleReady, live[0].Status)
+}
+
+func TestHandleSampleRegistered_MissingManifestIsAFailure(t *testing.T) {
+	items := sampleItems(4096, nil, readyFixtures())
+	h, db, _, _, ev := newSampleTestHandler(items)
+	raw, _ := json.Marshal(map[string]any{
+		"source": models.ReleaseReadySource, "detail-type": models.SampleRegisteredDetailType,
+		"detail": models.SampleRegistered{ApplicationId: testStoreAppId, VersionId: "version-1", Tag: testFixtureBuildTag, RunId: "run-8", VersionsTable: testVersionsTable},
+	})
+	require.NoError(t, h.HandleEvent(context.Background(), raw))
+	rec := sampleRunRecorded(t, db)
+	require.NotNil(t, rec)
+	assert.Equal(t, models.SampleFailed, rec.Status)
+	assert.Equal(t, models.SampleErrorManifestMissing, rec.Error.Code)
+	assert.Len(t, ev.details(t), 1, "the release event still goes out, with the failure")
+}

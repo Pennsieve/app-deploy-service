@@ -230,3 +230,38 @@ resource "aws_lambda_permission" "sample_ready" {
   source_arn    = aws_cloudwatch_event_rule.sample_ready[0].arn
 }
 
+
+# --- a sample run on the owner's compute node -------------------------------
+# The service lambda's App Sample Run Registered events (an owner's run on
+# their node, its results archive copied under samples/) go to the status
+# lambda, which records the sample run from the manifest and emits App
+# Release Ready (lambda/status/handler/samples.go, HandleSampleRegistered).
+resource "aws_cloudwatch_event_rule" "sample_registered" {
+  count = local.fixture_builder_enabled ? 1 : 0
+
+  name        = "${var.environment_name}-${var.service_name}-sample-registered-${local.region_shortname}"
+  description = "Sample runs owners made on their compute nodes for App Store releases"
+  event_pattern = jsonencode({
+    "source" : ["pennsieve.app-deploy-service"],
+    "detail-type" : ["App Sample Run Registered"],
+  })
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "sample_registered" {
+  count = local.fixture_builder_enabled ? 1 : 0
+
+  rule      = aws_cloudwatch_event_rule.sample_registered[0].name
+  target_id = "${var.environment_name}-${var.service_name}-sample-registered-${local.region_shortname}"
+  arn       = aws_lambda_function.status_lambda.arn
+}
+
+resource "aws_lambda_permission" "sample_registered" {
+  count = local.fixture_builder_enabled ? 1 : 0
+
+  statement_id  = "AllowExecutionFromSampleRegisteredRule"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.status_lambda.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.sample_registered[0].arn
+}

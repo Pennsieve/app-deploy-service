@@ -220,6 +220,11 @@ type AppSampleRun struct {
 	Error           *AppFixturesError `json:"error,omitempty"`
 	FinishedAt      string            `json:"finishedAt,omitempty"`
 	UpdatedAt       string            `json:"updatedAt,omitempty"`
+	// A sample run on a compute node of the owner's: the run and the node
+	// (Source "node"); the runner's have neither.
+	RunId         string `json:"runId,omitempty"`
+	ComputeNodeId string `json:"computeNodeId,omitempty"`
+	Source        string `json:"source,omitempty"`
 }
 
 // AppSample is a version's sample document as the API shows it. Status:

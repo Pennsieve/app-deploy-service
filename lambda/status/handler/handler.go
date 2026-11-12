@@ -103,10 +103,20 @@ func (h *DeployTaskStateChangeHandler) WithRealtime(publisher realtime.Publisher
 // the image-builder project, whichever builder the environment uses.
 func (h *DeployTaskStateChangeHandler) HandleEvent(ctx context.Context, raw json.RawMessage) error {
 	var envelope struct {
-		Source string `json:"source"`
+		Source     string `json:"source"`
+		DetailType string `json:"detail-type"`
 	}
 	if err := json.Unmarshal(raw, &envelope); err != nil {
 		return fmt.Errorf("error reading event: %w", err)
+	}
+	if envelope.Source == models.ReleaseReadySource && envelope.DetailType == models.SampleRegisteredDetailType {
+		var event struct {
+			Detail models.SampleRegistered `json:"detail"`
+		}
+		if err := json.Unmarshal(raw, &event); err != nil {
+			return fmt.Errorf("error reading sample registered event: %w", err)
+		}
+		return h.HandleSampleRegistered(ctx, event.Detail)
 	}
 	if envelope.Source == models.CodeBuildSource {
 		var event models.BuildStateChangeEvent

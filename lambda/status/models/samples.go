@@ -41,6 +41,29 @@ type SampleRun struct {
 	StartedAt       string         `dynamodbav:"startedAt,omitempty" json:"startedAt,omitempty"`
 	FinishedAt      string         `dynamodbav:"finishedAt,omitempty" json:"finishedAt,omitempty"`
 	UpdatedAt       string         `dynamodbav:"updatedAt" json:"updatedAt"`
+	// A sample run on a compute node of the owner's (the service lambda's
+	// sample_run_node.go): the run, the node, who started it; Source "node".
+	RunId         string `dynamodbav:"runId,omitempty" json:"runId,omitempty"`
+	ComputeNodeId string `dynamodbav:"computeNodeId,omitempty" json:"computeNodeId,omitempty"`
+	StartedBy     string `dynamodbav:"startedBy,omitempty" json:"startedBy,omitempty"`
+	Source        string `dynamodbav:"source,omitempty" json:"source,omitempty"`
+}
+
+// SampleRegisteredDetailType is the service lambda's event when an owner's
+// sample run on a compute node has its results archive in the fixtures
+// bucket (source ReleaseReadySource): the status lambda records the
+// sample run from the manifest and emits App Release Ready.
+const SampleRegisteredDetailType = "App Sample Run Registered"
+
+// SampleRegistered is that event's detail.
+type SampleRegistered struct {
+	Environment   string `json:"environment"`
+	ApplicationId string `json:"applicationId"`
+	VersionId     string `json:"versionId"`
+	Tag           string `json:"tag"`
+	RunId         string `json:"runId"`
+	ComputeNodeId string `json:"computeNodeId,omitempty"`
+	VersionsTable string `json:"versionsTable"`
 }
 
 // SampleRunManifest is manifest.json as image-builder/sample-run.sh writes it.
@@ -58,6 +81,13 @@ type SampleRunManifest struct {
 	FinishedAt      string         `json:"finishedAt"`
 	BuildId         string         `json:"buildId"`
 	LogTail         string         `json:"logTail"`
+	// Node is set by a sample run on a compute node of the owner's.
+	Node *SampleNode `json:"node,omitempty"`
+}
+
+type SampleNode struct {
+	ComputeNodeId string `json:"computeNodeId"`
+	Source        string `json:"source"`
 }
 
 type SampleResults struct {

@@ -196,6 +196,12 @@ type AppSampleRun struct {
 	StartedAt       string            `dynamodbav:"startedAt,omitempty"`
 	FinishedAt      string            `dynamodbav:"finishedAt,omitempty"`
 	UpdatedAt       string            `dynamodbav:"updatedAt,omitempty"`
+	// A sample run on a compute node of the owner's (handler/sample_run_node.go):
+	// the run, the node, who started it; Source is "node" (the runner's leave it empty).
+	RunId         string `dynamodbav:"runId,omitempty"`
+	ComputeNodeId string `dynamodbav:"computeNodeId,omitempty"`
+	StartedBy     string `dynamodbav:"startedBy,omitempty"`
+	Source        string `dynamodbav:"source,omitempty"`
 }
 
 // AppSample is what the status lambda records about a version's sample

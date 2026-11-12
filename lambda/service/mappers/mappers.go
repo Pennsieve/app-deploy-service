@@ -164,6 +164,7 @@ func AppSampleRunToModel(r *store_dynamodb.AppSampleRun) *models.AppSampleRun {
 	out := &models.AppSampleRun{
 		Status: r.Status, Bytes: r.Bytes, Files: r.Files, ExitCode: r.ExitCode, DurationSeconds: r.DurationSeconds,
 		Warnings: r.Warnings, FinishedAt: r.FinishedAt, UpdatedAt: r.UpdatedAt,
+		RunId: r.RunId, ComputeNodeId: r.ComputeNodeId, Source: r.Source,
 	}
 	if r.Error != nil {
 		out.Error = &models.AppFixturesError{Code: r.Error.Code, Message: r.Error.Message}
