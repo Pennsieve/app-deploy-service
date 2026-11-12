@@ -1437,3 +1437,164 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '5XX':
           $ref: '#/components/responses/Error'
+  /store/{id}/versions/{versionId}/sample-run/plan:
+    get:
+      summary: What the owner's app sends workflow-service to run the version's sample on a compute node
+      description: >
+        For a version the platform's sample runner could not run (a GPU app, or
+        more memory than it has): the app version, a presigned link to the
+        release's fixture bundle (an hour), the app-fixtures app at its newest
+        deployed version, the app's step id and the review parameters keyed by
+        it, and why the runner skipped. The owner only. 409 while the fixtures
+        are not ready, while a sample run is under way on a node, or without
+        an app-fixtures app.
+      x-amazon-apigateway-integration:
+        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
+      operationId: getSampleRunPlan
+      security:
+        - token_auth: []
+      tags:
+        - App Store
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: versionId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The plan
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Not possible now (code says why)
+          content:
+            application/json:
+              schema:
+                type: object
+  /store/{id}/versions/{versionId}/sample-run:
+    post:
+      summary: Record the sample run the owner started on a compute node
+      description: >
+        The run (workflow-service, an app run with sample) and the node it runs
+        on. The version's sample run is running on that node until its results
+        are registered. The owner only.
+      x-amazon-apigateway-integration:
+        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
+      operationId: postSampleRun
+      security:
+        - token_auth: []
+      tags:
+        - App Store
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: versionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runId]
+              properties:
+                runId:
+                  type: string
+                computeNodeId:
+                  type: string
+      responses:
+        '202':
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /store/{id}/versions/{versionId}/sample-run/results:
+    post:
+      summary: Register a succeeded sample run's results as the version's sample run
+      description: >
+        With the owner's own token, reads the run from workflow-service (a
+        sample run of this version, SUCCEEDED) and its results archive from
+        download-service, copies the archive into the fixtures bucket under the
+        runner's keys, and tells the status lambda, which records the sample
+        run and emits App Release Ready; curation-service then makes the
+        release report. 409 while the archive is still being made (try again),
+        or when the run did not succeed, is of another version, or is not a
+        sample run.
+      x-amazon-apigateway-integration:
+        $ref: '#/components/x-amazon-apigateway-integrations/app-deploy-service'
+      operationId: postSampleRunResults
+      security:
+        - token_auth: []
+      tags:
+        - App Store
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: versionId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [runId]
+              properties:
+                runId:
+                  type: string
+      responses:
+        '202':
+          description: Registered; the status lambda records it
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Not possible now (code says why)
+          content:
+            application/json:
+              schema:
+                type: object

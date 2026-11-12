@@ -61,6 +61,13 @@ resource "aws_lambda_function" "service_lambda" {
       // Live updates: the Event API's publish host where realtime is on
       // (realtime.tf); empty keeps Pusher.
       REALTIME_EVENTS_ENDPOINT = local.realtime_events_endpoint
+
+      # A version's sample run on the owner's compute node (handler/sample_run_node.go):
+      # the fixture bundle to presign, the app-fixtures app, where the run and its
+      # results archive are read with the owner's token.
+      FIXTURES_BUCKET         = local.fixtures_bucket_name_or_empty
+      WORKFLOWS_API_URL       = "https://api2.${data.terraform_remote_state.account.outputs.domain_name}/compute/workflows"
+      DOWNLOADS_API_URL       = "https://api2.${data.terraform_remote_state.account.outputs.domain_name}/downloads"
       // Build every variant of a release (true), or only the default.
       APP_VARIANTS_ENABLED = tostring(var.app_variants_enabled)
     }

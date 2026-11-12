@@ -32,6 +32,7 @@ type AppStoreVersionDBStore interface {
 	SetCitation(ctx context.Context, uuid string, citation *AppCitation) error
 	SetReview(ctx context.Context, uuid string, review *AppReview) error
 	SetVariants(ctx context.Context, uuid string, variants VersionVariants) error
+	SetSampleRun(ctx context.Context, uuid string, rec *AppSampleRun) error
 }
 
 type AppStoreVersionDatabaseStore struct {
@@ -328,6 +329,26 @@ func (r *AppStoreVersionDatabaseStore) SetReview(ctx context.Context, uuid strin
 	}
 	if _, err := r.api.UpdateItem(ctx, in); err != nil {
 		return fmt.Errorf("error setting appstore version review: %w", err)
+	}
+	return nil
+}
+
+// SetSampleRun records the version's sample run (the whole record).
+func (r *AppStoreVersionDatabaseStore) SetSampleRun(ctx context.Context, uuid string, rec *AppSampleRun) error {
+	value, err := attributevalue.Marshal(rec)
+	if err != nil {
+		return fmt.Errorf("encoding the sample run: %w", err)
+	}
+	_, err = r.api.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(r.TableName),
+		Key:                       map[string]types.AttributeValue{"uuid": &types.AttributeValueMemberS{Value: uuid}},
+		UpdateExpression:          aws.String("SET sampleRun = :rec"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{":rec": value},
+		ConditionExpression:       aws.String("attribute_exists(#u)"),
+		ExpressionAttributeNames:  map[string]string{"#u": "uuid"},
+	})
+	if err != nil {
+		return fmt.Errorf("recording the sample run on version %s: %w", uuid, err)
 	}
 	return nil
 }

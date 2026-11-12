@@ -56,5 +56,10 @@ func AppDeployServiceHandler(ctx context.Context, request events.APIGatewayV2HTT
 	router.GET("/store/{id}/permissions", GetAppPermissionsHandler)
 	router.PUT("/store/{id}/permissions", PutAppPermissionsHandler)
 
+	// A version's sample run on the owner's compute node (sample_run_node.go)
+	router.GET("/store/{id}/versions/{versionId}/sample-run/plan", GetSampleRunPlanHandler)
+	router.POST("/store/{id}/versions/{versionId}/sample-run", PostSampleRunHandler)
+	router.POST("/store/{id}/versions/{versionId}/sample-run/results", PostSampleRunResultsHandler)
+
 	return router.Start(ctx, request)
 }

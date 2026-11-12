@@ -237,12 +237,63 @@ func (h *DeployTaskStateChangeHandler) HandleSampleRun(ctx context.Context, even
 	return nil
 }
 
+// HandleSampleRegistered takes up the service lambda's event for a sample
+// run on a compute node of the owner's: its results archive and manifest
+// are in the fixtures bucket under the runner's keys, so the version is
+// recorded from the manifest as a runner's would be, and the release event
+// goes out.
+func (h *DeployTaskStateChangeHandler) HandleSampleRegistered(ctx context.Context, d models.SampleRegistered) error {
+	if h.Fixtures == nil {
+		return fmt.Errorf("sample registered for %s: this environment has no fixture builder", d.VersionId)
+	}
+	fb := h.Fixtures
+	if d.VersionId == "" || d.ApplicationId == "" || d.Tag == "" || d.VersionsTable == "" {
+		return fmt.Errorf("sample registered event is missing its version (%+v)", d)
+	}
+	logger := h.logger.With(slog.String("versionId", d.VersionId), slog.String("applicationId", d.ApplicationId),
+		slog.String("tag", d.Tag), slog.String("runId", d.RunId))
+	rec := models.SampleRun{BuildId: "run:" + d.RunId, UpdatedAt: fb.now(), RunId: d.RunId, ComputeNodeId: d.ComputeNodeId, Source: "node"}
+	rel := release{VersionId: d.VersionId, ApplicationId: d.ApplicationId, Tag: d.Tag}
+	if full, err := h.releaseFacts(ctx, d.VersionId, d.VersionsTable); err == nil {
+		rel = full
+		if rel.SampleRun != nil {
+			rec.StartedBy = rel.SampleRun.StartedBy
+			if rec.ComputeNodeId == "" {
+				rec.ComputeNodeId = rel.SampleRun.ComputeNodeId
+			}
+		}
+	} else {
+		logger.Warn("sample: unable to read the release for its event; sending what is known", slog.Any("error", err))
+	}
+	if manifest, err := h.readSampleManifest(ctx, d.ApplicationId, d.Tag); err != nil {
+		logger.Warn("sample: registered, but the manifest could not be read", slog.Any("error", err))
+		rec.Status = models.SampleFailed
+		rec.Error = &models.FixturesError{Code: models.SampleErrorManifestMissing, Message: err.Error()}
+	} else {
+		rec = sampleFromManifest(manifest, rec, fb.Bucket)
+	}
+	h.setSampleRun(ctx, logger, rel, d.VersionsTable, rec)
+	if rec.Status == models.SampleReady {
+		h.expireSuperseded(ctx, logger, samplesKeyPrefix+d.ApplicationId+"/", ".zip", d.Tag)
+	}
+	fixtures := models.Fixtures{Status: models.FixturesReady}
+	if rel.Fixtures != nil {
+		fixtures = *rel.Fixtures
+	}
+	h.emitReleaseReady(ctx, logger, rel, fixtures, &rec)
+	logger.Info("sample: recorded from a compute node run", slog.String("status", rec.Status))
+	return nil
+}
+
 // sampleFromManifest is the version's record of a finished sample run.
 func sampleFromManifest(m models.SampleRunManifest, rec models.SampleRun, bucket string) models.SampleRun {
 	rec.Warnings, rec.Files, rec.StartedAt, rec.FinishedAt = m.Warnings, m.Files, m.StartedAt, m.FinishedAt
 	rec.ExitCode, rec.DurationSeconds = m.ExitCode, m.DurationSeconds
 	if m.BuildId != "" {
 		rec.BuildId = m.BuildId
+	}
+	if m.Node != nil {
+		rec.ComputeNodeId, rec.Source = m.Node.ComputeNodeId, m.Node.Source
 	}
 	switch {
 	case m.Status == models.SampleReady && m.Results != nil && m.Results.Key != "":

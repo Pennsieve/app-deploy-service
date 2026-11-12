@@ -159,3 +159,7 @@ func TestBackfillReplacesEmptyManifests(t *testing.T) {
 	assert.Equal(t, 0, res.Stored)
 	assert.Empty(t, versions.manifests)
 }
+
+func (f *fakeVersions) SetSampleRun(context.Context, string, *store_dynamodb.AppSampleRun) error {
+	return nil
+}

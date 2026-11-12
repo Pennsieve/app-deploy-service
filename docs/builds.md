@@ -566,6 +566,53 @@ once on its fixture bundle, and the results feed the sample document
   the fixtures are not ready, or no runner is configured, the event goes out
   when the fixtures are decided, without `sampleRun`.
 
+## Sample runs on a compute node
+
+The runner has no GPU and two memory tiers, so an app that is GPU-only, or
+asks for more memory than the largest tier, gets `sampleRun.status =
+skipped` with `needs_hardware` and no sample document. Its owner runs the
+sample on a compute node of theirs instead, from the version's row on the
+app's page ("Generate release report"). Three requests of the owner, all
+`token_auth`, all refused for anyone else (403):
+
+1. `GET /store/{id}/versions/{versionId}/sample-run/plan` is what to send
+   workflow-service: the app version, a presigned link to the release's
+   fixture bundle (an hour), the app-fixtures app at its newest deployed
+   version, the app's step id and the release's review parameters keyed by
+   it, and why the runner skipped (`reason`). 409 while the fixtures are not
+   ready, while a sample run is already under way on a node, or when the
+   App Store has no app-fixtures app.
+2. The app sends `POST /runs` to workflow-service as the owner, an app run
+   with `sample` (workflow-service docs/app-runs.md, "Sample runs"): a
+   two-step workflow, app-fixtures unpacking the bundle and the app on it,
+   its results to a download. Then `POST
+   /store/{id}/versions/{versionId}/sample-run` with `{runId,
+   computeNodeId}` records `sampleRun = {status: running, runId,
+   computeNodeId, startedBy, source: "node"}` on the version.
+3. When the run has SUCCEEDED, `POST
+   /store/{id}/versions/{versionId}/sample-run/results` with `{runId}`
+   registers it. With the owner's own token (workflow-service and
+   download-service answer only the run's creator), the service lambda
+   reads the run (it must be a sample run of this app and version, and
+   SUCCEEDED), finds its results archive at download-service (409
+   `archive_not_ready` while it is still being made; the app retries), and
+   streams the archive into the fixtures bucket, hashing it on the way,
+   under the runner's keys: `samples/<applicationId>/<tag>/<sha256>.zip`
+   and a `manifest.json` in the runner's shape with `node` set. Then it
+   emits `App Sample Run Registered` (source `pennsieve.app-deploy-service`,
+   `samples.tf`), which the status lambda takes up exactly as a runner's
+   completion: the version is recorded from the manifest (`sampleRun` keeps
+   `runId`, `computeNodeId`, `source`), superseded archives are tagged, and
+   `App Release Ready` goes out, so curation-service makes the document
+   with no change. Archives over 5 GiB are refused.
+
+The app marks the run as it goes (the run's own live status, then the
+version's `application_sample_run_status_event` once registered) and
+offers "Use results as the release report" on a succeeded sample run
+whose results were not registered, for a page that was closed in between.
+The report says the sample ran on a compute node of the owner's workspace
+rather than on the platform's runner.
+
 ## The sample document
 
 curation-service makes the sample document from the sample run (its
