@@ -140,6 +140,12 @@ func (h *DeployTaskStateChangeHandler) startSampleRun(ctx context.Context, logge
 		skip(models.SampleErrorNeedsHardware, fmt.Sprintf("the app declares %d MiB of memory, more than the sample runner has", memory))
 		return
 	}
+	if base, err := h.reportedPatchBase(ctx, rel, versionsTable); err != nil {
+		logger.Warn("sample: unable to check for a patch release; running it", slog.Any("error", err))
+	} else if base != "" {
+		skip(models.SampleErrorPatchRelease, fmt.Sprintf("a patch release: %s keeps the release report of %s; the owner can generate one from the version's row", rel.Tag, base))
+		return
+	}
 	image := imageByDigestOf(rel.Destination, rel.ImageDigest)
 	if image == "" {
 		skip(models.SampleErrorBuildFailed, "the version has no promoted image to run")
