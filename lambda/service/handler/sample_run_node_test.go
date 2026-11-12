@@ -158,7 +158,7 @@ func skippedVersion() *store_dynamodb.AppStoreVersion {
 
 func TestSamplePlan_ForTheOwner(t *testing.T) {
 	svc, _, _, _ := sampleTestService(t, skippedVersion())
-	plan, err := svc.Plan(context.Background(), newTestClaims(sampleOwner, "", nil), "app-1", sampleVersion)
+	plan, err := svc.Plan(context.Background(), newTestClaims(sampleOwner, "", nil), "", "app-1", sampleVersion)
 	require.NoError(t, err)
 	assert.Equal(t, SamplePlanApp{SourceUrl: sampleAppUrl, Tag: "v0.1.4"}, plan.App)
 	assert.Equal(t, "https://dev-fixtures.s3.amazonaws.com/fixtures/app-1/v0.1.4/abc.tar.gz?X-Amz-Expires=1h0m0s", plan.Sample.BundleUrl)
@@ -176,29 +176,83 @@ func TestSamplePlan_Refusals(t *testing.T) {
 	owner := newTestClaims(sampleOwner, "", nil)
 
 	svc, _, _, _ := sampleTestService(t, skippedVersion())
-	_, err := svc.Plan(ctx, newTestClaims("N:user:someone", "", nil), "app-1", sampleVersion)
+	_, err := svc.Plan(ctx, newTestClaims("N:user:someone", "", nil), "", "app-1", sampleVersion)
 	assertRefusal(t, err, http.StatusForbidden, "not_owner")
-	_, err = svc.Plan(ctx, owner, "app-1", "ver-9")
+	_, err = svc.Plan(ctx, owner, "", "app-1", "ver-9")
 	assertRefusal(t, err, http.StatusNotFound, "not_found")
-	_, err = svc.Plan(ctx, owner, "app-9", sampleVersion)
+	_, err = svc.Plan(ctx, owner, "", "app-9", sampleVersion)
 	assertRefusal(t, err, http.StatusNotFound, "not_found")
 
 	building := skippedVersion()
 	building.Fixtures.Status = "building"
 	svc, _, _, _ = sampleTestService(t, building)
-	_, err = svc.Plan(ctx, owner, "app-1", sampleVersion)
+	_, err = svc.Plan(ctx, owner, "", "app-1", sampleVersion)
 	assertRefusal(t, err, http.StatusConflict, "fixtures_not_ready")
 
 	running := skippedVersion()
 	running.SampleRun = &store_dynamodb.AppSampleRun{Status: "running", RunId: "run-7", Source: "node"}
 	svc, _, _, _ = sampleTestService(t, running)
-	_, err = svc.Plan(ctx, owner, "app-1", sampleVersion)
+	_, err = svc.Plan(ctx, owner, "", "app-1", sampleVersion)
 	assertRefusal(t, err, http.StatusConflict, "sample_running")
 
 	svc, _, _, _ = sampleTestService(t, skippedVersion())
 	svc.Apps.(*sampleFakeApps).byUrl = nil
-	_, err = svc.Plan(ctx, owner, "app-1", sampleVersion)
+	_, err = svc.Plan(ctx, owner, "", "app-1", sampleVersion)
 	assertRefusal(t, err, http.StatusConflict, "no_app_fixtures")
+}
+
+// A node run on record as running is settled from the run itself, with the
+// owner's token: failed, the version records it and the plan goes ahead;
+// succeeded, the results are what to register; still running, or a run
+// workflow-service won't show, keeps the conflict.
+func TestSamplePlan_SettlesANodeRunOnRecord(t *testing.T) {
+	ctx := context.Background()
+	owner := newTestClaims(sampleOwner, "", nil)
+	onRecord := func() *store_dynamodb.AppStoreVersion {
+		v := skippedVersion()
+		v.SampleRun = &store_dynamodb.AppSampleRun{Status: "running", RunId: "run-7", ComputeNodeId: "node-1", Source: "node", StartedBy: sampleOwner, StartedAt: "2026-11-12T15:00:00Z"}
+		return v
+	}
+	plan := func(be *sampleBackends, token string) (*SamplePlan, *sampleFakeVersions, error) {
+		srv := be.server(t)
+		svc, versions, _, _ := sampleTestService(t, onRecord())
+		svc.WorkflowsApiUrl = srv.URL + "/workflows"
+		out, err := svc.Plan(ctx, owner, token, "app-1", sampleVersion)
+		return out, versions, err
+	}
+	failed := succeededRun()
+	failed["status"], failed["completedAt"] = "FAILED", "2026-11-12T15:02:00Z"
+
+	out, versions, err := plan(&sampleBackends{run: failed}, "Bearer owner-token")
+	require.NoError(t, err)
+	rec := versions.written[sampleVersion]
+	require.NotNil(t, rec, "the failure is recorded on the version")
+	assert.Equal(t, "failed", rec.Status)
+	assert.Equal(t, "run-7", rec.RunId)
+	assert.Equal(t, "node", rec.Source)
+	assert.Equal(t, "node-1", rec.ComputeNodeId)
+	assert.Equal(t, "2026-11-12T15:02:00Z", rec.FinishedAt)
+	assert.Equal(t, "2026-11-12T16:00:00Z", rec.UpdatedAt)
+	require.NotNil(t, rec.Error)
+	assert.Equal(t, "run_failed", rec.Error.Code)
+	require.NotNil(t, out.Reason)
+	assert.Equal(t, "run_failed", out.Reason.Code, "the plan says why the last run gave no report")
+	assert.Equal(t, "v0.1.4", out.App.Tag)
+
+	_, versions, err = plan(&sampleBackends{run: succeededRun()}, "Bearer owner-token")
+	assertRefusal(t, err, http.StatusConflict, "sample_succeeded")
+	assert.Nil(t, versions.written[sampleVersion])
+
+	still := succeededRun()
+	still["status"] = "RUNNING"
+	_, versions, err = plan(&sampleBackends{run: still}, "Bearer owner-token")
+	assertRefusal(t, err, http.StatusConflict, "sample_running")
+	assert.Nil(t, versions.written[sampleVersion])
+
+	_, _, err = plan(&sampleBackends{run: nil}, "Bearer owner-token")
+	assertRefusal(t, err, http.StatusConflict, "sample_running")
+	_, _, err = plan(&sampleBackends{run: failed}, "")
+	assertRefusal(t, err, http.StatusConflict, "sample_running")
 }
 
 func assertRefusal(t *testing.T, err error, status int, code string) {
