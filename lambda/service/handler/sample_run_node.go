@@ -272,7 +272,13 @@ func (s *sampleRunService) ownedVersion(ctx context.Context, claims *authorizer.
 // Plan is what the owner's app sends workflow-service: the app version, a
 // presigned link to its fixture bundle, the app-fixtures app at its newest
 // version, and the release's review parameters for the app's step.
-func (s *sampleRunService) Plan(ctx context.Context, claims *authorizer.Claims, appId, versionId string) (*SamplePlan, error) {
+//
+// A node run on record as running is looked up at workflow-service with the
+// owner's token (authorization): one that ended in failure is recorded as
+// failed on the version, so the owner can run the sample again; one that
+// succeeded waits for its results to be registered; one still running
+// refuses a second.
+func (s *sampleRunService) Plan(ctx context.Context, claims *authorizer.Claims, authorization, appId, versionId string) (*SamplePlan, error) {
 	app, version, err := s.ownedVersion(ctx, claims, appId, versionId)
 	if err != nil {
 		return nil, err
@@ -285,7 +291,11 @@ func (s *sampleRunService) Plan(ctx context.Context, claims *authorizer.Claims, 
 		return nil, refuse(http.StatusConflict, "fixtures_not_ready", "the release's test inputs are not built; a sample run needs them")
 	}
 	if sr := version.SampleRun; sr != nil && sr.Status == "running" && sr.RunId != "" {
-		return nil, refuse(http.StatusConflict, "sample_running", "a sample run of this version is under way on a compute node (run "+sr.RunId+")")
+		settled, err := s.settleNodeRun(ctx, authorization, version)
+		if err != nil {
+			return nil, err
+		}
+		version.SampleRun = settled
 	}
 	fixtures, err := s.newestAppFixtures(ctx)
 	if err != nil {
@@ -317,6 +327,42 @@ func (s *sampleRunService) Plan(ctx context.Context, claims *authorizer.Claims, 
 		plan.Reason = &models.AppFixturesError{Code: version.SampleRun.Error.Code, Message: version.SampleRun.Error.Message}
 	}
 	return plan, nil
+}
+
+// settleNodeRun is the version's sample run on a compute node, on record as
+// running, after a look at the run itself: nothing marks the version when a
+// node run fails (the app's page shows the run's live status, and results
+// are registered only for a success), so a failed one would block every
+// later sample run with sample_running. With the owner's token the run is
+// read from workflow-service: ended in failure, it is recorded as failed
+// (the app then offers "Run the sample again"); succeeded, its results are
+// what to register; still running, or unreadable, it stays a conflict.
+func (s *sampleRunService) settleNodeRun(ctx context.Context, authorization string, version *store_dynamodb.AppStoreVersion) (*store_dynamodb.AppSampleRun, error) {
+	sr := version.SampleRun
+	running := refuse(http.StatusConflict, "sample_running", "a sample run of this version is under way on a compute node (run "+sr.RunId+")")
+	if strings.TrimSpace(authorization) == "" {
+		return nil, running
+	}
+	run, err := s.readRun(ctx, authorization, sr.RunId)
+	if err != nil {
+		return nil, running
+	}
+	switch strings.ToUpper(run.Status) {
+	case "SUCCEEDED":
+		return nil, refuse(http.StatusConflict, "sample_succeeded", "the sample run on the compute node succeeded; register its results (run "+sr.RunId+")")
+	case "FAILED", "CANCELED", "CANCELLED", "TIMED_OUT":
+		rec := *sr
+		rec.Status = "failed"
+		rec.Error = &store_dynamodb.AppFixturesError{Code: "run_failed", Message: "the sample run on the compute node did not succeed (" + run.Status + ")"}
+		rec.FinishedAt = run.CompletedAt
+		rec.UpdatedAt = s.Now().Format(time.RFC3339)
+		if err := s.Versions.SetSampleRun(ctx, version.Uuid, &rec); err != nil {
+			return nil, err
+		}
+		return &rec, nil
+	default:
+		return nil, running
+	}
 }
 
 // gpuOnlyRuntime: every compute type the app.yml declares is gpu.
@@ -657,6 +703,15 @@ func sampleRunRequest(ctx context.Context, request events.APIGatewayV2HTTPReques
 	return svc, claims, appId, versionId, nil
 }
 
+// requestAuthorization is the caller's own token, passed on to
+// workflow-service and download-service, which answer only the run's creator.
+func requestAuthorization(request events.APIGatewayV2HTTPRequest) string {
+	if a := request.Headers["authorization"]; a != "" {
+		return a
+	}
+	return request.Headers["Authorization"]
+}
+
 func sampleRunResponse(status int, body any) events.APIGatewayV2HTTPResponse {
 	b, _ := json.Marshal(body)
 	return events.APIGatewayV2HTTPResponse{StatusCode: status, Headers: map[string]string{"Content-Type": "application/json"}, Body: string(b)}
@@ -676,7 +731,7 @@ func GetSampleRunPlanHandler(ctx context.Context, request events.APIGatewayV2HTT
 	if early != nil {
 		return *early, nil
 	}
-	plan, err := svc.Plan(ctx, claims, appId, versionId)
+	plan, err := svc.Plan(ctx, claims, requestAuthorization(request), appId, versionId)
 	if err != nil {
 		return sampleRunFailure("GetSampleRunPlanHandler", err), nil
 	}
@@ -710,11 +765,7 @@ func PostSampleRunResultsHandler(ctx context.Context, request events.APIGatewayV
 	if err := json.Unmarshal([]byte(request.Body), &body); err != nil {
 		return sampleRunResponse(http.StatusBadRequest, map[string]any{"code": "bad_request", "message": "the body must be JSON with runId"}), nil
 	}
-	authorization := request.Headers["authorization"]
-	if authorization == "" {
-		authorization = request.Headers["Authorization"]
-	}
-	registered, err := svc.Results(ctx, claims, authorization, appId, versionId, body)
+	registered, err := svc.Results(ctx, claims, requestAuthorization(request), appId, versionId, body)
 	if err != nil {
 		return sampleRunFailure("PostSampleRunResultsHandler", err), nil
 	}

@@ -581,7 +581,13 @@ app's page ("Generate release report"). Three requests of the owner, all
    version, the app's step id and the release's review parameters keyed by
    it, and why the runner skipped (`reason`). 409 while the fixtures are not
    ready, while a sample run is already under way on a node, or when the
-   App Store has no app-fixtures app.
+   App Store has no app-fixtures app. A node run on record as running is
+   looked up at workflow-service with the owner's token first: one that
+   ended in failure is recorded as failed on the version (nothing else
+   marks it, since results are registered only for a success) and the plan
+   goes ahead, with `reason.code = run_failed`; one that succeeded answers
+   409 `sample_succeeded` (register its results); one still running, 409
+   `sample_running`.
 2. The app sends `POST /runs` to workflow-service as the owner, an app run
    with `sample` (workflow-service docs/app-runs.md, "Sample runs"): a
    two-step workflow, app-fixtures unpacking the bundle and the app on it,
