@@ -543,6 +543,18 @@ once on its fixture bundle, and the results feed the sample document
   the largest tier, is not run: `sampleRun.status = skipped`,
   `error.code = needs_hardware`, and the release event goes out at once.
   That is what the owner's own-node fallback is for.
+- **Patch releases.** A patch release, `vX.Y.Z` with `Z > 0` and no
+  pre-release or build suffix, is not run when an earlier release of the
+  same app in the same `X.Y` line already has a ready release report
+  (`sample.status = ready`). Its fixtures are still built, so the owner can
+  make a report from the version's row ("Generate release report", see
+  [Sample runs on a compute node](#sample-runs-on-a-compute-node)).
+  `sampleRun.status = skipped`, `error.code = patch_release`, naming the
+  release whose report stands; the release event goes out at once and
+  curation-service makes no document, so the app's page keeps showing that
+  release's report, under its own tag. Minor and major releases, the first
+  patch in a line without a report, and pre-releases are run as before.
+  The hardware checks come first: a GPU-only app keeps `needs_hardware`.
 - **Caps.** `sample_run_timeout_seconds` (1200) for the container, the build
   `sample_runner_timeout_minutes` (30), `sample_output_max_bytes` (2 GiB)
   on the zipped results (`too_large`).

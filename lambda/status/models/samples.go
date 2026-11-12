@@ -19,6 +19,7 @@ const (
 // invalid_parameters).
 const (
 	SampleErrorNeedsHardware   = "needs_hardware" // GPU, or more memory than the runner has
+	SampleErrorPatchRelease    = "patch_release"  // a patch of a release that already has a report
 	SampleErrorNoBundle        = "no_bundle"      // the fixtures are not ready
 	SampleErrorBuildFailed     = "build_failed"
 	SampleErrorManifestMissing = "manifest_missing"
