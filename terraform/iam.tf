@@ -192,7 +192,7 @@ data "aws_iam_policy_document" "service_iam_policy_document" {
     content {
       sid       = "ServiceLambdaSampleRegisteredEvents"
       actions   = ["events:PutEvents"]
-      resources = ["arn:aws:events:${var.aws_region}:${var.aws_account}:event-bus/default"]
+      resources = ["arn:aws:events:${data.aws_region.current_region.name}:${data.aws_caller_identity.current.account_id}:event-bus/default"]
     }
   }
 
