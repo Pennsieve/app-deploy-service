@@ -569,7 +569,7 @@
     },
     "reviewDataset": {
       "type": "object",
-      "description": "A public dataset, fetched by the platform from an allowed host (Zenodo, Figshare, OSF, OpenNeuro): its DOI or HTTPS URL, and optionally which of its files.",
+      "description": "A public dataset, fetched by the platform from an allowed host (Pennsieve Discover, Zenodo, Figshare, OSF, OpenNeuro): its DOI or HTTPS URL, and optionally which of its files.",
       "additionalProperties": false,
       "oneOf": [{ "required": ["doi"] }, { "required": ["url"] }],
       "properties": {
