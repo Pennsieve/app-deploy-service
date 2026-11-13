@@ -223,9 +223,10 @@ func AppReviewToModel(r *store_dynamodb.AppReview) *models.AppReview {
 		out.Inputs = make(map[string]models.ReviewInput, len(r.Inputs))
 		for name, in := range r.Inputs {
 			out.Inputs[name] = models.ReviewInput{
-				Generate: reviewGenerateToModel(in.Generate),
-				Files:    in.Files,
-				Dataset:  reviewDatasetToModel(in.Dataset),
+				Generate:  reviewGenerateToModel(in.Generate),
+				Files:     in.Files,
+				Dataset:   reviewDatasetToModel(in.Dataset),
+				FilePaths: in.FilePaths,
 			}
 		}
 	}

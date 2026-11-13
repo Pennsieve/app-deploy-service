@@ -94,6 +94,11 @@ func TestAppReviewRecord(t *testing.T) {
 			},
 			Parameters: map[string]string{"N": "2000"},
 		}},
+		{"a layout for files and a dataset; none for a generator", "review:\n  version: 1\n  inputs:\n    fcs: {files: [a.fcs], filePaths: flat}\n    meta: {dataset: {doi: 10.26275/har8-ytia}, filePaths: source}\n    x: {generate: {command: make fixture}, filePaths: source}\n",
+			&store_dynamodb.AppReview{Version: 1, Inputs: map[string]store_dynamodb.ReviewInput{
+				"fcs":  {Files: []string{"a.fcs"}, FilePaths: "flat"},
+				"meta": {Dataset: &store_dynamodb.ReviewDataset{DOI: "10.26275/har8-ytia"}, FilePaths: "source"},
+				"x":    {Generate: &store_dynamodb.ReviewGenerate{Command: "make fixture"}}}}},
 		{"a port's generate", "review:\n  version: 1\n  inputs:\n    fcs: {generate: {command: make fixture}}\n",
 			&store_dynamodb.AppReview{Version: 1, Inputs: map[string]store_dynamodb.ReviewInput{
 				"fcs": {Generate: &store_dynamodb.ReviewGenerate{Command: "make fixture"}}}}},

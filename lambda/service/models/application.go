@@ -306,11 +306,13 @@ type ReviewGenerate struct {
 	Source  *ReviewDataset `json:"source,omitempty"`
 }
 
-// ReviewInput is one input port's review data: generate, files or dataset.
+// ReviewInput is one input port's review data: generate, files or dataset;
+// FilePaths (flat, the default, or source) lays out files or a dataset.
 type ReviewInput struct {
-	Generate *ReviewGenerate `json:"generate,omitempty"`
-	Files    []string        `json:"files,omitempty"`
-	Dataset  *ReviewDataset  `json:"dataset,omitempty"`
+	Generate  *ReviewGenerate `json:"generate,omitempty"`
+	Files     []string        `json:"files,omitempty"`
+	Dataset   *ReviewDataset  `json:"dataset,omitempty"`
+	FilePaths string          `json:"filePaths,omitempty"`
 }
 
 // ReviewDataset is a public dataset by doi or url, optionally some files.

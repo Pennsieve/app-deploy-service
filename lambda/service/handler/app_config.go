@@ -98,9 +98,10 @@ type appReviewGenerate struct {
 
 // appReviewInput is one of review.inputs: generate, files or dataset.
 type appReviewInput struct {
-	Generate *appReviewGenerate `yaml:"generate"`
-	Files    []string           `yaml:"files"`
-	Dataset  *appReviewDataset  `yaml:"dataset"`
+	Generate  *appReviewGenerate `yaml:"generate"`
+	Files     []string           `yaml:"files"`
+	Dataset   *appReviewDataset  `yaml:"dataset"`
+	FilePaths string             `yaml:"filePaths"`
 }
 
 // appReviewDataset is a public dataset, by doi or url.
@@ -461,6 +462,9 @@ func appReviewRecord(r *appReview) *store_dynamodb.AppReview {
 			Generate: reviewGenerateRecord(in.Generate),
 			Files:    in.Files,
 			Dataset:  reviewDatasetRecord(in.Dataset),
+		}
+		if rec.Generate == nil && (in.FilePaths == "flat" || in.FilePaths == "source") {
+			rec.FilePaths = in.FilePaths
 		}
 		if rec.Generate == nil && len(rec.Files) == 0 && rec.Dataset == nil {
 			continue

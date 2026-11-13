@@ -246,10 +246,12 @@ func TestReviewIsValid(t *testing.T) {
     root: linked
 `),
 		"a generator plus a dataset for one port": reviewYML("  version: 1\n  generate: { command: python -m tests.make_fixture \"$REVIEW_INPUT_DIR\", root: linked }\n  inputs:\n    fcs:\n      dataset: { doi: 10.5281/zenodo.15388817 }\n"),
-		"an R generator":   reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { image: r, command: Rscript tests/fixture.R }\n"),
-		"committed files":  reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [tests/fixtures/*.fcs, tests/fixtures/samples.csv]\n"),
-		"a dataset by DOI": reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.5281/zenodo.15388817, files: [\"B01_*.fcs\"] }\n"),
-		"a dataset by URL": reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { url: \"https://zenodo.org/records/15388817\" }\n"),
+		"an R generator":                     reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { image: r, command: Rscript tests/fixture.R }\n"),
+		"committed files":                    reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [tests/fixtures/*.fcs, tests/fixtures/samples.csv]\n"),
+		"a dataset by DOI":                   reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.5281/zenodo.15388817, files: [\"B01_*.fcs\"] }\n"),
+		"a dataset by URL":                   reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { url: \"https://zenodo.org/records/15388817\" }\n"),
+		"a Discover dataset, its paths kept": reviewYML("  version: 1\n  inputs:\n    fcs:\n      dataset: { doi: 10.26275/har8-ytia, files: [files/primary] }\n      filePaths: source\n"),
+		"committed files, flat":              reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [tests/fixtures/**/*.fcs]\n      filePaths: flat\n"),
 	}
 	for name, yml := range cases {
 		ps, err := Validate([]byte(yml))
@@ -270,6 +272,9 @@ func TestReviewProblems(t *testing.T) {
 		{"no inputs in the map", reviewYML("  version: 1\n  inputs: {}\n"), "/review/inputs"},
 		{"two sources for one port", reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [a.fcs]\n      dataset: { doi: 10.5281/zenodo.1 }\n"), "/review/inputs/fcs"},
 		{"no source", reviewYML("  version: 1\n  inputs:\n    fcs: {}\n"), "/review/inputs/fcs"},
+		{"filePaths alone", reviewYML("  version: 1\n  inputs:\n    fcs: { filePaths: flat }\n"), "/review/inputs/fcs"},
+		{"filePaths on a generator", reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { command: make fixture }\n      filePaths: flat\n"), "/review/inputs/fcs"},
+		{"an unknown filePaths", reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [a.fcs]\n      filePaths: nested\n"), "/review/inputs/fcs/filePaths"},
 		{"a generator without a command", reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { image: python }\n"), "command"},
 		{"an unknown generator image", reviewYML("  version: 1\n  inputs:\n    fcs:\n      generate: { image: ubuntu, command: make fixture }\n"), "/review/inputs/fcs/generate/image"},
 		{"an absolute file", reviewYML("  version: 1\n  inputs:\n    fcs:\n      files: [/etc/passwd]\n"), "/review/inputs/fcs/files/0"},
