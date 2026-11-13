@@ -285,9 +285,10 @@ type ReviewGenerate struct {
 // ReviewInput is where one input port's review data comes from: one of
 // Generate, Files or Dataset.
 type ReviewInput struct {
-	Generate *ReviewGenerate `dynamodbav:"generate,omitempty"`
-	Files    []string        `dynamodbav:"files,omitempty"`
-	Dataset  *ReviewDataset  `dynamodbav:"dataset,omitempty"`
+	Generate  *ReviewGenerate `dynamodbav:"generate,omitempty"`
+	Files     []string        `dynamodbav:"files,omitempty"`
+	Dataset   *ReviewDataset  `dynamodbav:"dataset,omitempty"`
+	FilePaths string          `dynamodbav:"filePaths,omitempty"` // flat (the default) or source
 }
 
 // ReviewDataset is a public dataset by DOI or URL, optionally some of its
