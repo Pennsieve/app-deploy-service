@@ -48,6 +48,11 @@ type SampleRun struct {
 	ComputeNodeId string `dynamodbav:"computeNodeId,omitempty" json:"computeNodeId,omitempty"`
 	StartedBy     string `dynamodbav:"startedBy,omitempty" json:"startedBy,omitempty"`
 	Source        string `dynamodbav:"source,omitempty" json:"source,omitempty"`
+	// ReportOf is the earlier release in the same X.Y line whose release
+	// report stands for this patch release, when this one gets none of its
+	// own (skipped patch_release, or needs_hardware on a patch): readers
+	// that look a report up by tag, such as Discover, show that one.
+	ReportOf string `dynamodbav:"reportOf,omitempty" json:"reportOf,omitempty"`
 }
 
 // SampleRegisteredDetailType is the service lambda's event when an owner's
