@@ -71,10 +71,12 @@ func TestPatchRelease_SkipsTheSampleRunWhenTheLineHasAReport(t *testing.T) {
 	assert.Equal(t, models.SampleSkipped, rec.Status)
 	assert.Equal(t, models.SampleErrorPatchRelease, rec.Error.Code)
 	assert.Contains(t, rec.Error.Message, "v1.0.2", "the newest earlier release of the line with a report")
+	assert.Equal(t, "v1.0.2", rec.ReportOf, "readers that look the report up by tag show v1.0.2's")
 	details := ev.details(t)
 	require.Len(t, details, 1, "the release event goes out at once with the skipped run")
 	require.NotNil(t, details[0].SampleRun)
 	assert.Equal(t, models.SampleErrorPatchRelease, details[0].SampleRun.Error.Code)
+	assert.Equal(t, "v1.0.2", details[0].SampleRun.ReportOf, "the event names the report that stands")
 }
 
 func TestPatchRelease_RunsWhenItIsNotAPatchOrTheLineHasNoReport(t *testing.T) {
@@ -115,5 +117,18 @@ func TestPatchRelease_HardwareSkipComesFirst(t *testing.T) {
 	rec := sampleRunRecorded(t, db)
 	require.NotNil(t, rec)
 	assert.Equal(t, models.SampleErrorNeedsHardware, rec.Error.Code, "a GPU app keeps its own reason, which offers the node run")
-	assert.Empty(t, q.queries)
+	assert.Equal(t, "v1.0.2", rec.ReportOf, "a GPU app's patch still names the report of its line")
+}
+
+func TestPatchRelease_HardwareSkipOfANewLineNamesNoReport(t *testing.T) {
+	items := sampleItems(4096, []string{"gpu"}, nil)
+	items[testVersionsTable]["version"] = &types.AttributeValueMemberS{Value: "v1.1.0"}
+	h, db, _, store, _ := newSampleTestHandler(items)
+	h.DynamoDBApi = &queryingDynamoDB{recordingDynamoDB: db, versions: map[string]string{"v1.0.2": models.SampleDocReady}}
+	store.objects = map[string]string{"fixtures/app-1/v1.0.0/manifest.json": readyManifest()}
+	require.NoError(t, h.HandleEvent(context.Background(), fixtureBuildEvent(models.BuildSucceeded)))
+	rec := sampleRunRecorded(t, db)
+	require.NotNil(t, rec)
+	assert.Equal(t, models.SampleErrorNeedsHardware, rec.Error.Code)
+	assert.Empty(t, rec.ReportOf, "a minor release starts a line: no earlier report stands for it")
 }

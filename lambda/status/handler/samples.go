@@ -117,9 +117,26 @@ func imageByDigestOf(destination, digest string) string {
 // startSampleRun runs after the fixtures are ready. Best effort.
 func (h *DeployTaskStateChangeHandler) startSampleRun(ctx context.Context, logger *slog.Logger, rel release, fixtures models.Fixtures, versionsTable string) {
 	fb := h.Fixtures
+	// The earlier release whose report stands for this one when it is a
+	// patch of a reported line ("" otherwise), looked up once.
+	base, baseLooked := "", false
+	patchBase := func() string {
+		if !baseLooked {
+			baseLooked = true
+			b, err := h.reportedPatchBase(ctx, rel, versionsTable)
+			if err != nil {
+				logger.Warn("sample: unable to check for a patch release", slog.Any("error", err))
+			}
+			base = b
+		}
+		return base
+	}
 	skip := func(code, message string) {
 		logger.Info("sample: skipped", slog.String("reason", code))
 		rec := models.SampleRun{Status: models.SampleSkipped, Error: &models.FixturesError{Code: code, Message: message}, UpdatedAt: fb.now()}
+		if code == models.SampleErrorPatchRelease || code == models.SampleErrorNeedsHardware {
+			rec.ReportOf = patchBase()
+		}
 		h.setSampleRun(ctx, logger, rel, versionsTable, rec)
 		h.emitReleaseReady(ctx, logger, rel, fixtures, &rec)
 	}
@@ -140,10 +157,8 @@ func (h *DeployTaskStateChangeHandler) startSampleRun(ctx context.Context, logge
 		skip(models.SampleErrorNeedsHardware, fmt.Sprintf("the app declares %d MiB of memory, more than the sample runner has", memory))
 		return
 	}
-	if base, err := h.reportedPatchBase(ctx, rel, versionsTable); err != nil {
-		logger.Warn("sample: unable to check for a patch release; running it", slog.Any("error", err))
-	} else if base != "" {
-		skip(models.SampleErrorPatchRelease, fmt.Sprintf("a patch release: %s keeps the release report of %s; the owner can generate one from the version's row", rel.Tag, base))
+	if b := patchBase(); b != "" {
+		skip(models.SampleErrorPatchRelease, fmt.Sprintf("a patch release: %s keeps the release report of %s; the owner can generate one from the version's row", rel.Tag, b))
 		return
 	}
 	image := imageByDigestOf(rel.Destination, rel.ImageDigest)

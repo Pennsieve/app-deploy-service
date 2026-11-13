@@ -552,7 +552,11 @@ once on its fixture bundle, and the results feed the sample document
   `sampleRun.status = skipped`, `error.code = patch_release`, naming the
   release whose report stands; the release event goes out at once and
   curation-service makes no document, so the app's page keeps showing that
-  release's report, under its own tag. Minor and major releases, the first
+  release's report, under its own tag. The record and the event name that
+  release in `sampleRun.reportOf`, also when a GPU or large app's patch is
+  skipped for `needs_hardware`; curation-service then copies its report to
+  the patch's stable address, so readers that look a report up by tag
+  (Discover) show it. Minor and major releases, the first
   patch in a line without a report, and pre-releases are run as before.
   The hardware checks come first: a GPU-only app keeps `needs_hardware`.
 - **Caps.** `sample_run_timeout_seconds` (1200) for the container, the build
