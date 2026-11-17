@@ -464,8 +464,8 @@ type AppRuntime struct {
 	// LLM proxy sidecar); workflow-service reads it at run start.
 	LLM bool `dynamodbav:"llm,omitempty"`
 	// Interactive: a human-in-the-loop app, run as a live session of
-	// SessionType ("jupyter" is a notebook); Kernel is a Jupyter session's
-	// language ("python", "r").
+	// SessionType ("jupyter" is a notebook, "webapp" a web page the app
+	// serves itself); Kernel is a Jupyter session's language ("python", "r").
 	Interactive bool   `dynamodbav:"interactive,omitempty"`
 	SessionType string `dynamodbav:"sessionType,omitempty"`
 	Kernel      string `dynamodbav:"kernel,omitempty"`

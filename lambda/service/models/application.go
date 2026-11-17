@@ -457,8 +457,8 @@ type AppRuntime struct {
 	// LLM proxy sidecar).
 	LLM bool `json:"llm,omitempty"`
 	// Interactive: a human-in-the-loop app, run as a live session of
-	// SessionType ("jupyter" is a notebook); Kernel is a Jupyter session's
-	// language ("python", "r").
+	// SessionType ("jupyter" is a notebook, "webapp" a web page the app
+	// serves itself); Kernel is a Jupyter session's language ("python", "r").
 	Interactive bool   `json:"interactive,omitempty"`
 	SessionType string `json:"sessionType,omitempty"`
 	Kernel      string `json:"kernel,omitempty"`
