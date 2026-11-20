@@ -34,6 +34,7 @@ func TestRecordsInputs(t *testing.T) {
 		"at the root":        {"    placement: subfolder\noutputs:", "    placement: root\noutputs:", "/inputs/1/placement: an input of metadata records"},
 		"placement left out": {"    placement: subfolder\noutputs:", "outputs:", "needs placement: subfolder"},
 		"versioned":          {"conformsTo: pennsieve-records\n    placement: subfolder", "conformsTo: pennsieve-records@1.0\n    placement: root", "needs placement: subfolder"},
+		"listed first":       {"conformsTo: pennsieve-records\n    placement: subfolder", "conformsTo: [pennsieve-records, https://example.org/cohort]\n    placement: root", "needs placement: subfolder"},
 		"an output":          {"mediaTypes: [text/csv]", "conformsTo: pennsieve-records", "/outputs/0/conformsTo: apps can't write metadata records"},
 	}
 	for name, c := range cases {
@@ -61,5 +62,29 @@ func TestRecordsInputs(t *testing.T) {
 		if ps := recordsProblems(cfg); ps != nil {
 			t.Errorf("conformsTo %s: %v", ct, ps)
 		}
+	}
+}
+
+func TestRecordsProblemsAreAlwaysRefused(t *testing.T) {
+	ok, err := parseAppConfig([]byte(cohortStats))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reason := alwaysRefused(ok, "v1.0.0"); reason != "" {
+		t.Errorf("cohort-stats refused: %s", reason)
+	}
+	listed, err := parseAppConfig([]byte(strings.Replace(cohortStats, "conformsTo: pennsieve-records", "conformsTo: [pennsieve-records, https://example.org/cohort]", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reason := alwaysRefused(listed, "v1.0.0"); reason != "" {
+		t.Errorf("records listed first, in its own folder, refused: %s", reason)
+	}
+	root, err := parseAppConfig([]byte(strings.Replace(cohortStats, "    placement: subfolder\noutputs:", "outputs:", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reason := alwaysRefused(root, "v1.0.0"); !strings.Contains(reason, "needs placement: subfolder") {
+		t.Errorf("records at the root: got %q", reason)
 	}
 }

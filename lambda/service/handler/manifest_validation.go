@@ -185,6 +185,17 @@ func jsonPointerEscape(s string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(s, "~", "~0"), "/", "~1")
 }
 
+// alwaysRefused is why a release is refused in either validation mode, or
+// "": a tag variants can't use (variantTagProblem), or records ports
+// (recordsProblems). No app had records ports before the check, so refusing
+// them breaks none.
+func alwaysRefused(c appConfig, tag string) string {
+	if reason := variantTagProblem(c, tag); reason != "" {
+		return reason
+	}
+	return strings.Join(recordsProblems(c), "; ")
+}
+
 // variantTagProblem refuses a release tag containing "--" for an app with
 // variants: "--" separates the tag from the variant id in image tags
 // (<hash>-<tag>--<id>). Refused in either validation mode.

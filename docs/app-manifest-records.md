@@ -33,7 +33,7 @@ records/
   models/sample/schema.json
   models/sample/records.jsonl
   relationships.csv
-  files.csv                          when records are linked to files
+  files.csv                          records of a published dataset only
   .pennsieve/view.json
 ```
 
@@ -48,12 +48,23 @@ The structure's specification is
   `x-pennsieve-sensitive`.
 - `models/<model>/records.jsonl`: one record per line,
   `{"id": "<record id>", "data": {<field>: <value>, …}}`.
-- `relationships.csv`: `source_record_id,target_record_id,relationship_type`,
-  only between records in the folder.
+- `relationships.csv`: `source_record_id,target_record_id,relationship_type`.
+  It may name records that aren't in the folder (a published dataset's table
+  covers the whole dataset): join on the ids, and don't assume both ends of a
+  link are present.
+- `files.csv`, for records from a published dataset only:
+  `record_id,package_id,path`, where `path` is the file's path in the
+  published dataset (it starts with `files/`). Files reach a files input
+  without that prefix: match on `package_id`, or strip `files/`.
 
 It is Pennsieve's metadata export layout (what a Discover download has under
 `metadata/`) without the `versions/<n>/` level: a run pins one version of each
-model, so there is only one. Code that reads one reads the other.
+model, so there is only one. Code that reads one reads the other: the same
+files, one level shallower. A Discover `metadata/` folder may also have a
+`codebook.json`; readers ignore files they don't know.
+
+The specification has a DuckDB example that reads every model into a view
+of its fields, empty files included.
 
 Model names belong to the dataset. An app that needs particular models should
 say which in its description, and fail with a clear message when they're
@@ -62,8 +73,10 @@ missing.
 ## Rules
 
 - **Inputs only.** An output can't declare `pennsieve-records` yet.
-- **Its own folder.** `placement: subfolder` is required; registration
-  reports a records input at the root.
+- **Its own folder.** `placement: subfolder` is required.
+
+Registration refuses a release that breaks these, whatever the manifest
+validation mode.
 - **Outermost.** Only an input whose first `conformsTo` entry is
   `pennsieve-records` (or `pennsieve-records@1.0`) is a records input.
 

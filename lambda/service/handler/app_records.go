@@ -23,7 +23,8 @@ func takesRecords(conformsTo stringList) bool {
 // recordsProblems are the checks on records ports that JSON Schema can't
 // express: an input of records goes in its own folder (placement:
 // subfolder), since its layout would mix with other inputs at the root, and
-// no output writes records yet.
+// no output writes records yet. Refused in either validation mode
+// (alwaysRefused).
 func recordsProblems(c appConfig) []string {
 	var out []string
 	for i, p := range c.Inputs {
