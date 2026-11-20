@@ -35,6 +35,7 @@ func TestRecordsInputs(t *testing.T) {
 		"placement left out": {"    placement: subfolder\noutputs:", "outputs:", "needs placement: subfolder"},
 		"versioned":          {"conformsTo: pennsieve-records\n    placement: subfolder", "conformsTo: pennsieve-records@1.0\n    placement: root", "needs placement: subfolder"},
 		"listed first":       {"conformsTo: pennsieve-records\n    placement: subfolder", "conformsTo: [pennsieve-records, https://example.org/cohort]\n    placement: root", "needs placement: subfolder"},
+		"blank entry first":  {"conformsTo: pennsieve-records\n    placement: subfolder", "conformsTo: [\"\", \" pennsieve-records \"]\n    placement: \" root \"", "needs placement: subfolder"},
 		"an output":          {"mediaTypes: [text/csv]", "conformsTo: pennsieve-records", "/outputs/0/conformsTo: apps can't write metadata records"},
 	}
 	for name, c := range cases {
@@ -86,5 +87,15 @@ func TestRecordsProblemsAreAlwaysRefused(t *testing.T) {
 	}
 	if reason := alwaysRefused(root, "v1.0.0"); !strings.Contains(reason, "needs placement: subfolder") {
 		t.Errorf("records at the root: got %q", reason)
+	}
+	// What is stored decides: a blank first entry is dropped, so this is a
+	// records input at the root, refused in warn mode too.
+	t.Setenv("APP_MANIFEST_VALIDATION", "warn")
+	blank, err := parseAppConfig([]byte(strings.Replace(cohortStats, "conformsTo: pennsieve-records\n    placement: subfolder", "conformsTo: [\"\", pennsieve-records]\n    placement: root", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reason := alwaysRefused(blank, "v1.0.0"); !strings.Contains(reason, "/inputs/1/placement") {
+		t.Errorf("blank entry before records at the root: got %q", reason)
 	}
 }

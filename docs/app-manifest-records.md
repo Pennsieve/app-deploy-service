@@ -54,14 +54,17 @@ The structure's specification is
   link are present.
 - `files.csv`, for records from a published dataset only:
   `record_id,package_id,path`, where `path` is the file's path in the
-  published dataset (it starts with `files/`). Files reach a files input
-  without that prefix: match on `package_id`, or strip `files/`.
+  published dataset (it starts with `files/`), or empty when the file isn't
+  in the publication. Files reach a files input without that prefix: match on
+  `package_id`.
 
 It is Pennsieve's metadata export layout (what a Discover download has under
 `metadata/`) without the `versions/<n>/` level: a run pins one version of each
 model, so there is only one. Code that reads one reads the other: the same
-files, one level shallower. A Discover `metadata/` folder may also have a
-`codebook.json`; readers ignore files they don't know.
+files, one level shallower. A run brings only these: `models/…`,
+`relationships.csv` and `files.csv`, plus `.pennsieve/view.json`. Other
+files of the export, such as a published dataset's `codebook.json`, are left
+out; a Discover download has them, and readers ignore files they don't know.
 
 The specification has a DuckDB example that reads every model into a view
 of its fields, empty files included.
@@ -72,13 +75,17 @@ missing.
 
 ## Rules
 
+An input is a records input when its first `conformsTo` entry is
+`pennsieve-records` (or `pennsieve-records@1.0`); a structure nested inside
+another isn't. For such ports:
+
 - **Inputs only.** An output can't declare `pennsieve-records` yet.
 - **Its own folder.** `placement: subfolder` is required.
 
 Registration refuses a release that breaks these, whatever the manifest
-validation mode.
-- **Outermost.** Only an input whose first `conformsTo` entry is
-  `pennsieve-records` (or `pennsieve-records@1.0`) is a records input.
+validation mode. Other manifest problems only refuse a release in enforce
+mode, so existing apps keep registering; records inputs are new, so no
+existing app is refused by these rules.
 
 ## Which records
 

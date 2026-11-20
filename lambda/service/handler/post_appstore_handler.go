@@ -212,6 +212,13 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 	if haveAppCfg {
 		if reason := alwaysRefused(appCfg, application.Source.Tag); reason != "" {
 			log.Printf("refusing %s %s: %s", application.Source.Url, application.Source.Tag, reason)
+			// The manifest's problems go on the version, as for a release
+			// refused in enforce mode.
+			if len(problems) > 0 {
+				if err := versionStore.SetRegistrationDetails(ctx, versionUuid, "", problems); err != nil {
+					log.Printf("warning: unable to record the manifest problems of %s: %v", versionUuid, err)
+				}
+			}
 			refusal := withLiveUpdates(ctx, NewAppStoreStatusManager(handlerName, versionStore, versionUuid), cfg)
 			return events.APIGatewayV2HTTPResponse{
 				StatusCode: http.StatusUnprocessableEntity,
