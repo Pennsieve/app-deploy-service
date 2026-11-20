@@ -48,6 +48,7 @@ func manifestProblems(appYml []byte) []string {
 		out = append(out, variantProblems(c)...)
 		out = append(out, reviewProblems(c)...)
 		out = append(out, referenceProblems(c)...)
+		out = append(out, recordsProblems(c)...)
 	}
 	return out
 }
