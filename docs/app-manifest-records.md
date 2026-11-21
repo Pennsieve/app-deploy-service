@@ -28,14 +28,18 @@ sub-01/run-01.edf
 sub-02/run-01.edf
 .pennsieve/view.json                 the dataset view they came from
 records/
-  models/subject/schema.json
-  models/subject/records.jsonl
-  models/sample/schema.json
-  models/sample/records.jsonl
+  models/subject/versions/1/schema.json
+  models/subject/versions/1/records.jsonl
+  models/sample/versions/1/schema.json
+  models/sample/versions/1/records.jsonl
+  models/sample/versions/2/schema.json
+  models/sample/versions/2/records.jsonl
   relationships.csv
   files.csv                          records of a published dataset only
   .pennsieve/view.json
 ```
+
+Here `sample` has records under two schema versions of its model.
 
 ## The layout
 
@@ -43,11 +47,16 @@ The structure's specification is
 [pennsieve-records 1.0](https://schemas.pennsieve.io/structures/pennsieve-records/v1.0)
 (packages-service's format registry). In short:
 
-- `models/<model>/schema.json`: the model's JSON Schema, with Pennsieve
-  annotations such as `x-pennsieve-key`, `x-pennsieve-unit` and
-  `x-pennsieve-sensitive`.
-- `models/<model>/records.jsonl`: one record per line,
+- `models/<model>/versions/<n>/schema.json`: the model's JSON Schema at
+  version `<n>`, with Pennsieve annotations such as `x-pennsieve-key`,
+  `x-pennsieve-unit` and `x-pennsieve-sensitive`.
+- `models/<model>/versions/<n>/records.jsonl`: the records written under
+  that schema version, one per line,
   `{"id": "<record id>", "data": {<field>: <value>, …}}`.
+- A model has one or more version folders: a dataset view can hold one
+  model's records under several schema versions. Read every version folder
+  of a model (fields can be added or removed between versions), or say which
+  you expect.
 - `relationships.csv`: `source_record_id,target_record_id,relationship_type`.
   It may name records that aren't in the folder (a published dataset's table
   covers the whole dataset): join on the ids, and don't assume both ends of a
@@ -59,15 +68,15 @@ The structure's specification is
   `package_id`.
 
 It is Pennsieve's metadata export layout (what a Discover download has under
-`metadata/`) without the `versions/<n>/` level: a run pins one version of each
-model, so there is only one. Code that reads one reads the other: the same
-files, one level shallower. A run brings only these: `models/…`,
+`metadata/`) without the `metadata/` prefix: code that reads one reads the
+other. A run brings only these: `models/…`,
 `relationships.csv` and `files.csv`, plus `.pennsieve/view.json`. Other
 files of the export, such as a published dataset's `codebook.json`, are left
 out; a Discover download has them, and readers ignore files they don't know.
 
 The specification has a DuckDB example that reads every model into a view
-of its fields, empty files included.
+of its fields over all its versions, with a `schema_version` column, empty
+files included.
 
 Model names belong to the dataset. An app that needs particular models should
 say which in its description, and fail with a clear message when they're
@@ -104,10 +113,11 @@ no `files/` or `metadata/` folder: the records go only to a records input.
 
 ## Testing locally
 
-Lay the input out yourself: `INPUT_DIR/records/models/<model>/schema.json` and
+Lay the input out yourself:
+`INPUT_DIR/records/models/<model>/versions/<n>/schema.json` and
 `records.jsonl`, and `INPUT_DIR/records/relationships.csv`. A Discover
-download's `metadata/` folder gives real ones: move each
-`models/<model>/versions/<n>/` up to `models/<model>/`.
+download's `metadata/` folder gives real ones as they are: use it as
+`INPUT_DIR/records/`.
 
 ## Review
 
