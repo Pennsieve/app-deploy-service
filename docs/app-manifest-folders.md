@@ -97,6 +97,7 @@ The structures in the registry (`GET /packages/formats`, `structures`; also
 | `pennsieve-published-dataset` | Pennsieve Published Dataset (PPD): `manifest.json`, `readme.md`, `changelog.md`, `banner.jpg`, `files/` | `files` |
 | `ro-crate` | A folder described by `ro-crate-metadata.json` (Pennsieve views) | |
 | `pennsieve-records` | A dataset's metadata records: `models/<model>/versions/<n>/schema.json` + `records.jsonl`, `relationships.csv`. Inputs only, `placement: subfolder`; see [app-manifest-records.md](app-manifest-records.md) | |
+| `kgx` | A dataset's records as a knowledge graph in KGX tables: `nodes.tsv.gz`, `edges.tsv.gz`, the same in Parquet, `graph.json`, `graph_stats.yaml`. Inputs only, `placement: subfolder`; see [app-manifest-kgx.md](app-manifest-kgx.md) | |
 
 Adding one is a PR to packages-service's format registry.
 
