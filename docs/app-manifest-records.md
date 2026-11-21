@@ -32,12 +32,14 @@ records/
   models/subject/versions/1/records.jsonl
   models/sample/versions/1/schema.json
   models/sample/versions/1/records.jsonl
-  models/sample/versions/2/schema.json     samples written under the model's next schema
+  models/sample/versions/2/schema.json
   models/sample/versions/2/records.jsonl
   relationships.csv
   files.csv                          records of a published dataset only
   .pennsieve/view.json
 ```
+
+Here `sample` has records under two schema versions of its model.
 
 ## The layout
 
@@ -53,7 +55,8 @@ The structure's specification is
   `{"id": "<record id>", "data": {<field>: <value>, …}}`.
 - A model has one or more version folders: a dataset view can hold one
   model's records under several schema versions. Read every version folder
-  of a model (later versions usually add fields), or say which you expect.
+  of a model (fields can be added or removed between versions), or say which
+  you expect.
 - `relationships.csv`: `source_record_id,target_record_id,relationship_type`.
   It may name records that aren't in the folder (a published dataset's table
   covers the whole dataset): join on the ids, and don't assume both ends of a
