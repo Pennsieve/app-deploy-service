@@ -207,11 +207,18 @@ func PostAppStoreHandler(ctx context.Context, request events.APIGatewayV2HTTPReq
 			log.Printf("warning: unable to parse the app.yml of %s %s: %v", application.Source.Url, application.Source.Tag, err)
 		}
 	}
-	// "--" separates the release tag from the variant id in image tags, so
-	// an app with variants can't use it in a tag, whatever the validation mode.
+	// Refused whatever the validation mode: "--" in the release tag of an
+	// app with variants, and records ports the platform can't fill.
 	if haveAppCfg {
-		if reason := variantTagProblem(appCfg, application.Source.Tag); reason != "" {
+		if reason := alwaysRefused(appCfg, application.Source.Tag); reason != "" {
 			log.Printf("refusing %s %s: %s", application.Source.Url, application.Source.Tag, reason)
+			// The manifest's problems go on the version, as for a release
+			// refused in enforce mode.
+			if len(problems) > 0 {
+				if err := versionStore.SetRegistrationDetails(ctx, versionUuid, "", problems); err != nil {
+					log.Printf("warning: unable to record the manifest problems of %s: %v", versionUuid, err)
+				}
+			}
 			refusal := withLiveUpdates(ctx, NewAppStoreStatusManager(handlerName, versionStore, versionUuid), cfg)
 			return events.APIGatewayV2HTTPResponse{
 				StatusCode: http.StatusUnprocessableEntity,
