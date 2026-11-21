@@ -47,7 +47,7 @@ func TestRecordsInputs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		ps := recordsProblems(cfg)
+		ps := viewPartProblems(cfg)
 		if len(ps) != 1 || !strings.Contains(ps[0], c.want) {
 			t.Errorf("%s: got %v, want one problem with %q", name, ps, c.want)
 		}
@@ -60,7 +60,7 @@ func TestRecordsInputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ps := recordsProblems(cfg); ps != nil {
+		if ps := viewPartProblems(cfg); ps != nil {
 			t.Errorf("conformsTo %s: %v", ct, ps)
 		}
 	}
@@ -140,7 +140,7 @@ func TestKGXInputs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
-		ps := recordsProblems(cfg)
+		ps := viewPartProblems(cfg)
 		if len(ps) != 1 || !strings.Contains(ps[0], c.want) {
 			t.Errorf("%s: got %v, want one problem with %q", name, ps, c.want)
 		}
@@ -153,7 +153,7 @@ func TestKGXInputs(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ps := recordsProblems(cfg); ps != nil {
+		if ps := viewPartProblems(cfg); ps != nil {
 			t.Errorf("conformsTo %s: %v", ct, ps)
 		}
 	}

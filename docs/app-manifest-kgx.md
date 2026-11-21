@@ -72,7 +72,8 @@ validation mode.
 ## Which graph
 
 A run's graph comes from a dataset view: the graph Pennsieve's metadata
-export renders from the records the view pins, as of when the view was made.
+export renders from the records the view pins (the models it picked), as of
+when the view was made.
 One dataset can feed several inputs of a step, each link taking its part of
 the view: the files, the records, the graph. A run is refused before it
 starts when:

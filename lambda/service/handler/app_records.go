@@ -40,14 +40,14 @@ func viewPartOf(conformsTo []string) (viewPartStructure, bool) {
 	return viewPartStructure{}, false
 }
 
-// recordsProblems are the checks on ports of view parts (records, a
+// viewPartProblems are the checks on ports of view parts (records, a
 // knowledge graph) that JSON Schema can't express: such an input goes in its
 // own folder (placement: subfolder), since its layout would mix with other
 // inputs at the root, and no output writes one yet. They judge the ports as
 // they are stored (conformsTo and placement trimmed, as appPorts stores
 // them), which is what workflow-service reads. Refused in either validation
 // mode (alwaysRefused).
-func recordsProblems(c appConfig) []string {
+func viewPartProblems(c appConfig) []string {
 	var out []string
 	for i, p := range c.Inputs {
 		if s, ok := viewPartOf(p.ConformsTo.trimmed()); ok && strings.TrimSpace(p.Placement) != "subfolder" {

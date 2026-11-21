@@ -48,7 +48,7 @@ func manifestProblems(appYml []byte) []string {
 		out = append(out, variantProblems(c)...)
 		out = append(out, reviewProblems(c)...)
 		out = append(out, referenceProblems(c)...)
-		out = append(out, recordsProblems(c)...)
+		out = append(out, viewPartProblems(c)...)
 	}
 	return out
 }
@@ -187,13 +187,13 @@ func jsonPointerEscape(s string) string {
 
 // alwaysRefused is why a release is refused in either validation mode, or
 // "": a tag variants can't use (variantTagProblem), or records ports
-// (recordsProblems). No app had records ports before the check, so refusing
+// (viewPartProblems). No app had records ports before the check, so refusing
 // them breaks none.
 func alwaysRefused(c appConfig, tag string) string {
 	if reason := variantTagProblem(c, tag); reason != "" {
 		return reason
 	}
-	return strings.Join(recordsProblems(c), "; ")
+	return strings.Join(viewPartProblems(c), "; ")
 }
 
 // variantTagProblem refuses a release tag containing "--" for an app with
