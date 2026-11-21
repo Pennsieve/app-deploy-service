@@ -109,7 +109,8 @@ the example: each link takes its part of the view, the files or the records.
 An input of files fed from a dataset view (any input that isn't
 `pennsieve-records`) gets the picked files at its placement, as the app.yml
 says, with the view's manifest beside them in `.pennsieve/view.json`. There is
-no `files/` or `metadata/` folder: the records go only to a records input.
+no `files/` or `metadata/` folder: the records go only to a records input,
+and the graph only to a [graph input](app-manifest-kgx.md) (`conformsTo: kgx`).
 
 ## Testing locally
 

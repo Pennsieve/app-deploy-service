@@ -99,3 +99,62 @@ func TestRecordsProblemsAreAlwaysRefused(t *testing.T) {
 		t.Errorf("blank entry before records at the root: got %q", reason)
 	}
 }
+
+// kgSummary takes a dataset's knowledge graph.
+const kgSummary = `schemaVersion: "1.0"
+application:
+  name: kg-summary
+  type: processor
+runtime:
+  computeTypes: [standard]
+inputs:
+  - name: graph
+    description: The dataset's records as a graph.
+    conformsTo: kgx
+    placement: subfolder
+outputs:
+  - name: summary
+    mediaTypes: [text/html]
+`
+
+// An input of a knowledge graph follows the records' rules: in its own
+// folder, and not as an output.
+func TestKGXInputs(t *testing.T) {
+	if ps := manifestProblems([]byte(kgSummary)); len(ps) != 0 {
+		t.Fatalf("kg-summary: %v", ps)
+	}
+	cases := map[string]struct {
+		change, with, want string
+	}{
+		"at the root":        {"    placement: subfolder\noutputs:", "    placement: root\noutputs:", "/inputs/0/placement: an input of a knowledge graph (conformsTo: kgx) needs placement: subfolder: the graph goes in its own folder"},
+		"placement left out": {"    placement: subfolder\noutputs:", "outputs:", "needs placement: subfolder"},
+		"versioned":          {"conformsTo: kgx\n    placement: subfolder", "conformsTo: kgx@1.0\n    placement: root", "needs placement: subfolder"},
+		"an output":          {"mediaTypes: [text/html]", "conformsTo: kgx", "/outputs/0/conformsTo: apps can't write a knowledge graph (kgx) yet"},
+	}
+	for name, c := range cases {
+		yml := strings.Replace(kgSummary, c.change, c.with, 1)
+		if yml == kgSummary {
+			t.Fatalf("%s: the change didn't apply", name)
+		}
+		cfg, err := parseAppConfig([]byte(yml))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		ps := recordsProblems(cfg)
+		if len(ps) != 1 || !strings.Contains(ps[0], c.want) {
+			t.Errorf("%s: got %v, want one problem with %q", name, ps, c.want)
+		}
+		if reason := alwaysRefused(cfg, "v1.0.0"); !strings.Contains(reason, c.want) {
+			t.Errorf("%s: not refused: %q", name, reason)
+		}
+	}
+	for _, ct := range []string{"[ro-crate, kgx]", "kgxx"} {
+		cfg, err := parseAppConfig([]byte(strings.Replace(kgSummary, "conformsTo: kgx\n    placement: subfolder", "conformsTo: "+ct+"\n    placement: root", 1)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if ps := recordsProblems(cfg); ps != nil {
+			t.Errorf("conformsTo %s: %v", ct, ps)
+		}
+	}
+}
