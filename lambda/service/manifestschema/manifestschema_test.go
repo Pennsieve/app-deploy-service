@@ -21,8 +21,9 @@ func TestSchemaIsValidJSONWithItsURLAsID(t *testing.T) {
 	}
 }
 
-// Real app.yml files, as their repositories have them: the two session apps
-// (pennsieve-jupyter-session #9, pennsieve-r-session #4) and seurat-processor.
+// Real app.yml files, as their repositories have them: the two notebook apps
+// (pennsieve-jupyter-session #9, pennsieve-r-session #4), the web app session
+// (interactive-review) and seurat-processor.
 func TestRealManifestsAreValid(t *testing.T) {
 	files, err := filepath.Glob("testdata/*.app.yml")
 	if err != nil || len(files) < 3 {
@@ -52,6 +53,9 @@ func TestProblems(t *testing.T) {
 		{"jupyter without a kernel", "application:\n  name: a\nruntime:\n  interactive: true\n  sessionType: jupyter\n", "kernel"},
 		{"a session type that isn't interactive", "application:\n  name: a\nruntime:\n  sessionType: jupyter\n  kernel: python\n", "interactive"},
 		{"a kernel without jupyter", "application:\n  name: a\nruntime:\n  kernel: r\n", "sessionType"},
+		{"a kernel on a web app", "application:\n  name: a\nruntime:\n  interactive: true\n  sessionType: webapp\n  kernel: python\n", "sessionType"},
+		{"a web app that isn't interactive", "application:\n  name: a\nruntime:\n  sessionType: webapp\n", "interactive"},
+		{"an unknown session type", "application:\n  name: a\nruntime:\n  interactive: true\n  sessionType: rstudio\n", "/runtime/sessionType"},
 		{"an unknown compute type", "application:\n  name: a\nruntime:\n  computeTypes: [ecs]\n", "/runtime/computeTypes/0"},
 		{"a bad ORCID", "application:\n  name: a\n  maintainers:\n    - name: b\n      orcid: 1234\n", "/application/maintainers/0/orcid"},
 		{"a bad media type", "application:\n  name: a\ninputs:\n  - name: x\n    mediaTypes: [parquet]\n", "/inputs/0/mediaTypes/0"},
@@ -161,6 +165,7 @@ func TestVariantsAndBuildAreValid(t *testing.T) {
 		"a 32-character id":                                 variantsYML("  - id: abcdefghijklmnopqrstuvwxyz012345\n"),
 		"eight variants":                                    variantsYML("  - id: a\n  - id: b\n  - id: c\n  - id: d\n  - id: e\n  - id: f\n  - id: g\n  - id: h\n"),
 		"a top-level build, no variants":                    "application:\n  name: a\nbuild:\n  args: { A_1: x }\n  target: runtime\n  dockerfile: ./Dockerfile\n",
+		"a web app session, which has no kernel":            "application:\n  name: a\nruntime:\n  interactive: true\n  sessionType: webapp\n",
 		"a notebook app with variants":                      "application:\n  name: a\nruntime:\n  interactive: true\n  sessionType: jupyter\n  kernel: python\nvariants:\n  - id: cpu\n  - id: gpu\n    runtime: { computeTypes: [gpu] }\n",
 	}
 	for name, yml := range cases {

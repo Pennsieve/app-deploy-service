@@ -42,8 +42,9 @@ type appConfig struct {
 		// get the LLM proxy sidecar (opt-in).
 		LLM bool `yaml:"llm"`
 		// Interactive: a human-in-the-loop app, run as a live session of
-		// SessionType ("jupyter" is a notebook); Kernel is a Jupyter
-		// session's language ("python", "r").
+		// SessionType ("jupyter" is a notebook, "webapp" a web page the app
+		// serves itself); Kernel is a Jupyter session's language ("python",
+		// "r").
 		Interactive bool   `yaml:"interactive"`
 		SessionType string `yaml:"sessionType"`
 		Kernel      string `yaml:"kernel"`
